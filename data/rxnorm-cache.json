@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "source": "NLM RxNav REST API (rxcui.json?name=...&search=2), fetched once on 2026-11-06 and cached; seeding works offline from this file.",
+    "note": "RxCUIs are ingredient level (TTY IN, or PIN for the hydroxyzine salts). Release forms (ER, SR, XL) share the ingredient RxCUI. TODO: source needed for dose-form level RxCUIs if form-specific matching is required."
+  },
+  "entries": {
+    "fluoxetine": { "rxcui": "4493", "tty": "IN" },
+    "sertraline": { "rxcui": "36437", "tty": "IN" },
+    "escitalopram": { "rxcui": "321988", "tty": "IN" },
+    "citalopram": { "rxcui": "2556", "tty": "IN" },
+    "paroxetine": { "rxcui": "32937", "tty": "IN" },
+    "venlafaxine_er": { "rxcui": "39786", "tty": "IN" },
+    "desvenlafaxine": { "rxcui": "734064", "tty": "IN" },
+    "duloxetine": { "rxcui": "72625", "tty": "IN" },
+    "bupropion_sr": { "rxcui": "42347", "tty": "IN" },
+    "bupropion_xl": { "rxcui": "42347", "tty": "IN" },
+    "trazodone": { "rxcui": "10737", "tty": "IN" },
+    "mirtazapine": { "rxcui": "15996", "tty": "IN" },
+    "buspirone": { "rxcui": "1827", "tty": "IN" },
+    "hydroxyzine_hcl": { "rxcui": "154987", "tty": "PIN" },
+    "hydroxyzine_pamoate": { "rxcui": "203182", "tty": "PIN" },
+    "alprazolam": { "rxcui": "596", "tty": "IN" },
+    "lisdexamfetamine": { "rxcui": "700810", "tty": "IN" }
+  }
+}
