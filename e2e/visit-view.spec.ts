@@ -167,6 +167,10 @@ test("book visit: records the visit and the patient sees follow-up needed", asyn
   await panel.getByRole("button", { name: "Book visit", exact: true }).click();
   await expect(panel).toHaveAttribute("data-review-state", "decided");
   await expect(page.getByTestId("visit-history-item")).toContainText("2030-01-15");
+  // One DOM element per source id (the booked visit is both a renewal event and a patient visit).
+  const ids = await page.locator("[id^='src-']").evaluateAll((els) => els.map((e) => e.id));
+  expect(ids.length).toBeGreaterThan(0);
+  expect(new Set(ids).size).toBe(ids.length);
   await loginAs(context, "patient", p.patientId);
   await page.goto(`/patient/renew/${bookId}/result`);
   await expect(page.getByTestId("renewal-result")).toHaveAttribute(

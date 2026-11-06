@@ -144,10 +144,15 @@ unidentified medications never reach the model (tested with a spy client).
 
 What the server guarantees, and what it does not. Guaranteed: (1) every shown line cites an id the
 server supplied (id membership only); (2) a deterministic deny-list drops any line with
-recommendation, reassurance or approval wording (approve, recommend, safe, low risk, eligible, ok to
-renew, no concerns and variants with spacing, homoglyphs and fullwidth forms), and for escalated
+recommendation, reassurance or approval wording (approve, recommend, safe, clear, cleared, low risk, eligible, ok to
+renew, no concerns, no red flags, green light, unremarkable and similar phrases, plus approval stems
+in Spanish, French, German and Portuguese/Italian), and for escalated
 renewals any line asserting an absence of risk; dropped lines are counted and shown as "N lines
-removed"; (3) source text reaches the model as one JSON array with control and format characters
+removed". The matcher folds accents and combining marks (NFD then NFKC), format characters,
+fullwidth and math-alphanumeric forms, spacing and zero-width splits, and a table of Cyrillic, Greek,
+small-capital and leetspeak lookalikes. It over-blocks on purpose (for example any use of "clear")
+and is a heuristic that is not exhaustive: other scripts, rare lookalikes, paraphrases and other
+languages can still pass. (3) source text reaches the model as one JSON array with control and format characters
 removed and every bracket replaced, and source ids must be plain `[A-Za-z0-9_-]` tokens. NOT
 guaranteed: a cited line's claims are not verified against the text of its source, so a misleading
 sentence that avoids the deny-list can still be shown under a real id; the deny-list is a heuristic

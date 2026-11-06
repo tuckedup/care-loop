@@ -40,7 +40,10 @@ export function buildSummarySources(data: VisitData): SummarySource[] {
       text: `Visit note ${n.noteId} signed for visit ${n.visitId}.`,
     });
   }
-  return out;
+  // One source record per id (first wins): a VisitBooked event can appear both in the renewal's
+  // own stream and in the patient-wide visit query.
+  const seen = new Set<string>();
+  return out.filter((src) => (seen.has(src.id) ? false : (seen.add(src.id), true)));
 }
 
 /** Same positive AI gate input the decision pipeline uses; null when it cannot be built. */

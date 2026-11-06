@@ -137,6 +137,7 @@ export default async function VisitPage({
   const requestedRx = row.prescriptionId;
   const active = data.meds.filter((m) => m.status === "active");
   const stopped = data.meds.filter((m) => m.status === "stopped");
+  const eventIds = new Set(data.events.map((e) => e.id));
   const signals = data.events.flatMap((e) =>
     e.event.type === "RiskSignalsExtracted" ? e.event.data.signals : [],
   );
@@ -374,7 +375,11 @@ export default async function VisitPage({
         ) : (
           <ul className="text-sm">
             {data.visits.map((v) => (
-              <li key={v.visitId} id={anchorId(v.eventId)} data-testid="visit-history-item">
+              <li
+                key={v.visitId}
+                id={eventIds.has(v.eventId) ? undefined : anchorId(v.eventId)}
+                data-testid="visit-history-item"
+              >
                 Visit {v.visitId}: {fmt(v.start)} to {fmt(v.end)}
                 {data.notes
                   .filter((n) => n.visitId === v.visitId)

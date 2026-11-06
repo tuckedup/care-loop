@@ -126,69 +126,169 @@ export function buildSummaryPrompt(sources: readonly SummarySource[]): {
 
 // ---------------------------------------------------------------------------------------------
 // Deterministic deny-list. A summary describes facts; it never recommends, reassures or approves.
+// HEURISTIC and NOT exhaustive: it folds accents/combining marks, compatibility forms (fullwidth,
+// math alphanumerics, via NFKC), format characters, and a table of Cyrillic / Greek / small-capital
+// / leetspeak lookalikes, then matches stems and phrases (English plus a few common other-language
+// forms). Over-blocking benign text (for example the word "clear") is accepted: fail safe.
 
-const HOMOGLYPHS: Record<string, string> = {
+/** Lookalike -> ASCII. Keys are single code points; applied AFTER lowercasing. */
+const LOOKALIKES: Record<string, string> = {
+  // Cyrillic
   а: "a",
+  в: "b",
   е: "e",
+  к: "k",
+  м: "m",
+  н: "h",
   о: "o",
   р: "p",
   с: "c",
+  т: "t",
+  у: "y",
   х: "x",
   і: "i",
-  у: "y",
-  к: "k",
-  ο: "o",
+  ѕ: "s",
+  ј: "j",
+  ѵ: "v",
+  ԁ: "d",
+  һ: "h",
+  г: "r",
+  и: "u",
+  з: "e",
+  б: "b",
+  // Greek
   α: "a",
+  β: "b",
   ε: "e",
+  ι: "i",
+  κ: "k",
+  ν: "v",
+  ο: "o",
+  ρ: "p",
+  τ: "t",
+  υ: "u",
+  χ: "x",
+  ς: "s",
+  σ: "o",
+  η: "n",
+  ω: "w",
+  // Small capitals and other Latin lookalikes
+  ᴀ: "a",
+  ʙ: "b",
+  ᴄ: "c",
+  ᴅ: "d",
+  ᴇ: "e",
+  ꜰ: "f",
+  ɢ: "g",
+  ʜ: "h",
+  ɪ: "i",
+  ᴊ: "j",
+  ᴋ: "k",
+  ʟ: "l",
+  ᴍ: "m",
+  ɴ: "n",
+  ᴏ: "o",
+  ᴘ: "p",
+  ʀ: "r",
+  ꜱ: "s",
+  ᴛ: "t",
+  ᴜ: "u",
+  ᴠ: "v",
+  ᴡ: "w",
+  ʏ: "y",
+  ᴢ: "z",
+  ø: "o",
+  ł: "l",
+  đ: "d",
+  ı: "i",
+  ɑ: "a",
+  ɡ: "g",
+  æ: "ae",
+  œ: "oe",
+  ß: "ss",
+  // Leetspeak
   "0": "o",
   "3": "e",
   "4": "a",
   "5": "s",
+  "7": "t",
   "@": "a",
   $: "s",
 };
 
-/** Lowercase, NFKC, strip format chars, fold common homoglyphs and leetspeak digits. */
+/**
+ * NFD, drop combining marks, NFKC, drop format characters, lowercase, then fold lookalikes.
+ * "1" is ambiguous ("i" or "l"), so callers check both readings.
+ */
 function foldForMatching(text: string, oneAs: "i" | "l"): string {
   const base = text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .normalize("NFKC")
     .replace(/\p{Cf}/gu, "")
     .toLowerCase();
-  return [...base].map((c) => (c === "1" ? oneAs : (HOMOGLYPHS[c] ?? c))).join("");
+  return [...base].map((c) => (c === "1" ? oneAs : (LOOKALIKES[c] ?? c))).join("");
 }
 
 // Word-level patterns, run on text where every non-letter run is a single space.
 const FORBIDDEN_WORDS: RegExp[] = [
+  // approval / recommendation (English, Spanish, French, German, Portuguese/Italian stems)
   /\bapprov\w*/,
+  /\baprob\w*/,
+  /\baprueb\w*/,
+  /\bapprouv\w*/,
+  /\bgenehmig\w*/,
+  /\bautori[sz]\w*/,
+  /\bauthori[sz]\w*/,
   /\brecommend\w*/,
   /\bsafe\w*/,
-  /\blow risk\b/,
-  /\bminimal risk\b/,
-  /\bno risk\b/,
-  /\bnot at risk\b/,
   /\beligib\w*/,
   /\bauto\b/,
   /\bautomatic\w*/,
-  /\bcleared?\b/,
-  /\bok(?:ay)? to\b/,
-  /\bcan be renewed\b/,
-  /\b(?:should|may|can|could) (?:be )?(?:renew|refill|continu)\w*/,
-  /\bgo ahead\b/,
+  /\bclear(?:ed)?\b/,
   /\bproceed\w*/,
-  /\bno (?:further )?concerns?\b/,
-  /\bnothing (?:of )?concern\w*/,
-  /\bnot concerning\b/,
-  /\bunconcerning\b/,
-  /\breassur\w*/,
+  /\bgo ahead\b/,
+  /\bgreen light\b/,
   /\bwarrant\w*/,
   /\bappropriate\b/,
-  /\bfine to\b/,
   /\bsuitable\b/,
-  /\bgood to\b/,
+  /\bgood (?:to|candidate)\b/,
+  /\bfine (?:to|for)\b/,
+  /\bok(?:ay)? (?:to|for)\b/,
+  /\bclinically fine\b/,
+  /\blooks? (?:fine|good|ok|okay)\b/,
+  /\bcan be renewed\b/,
+  /\b(?:should|may|can|could) (?:be )?(?:renew|refill|continu)\w*/,
+  /\brenew(?:al|ed)? as requested\b/,
+  /\broutine renewal\b/,
+  // low / absent risk and concern
+  /\b(?:low|minimal|minor|no) risk\b/,
+  /\bnot (?:at )?(?:a )?risk\b/,
+  /\brisk (?:level )?(?:is |was |appears |seems )?(?:low|minimal|minor)\b/,
+  /\bno risk signals?\b/,
+  /\brisk signals? (?:are |is )?(?:absent|none|not present)\b/,
+  /\bno (?:further |acute |significant |immediate |major )?concerns?\b/,
+  /\b(?:low|minimal|minor) concerns?\b/,
+  /\bnothing (?:of )?concern\w*/,
+  /\bnothing (?:to worry|alarming)\b/,
+  /\bno worr(?:y|ies)\b/,
+  /\bno red flags?\b/,
+  /\bno escalation\b/,
+  /\bnot concerning\b/,
+  /\bunconcerning\b/,
+  /\bunremarkable\b/,
+  /\breassur\w*/,
 ];
 // Spacing / obfuscation variants: letters only, every separator removed.
 const FORBIDDEN_SQUEEZED = [
   "approv",
+  "aprob",
+  "aprueb",
+  "genehmig",
+  "autoris",
+  "autoriz",
+  "authoris",
+  "authoriz",
   "recommend",
   "lowrisk",
   "minimalrisk",
@@ -200,16 +300,41 @@ const FORBIDDEN_SQUEEZED = [
   "eligib",
   "oktorenew",
   "okaytorenew",
+  "okforrefill",
+  "okayforrefill",
   "canberenewed",
   "safeto",
   "issafe",
   "reassur",
   "goahead",
+  "greenlight",
   "clearedto",
+  "cleared",
+  "proceed",
+  "allclear",
+  "nothingtoworry",
+  "noworr",
+  "noredflag",
+  "clinicallyfine",
+  "unremarkable",
+  "lowconcern",
+  "minimalconcern",
+  "riskislow",
+  "risklevellow",
+  "looksfine",
+  "fineforrenewal",
+  "goodcandidate",
+  "nothingalarming",
+  "noacuteconcern",
+  "noescalation",
+  "routinerenewal",
+  "renewasrequested",
+  "risksignalsareabsent",
 ];
 // Absence-of-risk assertions (enforced for escalated renewals).
 const ABSENCE_OF_RISK: RegExp[] = [
   /\b(?:no|not|denies|denied|denying|without|absent|absence|negative for|free of|none|never)\b.{0,50}\b(?:risk|suicid\w*|ideation|self harm|harm|thoughts?|plan|intent)\b/,
+  /\b(?:denies|denied|denying|no|negative for|without|neg)\s+(?:si|sh|hi|svi)\b/,
 ];
 
 export function isForbiddenSummaryLine(text: string, opts: { escalated: boolean }): boolean {
