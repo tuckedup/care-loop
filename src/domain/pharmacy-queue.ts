@@ -91,7 +91,7 @@ export interface ReviewFacts {
 export type TransmitCheck = { ok: true } | { ok: false; reason: string };
 
 /**
- * `renewal` is the renewal stream, `patient` the patient stream, `review` the folded review
+ * `renewal` is the renewal stream, `patient` the prescription (rx-*) stream, `review` the folded review
  * state. Every failure is a refusal (fail closed); the caller must dead-letter, never retry.
  */
 export function checkTransmittable(
@@ -136,7 +136,10 @@ export function checkTransmittable(
   }
 
   const med = patient.find(
-    (e) => e.type === "MedicationPrescribed" && e.data.prescriptionId === facts.prescriptionId,
+    (e) =>
+      e.type === "MedicationPrescribed" &&
+      e.data.prescriptionId === facts.prescriptionId &&
+      e.data.patientId === requested.data.patientId,
   );
   if (!med || med.type !== "MedicationPrescribed") return no("medication not found");
   if (med.data.controlledSchedule !== null) return no("controlled substance");

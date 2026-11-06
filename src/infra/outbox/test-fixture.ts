@@ -50,6 +50,10 @@ export async function readyRenewal(sql: Sql, o: ScenarioOptions = {}) {
       lastName: "Synthetic",
       dateOfBirth: "1990-05-17",
     }),
+  );
+  await push(
+    sql,
+    `rx-${prescriptionId}`,
     ev("MedicationPrescribed", {
       prescriptionId,
       patientId,

@@ -12,7 +12,7 @@ import { replay } from "@/domain/aggregate";
 import { loadStream } from "@/domain/aggregate-handler";
 import { type DomainEvent } from "@/domain/events";
 import { checkTransmittable } from "@/domain/pharmacy-queue";
-import { patientStreamId } from "@/domain/patient/patient";
+import { rxStreamId } from "@/domain/patient/patient";
 import { renewalStreamId } from "@/domain/renewal/renewal";
 import { reviewAggregate } from "@/domain/renewal/review";
 import { OUTBOX_PAYLOADS } from "./messages";
@@ -56,11 +56,8 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
     if (!requested || requested.type !== "RenewalRequested") {
       throw new NonRetryableError("REFUSED: renewal was never requested");
     }
-    const { events: patient } = await loadStream(
-      deps.sql,
-      patientStreamId(requested.data.patientId),
-    );
-    const check = checkTransmittable(renewal, patient, facts, replay(reviewAggregate, renewal));
+    const { events: medication } = await loadStream(deps.sql, rxStreamId(facts.prescriptionId));
+    const check = checkTransmittable(renewal, medication, facts, replay(reviewAggregate, renewal));
     if (!check.ok) throw new NonRetryableError(`REFUSED: ${check.reason}`);
     const known = await deps.sql.unsafe(`SELECT 1 FROM pharmacies WHERE id = $1`, [
       facts.pharmacyId,
