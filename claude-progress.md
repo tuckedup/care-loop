@@ -189,3 +189,21 @@ Known / follow-ups (non-blocking):
 - Tripwire lexicon is a non-validated heuristic (TODO clinical review). Eval total is 46 cases; SPEC
   target of 60+ (>=25 risk) is still open (F064-F066).
 - Implementer choices needing confirmation are in docs/DECISIONS.md (REJECT outranks ESCALATE).
+
+## 2026-11-06 — Decision pipeline + clinician actions (F036, F037, F042) passing after 3 safety reviews
+
+Review 1 FAIL: REJECT swallowed other safety signals (unknown drug + item 9 + 'I want to die' => system
+denial, no escalation); P01 rewrote REJECT to ESCALATE so a clinician could approve a non-formulary drug.
+Review 2 FAIL: leading-decimal dose ('.50 mg' vs 50) passed; system denial appended to an escalated
+renewal. Review 3: no leak / approval path / recall loss across 1500 DB cross-product cases; only a
+wrong patient-facing status (rx_status regressed to 'evaluated' after a clinician denial) - fixed in
+608597a with a property test over all event orderings. No fourth full review on that status-only
+delta; flags flipped on that basis; orchestrator re-ran listed verification (green).
+
+Contract now in force: system denial only for purely administrative R01/R02 REJECT with no safety
+signal (tripwire/injection also run when AI is gated off); REJECT stays REJECT while RenewalEscalated
+is also emitted; Approve refused for R01/R02/R03/controlled/REJECT/follow-up; clinician id only from
+the session; the AI call needs allow-list gate + verified identity + P01 + P02. Accepted deviation:
+LLM extraction has no idempotency key (read-only inference; aggregate stores one result).
+Known gaps: patient_med_list halts on a schema-invalid MedicationPrescribed; cron catch-up evaluates
+only undecided renewals; check-in wiring (evaluateAfterCheckIn) done by the UI stream (0f334b1).

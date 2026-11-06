@@ -537,7 +537,7 @@
     "verification": [
       "pnpm test src/domain/renewal/decision.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F037",
@@ -552,7 +552,7 @@
     "verification": [
       "pnpm test src/domain/pipeline/controlled-never-ai.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F038",
@@ -627,7 +627,7 @@
     "verification": [
       "pnpm test src/domain/renewal/clinician-actions.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F043",
