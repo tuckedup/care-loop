@@ -1,6 +1,6 @@
 import { getSql } from "@/infra/db/client";
 import { isCronAuthorized } from "@/infra/outbox/cron-auth";
-import { createDefaultRegistry } from "@/infra/outbox/registry";
+import { createDefaultRegistry, pharmacyBaseUrl } from "@/infra/outbox/registry";
 import { mulberry32 } from "@/infra/outbox/rng";
 import { runOnce } from "@/infra/outbox/worker";
 
@@ -14,7 +14,10 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const seed = Number(process.env.SEED ?? 42);
     const stats = await runOnce(getSql(), {
-      registry: createDefaultRegistry(),
+      registry: createDefaultRegistry({
+        sql: getSql(),
+        baseUrl: pharmacyBaseUrl(new URL(request.url).origin),
+      }),
       rng: mulberry32(Number.isFinite(seed) ? seed : 42),
     });
     return Response.json({ ok: true, ...stats });

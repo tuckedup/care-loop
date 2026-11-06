@@ -4,6 +4,7 @@
 import type { Sql } from "postgres";
 import type { AuditContext } from "@/infra/audit";
 import { handleCommand } from "../aggregate-handler";
+import { handleCommandWithOutbox } from "../pharmacy-queue";
 import { renewalStreamId } from "../renewal/renewal";
 import {
   reviewAggregate,
@@ -55,7 +56,9 @@ export function approveRenewal(
     actorRole: actor.role,
     ...(input.autonomyMode ? { autonomyMode: input.autonomyMode } : {}),
   };
-  return handleCommand(
+  // F048: RenewalApproved + RxRenewalQueued + the pharmacy outbox row + the audit entry are one
+  // transaction.
+  return handleCommandWithOutbox(
     sql,
     reviewAggregate,
     renewalStreamId(input.renewalId),

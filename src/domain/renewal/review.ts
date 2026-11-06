@@ -20,6 +20,7 @@ import {
   type DomainEvent,
 } from "../events";
 import { invalidCommand } from "../patient/patient";
+import { rxIdempotencyKey, rxMessageId } from "../pharmacy-keys";
 
 const id = z.string().min(1).max(200);
 
@@ -130,6 +131,11 @@ export interface ReviewState {
   decision: Decision | null;
   decidedBy: "system" | "clinician" | null;
   visitIds: string[];
+  /** Additive (F048): from RenewalRequested / the latest PharmacySelected before a decision. */
+  prescriptionId: string | null;
+  pharmacyId: string | null;
+  /** An RxRenewalQueued is already on the stream (never queued twice). */
+  queued: boolean;
 }
 
 export const reviewInitialState: ReviewState = {
@@ -148,6 +154,9 @@ export const reviewInitialState: ReviewState = {
   decision: null,
   decidedBy: null,
   visitIds: [],
+  prescriptionId: null,
+  pharmacyId: null,
+  queued: false,
 };
 
 export function evolveReview(state: ReviewState, event: DomainEvent): ReviewState {
@@ -155,7 +164,17 @@ export function evolveReview(state: ReviewState, event: DomainEvent): ReviewStat
     case "RenewalRequested":
       return state.requested
         ? state
-        : { ...state, requested: true, patientId: event.data.patientId };
+        : {
+            ...state,
+            requested: true,
+            patientId: event.data.patientId,
+            prescriptionId: event.data.prescriptionId,
+          };
+    case "PharmacySelected":
+      // Fixed once a decision exists: what was approved is what gets sent.
+      return state.decision === null ? { ...state, pharmacyId: event.data.pharmacyId } : state;
+    case "RxRenewalQueued":
+      return { ...state, queued: true };
     case "IdentityVerified":
       return { ...state, identityVerified: true };
     case "CheckInSubmitted":
@@ -437,18 +456,37 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
       } else if (state.reviewerId !== null && state.reviewerId !== c.clinicianId) {
         throw new DomainError("REVIEWER_MISMATCH", "another clinician is reviewing this renewal");
       }
-      return [
-        {
-          type: "RenewalApproved",
-          data: {
-            v: 1,
-            renewalId: c.renewalId,
-            by: "clinician",
-            autonomyMode: c.autonomyMode,
-            clinicianId: c.clinicianId,
-          },
+      const approved: DomainEvent = {
+        type: "RenewalApproved",
+        data: {
+          v: 1,
+          renewalId: c.renewalId,
+          by: "clinician",
+          autonomyMode: c.autonomyMode,
+          clinicianId: c.clinicianId,
         },
-      ];
+      };
+      // F048: the approval and the queued transmission are ONE append (and the outbox row rides in
+      // the same transaction, see handleCommandWithOutbox). Every guard above already refused
+      // controlled / REJECT / blocked / follow-up renewals. Without a confirmed pharmacy nothing
+      // is queued (fail closed: never guess a pharmacy).
+      if (state.pharmacyId !== null && state.prescriptionId !== null && !state.queued) {
+        return [
+          approved,
+          {
+            type: "RxRenewalQueued",
+            data: {
+              v: 1,
+              renewalId: c.renewalId,
+              prescriptionId: state.prescriptionId,
+              idempotencyKey: rxIdempotencyKey(c.renewalId),
+              pharmacyId: state.pharmacyId,
+              messageId: rxMessageId(c.renewalId),
+            },
+          },
+        ];
+      }
+      return [approved];
     }
     case "Deny": {
       const c = parse(DenySchema, command);

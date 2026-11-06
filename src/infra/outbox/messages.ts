@@ -12,6 +12,14 @@ export const OUTBOX_PAYLOADS = {
     pharmacyId: z.string().regex(/^[0-9]{7}$/, "pharmacy id must be exactly 7 digits"),
     messageId: id,
   }),
+  /** Approved renewal sent to the pharmacy (SCRIPT-style RxRenewalResponse, F048). */
+  "pharmacy.RxRenewalResponse": z.object({
+    renewalId: id,
+    prescriptionId: id,
+    pharmacyId: z.string().regex(/^[0-9]{7}$/, "pharmacy id must be exactly 7 digits"),
+    messageId: id,
+    response: z.literal("Approved"),
+  }),
   "pharmacy.CancelRx": z.object({
     renewalId: id,
     prescriptionId: id,

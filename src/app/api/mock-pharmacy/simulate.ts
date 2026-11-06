@@ -8,7 +8,14 @@ import { hashString, mulberry32 } from "@/infra/outbox/rng";
 const id = z.string().min(1).max(200);
 const pharmacyId = z.string().regex(/^[0-9]{7}$/, "pharmacy id must be exactly 7 digits");
 
-const Common = { messageId: id, renewalId: id, prescriptionId: id, pharmacyId };
+const Common = {
+  messageId: id,
+  renewalId: id,
+  prescriptionId: id,
+  pharmacyId,
+  /** Optional 1-based delivery attempt (the outbox worker sends it); later attempts draw anew. */
+  attempt: z.number().int().min(1).max(100).optional(),
+};
 
 export const MockPharmacyRequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("NewRx"), ...Common }),
@@ -76,14 +83,26 @@ const ESCALATIONS = [
   "Pharmacist asks whether the patient's last fill date is correct.",
 ];
 
+/**
+ * Scripted scenarios for end-to-end tests (MOCK_PHARMACY_FORCE). They override the random draw:
+ * "retry-then-fill": attempt 1 answers a retryable error, later attempts Status OK + one RxFill.
+ * "escalation": Status OK + RxFill + a pharmacist escalation on the first delivery.
+ */
+export type ForcedScenario = "retry-then-fill" | "escalation";
+
 export function simulate(
   seed: number,
   req: MockPharmacyRequest,
   rates: SimulationRates = DEFAULT_RATES,
+  force?: ForcedScenario,
 ): Simulation {
-  const rng = mulberry32((seed ^ hashString(req.messageId)) >>> 0);
+  const attempt = req.attempt ?? 1;
+  const rng = mulberry32(
+    (seed ^ hashString(attempt > 1 ? `${req.messageId}#a${attempt}` : req.messageId)) >>> 0,
+  );
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rng() * xs.length)]!;
-  const mid = (suffix: string) => `${req.messageId}:${suffix}`;
+  const mid = (suffix: string) =>
+    `${req.messageId}:${suffix}${attempt > 1 && suffix === "error" ? `:a${attempt}` : ""}`;
   // Always draw the same number of values in the same order, so rates do not shift later draws.
   const rError = rng();
   const rDelay = rng();
@@ -92,6 +111,40 @@ export function simulate(
   const rDup = rng();
   const rCancel = rng();
   const rEsc = rng();
+
+  if (force && req.type !== "CancelRx") {
+    const status: PharmacyMessage = { type: "Status", messageId: mid("status"), status: "OK" };
+    const fill: PharmacyMessage = {
+      type: "RxFill",
+      messageId: mid("fill"),
+      renewalId: req.renewalId,
+      prescriptionId: req.prescriptionId,
+    };
+    if (force === "retry-then-fill" && attempt <= 1) {
+      return {
+        httpStatus: 503,
+        delayMs: 0,
+        messages: [
+          {
+            type: "Error",
+            messageId: mid("error"),
+            code: "PHARMACY_BUSY",
+            retryable: true,
+            description: "Pharmacy system busy, retry later",
+          },
+        ],
+      };
+    }
+    const messages: PharmacyMessage[] = [status, fill];
+    if (force === "escalation") {
+      messages.push({
+        type: "PharmacistEscalation",
+        messageId: mid("escalation"),
+        message: ESCALATIONS[0]!,
+      });
+    }
+    return { httpStatus: 200, delayMs: 0, messages };
+  }
 
   if (req.type === "CancelRx") {
     return {
