@@ -2,7 +2,10 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
+  boolean,
   check,
+  doublePrecision,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -62,3 +65,43 @@ export const projectionCheckpoints = pgTable("projection_checkpoints", {
     .default(sql`0`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Projection: medications per patient. A later prescription of the same drug (rxcui) for the same
+// patient supersedes the earlier one, which becomes "stopped"; dose_changed flags a dose differing
+// from the one it replaced. Rebuildable from the event log.
+export const patientMedList = pgTable(
+  "patient_med_list",
+  {
+    prescriptionId: text("prescription_id").primaryKey(),
+    patientId: text("patient_id").notNull(),
+    rxcui: text("rxcui").notNull(),
+    drugName: text("drug_name").notNull(),
+    doseMg: doublePrecision("dose_mg").notNull(),
+    frequency: jsonb("frequency").notNull(),
+    status: text("status").notNull(),
+    doseChanged: boolean("dose_changed").notNull().default(false),
+    prescribedAt: timestamp("prescribed_at", { withTimezone: true }).notNull(),
+    stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+    lastPosition: bigint("last_position", { mode: "bigint" }).notNull(),
+  },
+  (t) => [
+    index("patient_med_list_patient_idx").on(t.patientId),
+    check("patient_med_list_status_check", sql`${t.status} in ('active', 'stopped')`),
+  ],
+);
+
+// Projection: latest status per renewal (renewal id is the key; prescription id is carried).
+export const rxStatus = pgTable(
+  "rx_status",
+  {
+    renewalId: text("renewal_id").primaryKey(),
+    patientId: text("patient_id").notNull(),
+    prescriptionId: text("prescription_id").notNull(),
+    status: text("status").notNull(),
+    pharmacyStatus: text("pharmacy_status"),
+    lastEventType: text("last_event_type").notNull(),
+    lastPosition: bigint("last_position", { mode: "bigint" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("rx_status_prescription_idx").on(t.prescriptionId)],
+);

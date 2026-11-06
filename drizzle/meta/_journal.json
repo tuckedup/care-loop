@@ -36,6 +36,13 @@
       "when": 1793952412294,
       "tag": "0004_projection_checkpoints",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793952500577,
+      "tag": "0005_projections_med_list_rx_status",
+      "breakpoints": true
     }
   ]
 }
