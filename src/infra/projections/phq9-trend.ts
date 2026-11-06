@@ -57,12 +57,25 @@ export const phq9TrendProjection: Projection = {
       return;
     }
     const d = event.data;
-    const [req] = await tx.unsafe<{ data: { patientId?: string } }[]>(
-      `SELECT data FROM events WHERE stream_id = $1 AND type = 'RenewalRequested' AND data->>'renewalId' = $2
-       ORDER BY stream_version ASC LIMIT 1`,
-      [stored.streamId, renewalId],
+    // Only a RenewalRequested that passes the event schema (and names this renewal) counts; an
+    // invalid one leaves the check-in orphaned so a later valid request repairs it.
+    const reqs = await tx.unsafe<{ type: string; data: unknown }[]>(
+      `SELECT type, data FROM events WHERE stream_id = $1 AND type = 'RenewalRequested'
+       ORDER BY stream_version ASC`,
+      [stored.streamId],
     );
-    const patientId = typeof req?.data?.patientId === "string" ? req.data.patientId : null;
+    let patientId: string | null = null;
+    for (const r of reqs) {
+      try {
+        const parsed = parseEvent({ type: r.type, data: r.data });
+        if (parsed.type === "RenewalRequested" && parsed.data.renewalId === renewalId) {
+          patientId = parsed.data.patientId;
+          break;
+        }
+      } catch {
+        // invalid request: ignore it
+      }
+    }
     await tx.unsafe(
       `INSERT INTO phq9_trend (renewal_id, position, patient_id, orphan, recorded_at, phq9_total,
                                gad7_total, item9)

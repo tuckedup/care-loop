@@ -52,6 +52,7 @@ export const QUEUE_ANOMALY = {
   ESCALATED_AFTER_NON_CLINICIAN_DECISION: "ESCALATED_AFTER_NON_CLINICIAN_DECISION",
   INVALID_EVENT_FOR_RENEWAL: "INVALID_EVENT_FOR_RENEWAL",
   INVALID_REQUEST_EVENT: "INVALID_REQUEST_EVENT",
+  MISSING_REQUEST_EVENT: "MISSING_REQUEST_EVENT",
 } as const;
 
 /** Reason code the rules use (R13) for any LLM risk signal. */
@@ -215,8 +216,8 @@ export function reduceRenewalQueue(
     case "RenewalEscalated":
       return escalate(event.data.reasonCodes);
     case "ClinicianReviewStarted":
-      // A second review start never overwrites the clinician who already took the task.
-      return current.status === "requested"
+      // First reviewer only: a later review start never reassigns, even after a re-open.
+      return current.status === "requested" && current.clinicianId === null
         ? next({ status: "in-progress", clinicianId: event.data.clinicianId })
         : current;
     case "RenewalApproved": {
@@ -336,6 +337,18 @@ export function reduceInvalidRequest(
   meta: { position: bigint; at: string },
 ): RenewalQueueRow {
   if (current !== null) return reduceInvalidEvent(current, "RenewalRequested", meta)!;
+  return placeholderRow(renewalId, meta, QUEUE_ANOMALY.INVALID_REQUEST_EVENT);
+}
+
+/**
+ * Placeholder for a renewal whose RenewalRequested is invalid or absent: visible, open and
+ * escalated (fail closed), so no later event can make the renewal vanish or look finished.
+ */
+export function placeholderRow(
+  renewalId: string,
+  meta: { position: bigint; at: string },
+  code: string,
+): RenewalQueueRow {
   return {
     renewalId,
     patientId: null,
@@ -343,13 +356,13 @@ export function reduceInvalidRequest(
     status: "requested",
     outcome: null,
     escalated: true,
-    reasonCodes: [QUEUE_ANOMALY.INVALID_REQUEST_EVENT],
+    reasonCodes: [code],
     riskSignalCount: 0,
     clinicianId: null,
     decision: null,
     decidedBy: null,
     decisionClinicianId: null,
-    anomalies: [QUEUE_ANOMALY.INVALID_REQUEST_EVENT],
+    anomalies: [code],
     requestedAt: meta.at,
     updatedAt: meta.at,
     lastPosition: meta.position,
@@ -433,6 +446,8 @@ async function writeRow(tx: Db, next: RenewalQueueRow): Promise<void> {
      VALUES ($1, $2, $3, $4, $5, $6, $7::text::jsonb, $8, $9, $10, $11, $12,
              $13::timestamptz, $14::timestamptz, $15::bigint, $16::bigint, $17::text::jsonb)
      ON CONFLICT (renewal_id) DO UPDATE SET
+       patient_id = COALESCE(EXCLUDED.patient_id, renewal_queue.patient_id),
+       prescription_id = COALESCE(EXCLUDED.prescription_id, renewal_queue.prescription_id),
        status = EXCLUDED.status, outcome = EXCLUDED.outcome, escalated = EXCLUDED.escalated,
        reason_codes = EXCLUDED.reason_codes, risk_signal_count = EXCLUDED.risk_signal_count,
        clinician_id = EXCLUDED.clinician_id, decision = EXCLUDED.decision,
@@ -482,7 +497,11 @@ export const renewalQueueProjection: Projection = {
         const marked =
           stored.type === "RenewalRequested"
             ? reduceInvalidRequest(id, row, m)
-            : reduceInvalidEvent(row, stored.type, m);
+            : reduceInvalidEvent(
+                row ?? placeholderRow(id, m, QUEUE_ANOMALY.MISSING_REQUEST_EVENT),
+                stored.type,
+                m,
+              );
         if (marked) await writeRow(tx, marked);
       }
       return;
@@ -500,11 +519,15 @@ export const renewalQueueProjection: Projection = {
       );
       return;
     }
+    const meta = { position: stored.globalPosition, at: stored.createdAt.toISOString() };
     const current = await loadRow(tx, renewalId);
-    const next = reduceRenewalQueue(current, event, {
-      position: stored.globalPosition,
-      at: stored.createdAt.toISOString(),
-    });
+    // A renewal whose first event is not RenewalRequested must not lose its escalation (or look
+    // finished): start from an open, escalated placeholder, then apply the event to it.
+    const base =
+      current === null && event.type !== "RenewalRequested"
+        ? placeholderRow(renewalId, meta, QUEUE_ANOMALY.MISSING_REQUEST_EVENT)
+        : current;
+    const next = reduceRenewalQueue(base, event, meta);
     if (next === null || next === current) return;
     await writeRow(tx, next);
   },
