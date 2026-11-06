@@ -34,7 +34,8 @@ test("patient renews sertraline: renew -> verify -> check-in -> status", async (
   await fillCheckIn(page, { score: 0, pregnancy: "no" });
   await page.getByRole("button", { name: "Submit check-in" }).click();
 
-  // result: safe default, never auto-approved before the decision pipeline exists
+  // result: the pipeline ran; with no AI key the AI result is "failed" => ESCALATE (fail closed).
+  // Never approved without a clinician: the patient sees "under review".
   await expect(page).toHaveURL(/\/result$/);
   await expect(page.getByTestId("renewal-result")).toHaveAttribute(
     "data-result-state",
@@ -45,7 +46,8 @@ test("patient renews sertraline: renew -> verify -> check-in -> status", async (
   await page.getByRole("link", { name: "View renewal status" }).click();
   const item = page.getByTestId(`renewal-${renewalId}`);
   await expect(item).toContainText("sertraline");
-  await expect(item.getByTestId("renewal-status")).toHaveText("Under review");
+  await expect(item).toHaveAttribute("data-status", "escalated");
+  await expect(item.getByTestId("renewal-status")).toHaveText("Under review by your care team");
 
   // what actually happened in the event store
   const sql = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false, onnotice: () => {} });
@@ -56,15 +58,29 @@ test("patient renews sertraline: renew -> verify -> check-in -> status", async (
       "RenewalRequested",
       "IdentityVerified",
       "CheckInSubmitted",
+      // No RiskSignalsExtracted: failed AI with no local tripwire hit emits no signals event.
+      "EligibilityEvaluated",
+      "RenewalEscalated",
     ]);
+    expect(events.map((e) => e.type)).not.toContain("RenewalApproved");
     const audit = await sql<{ actor: string; role: string; action: string }[]>`
       SELECT actor, role, action FROM audit_log WHERE entity = ${"renewal-" + renewalId} ORDER BY seq`;
     expect(audit.map((a) => a.action)).toEqual([
       "patient:RequestRenewal",
       "patient:VerifyIdentity",
       "patient:SubmitCheckIn",
+      "system:RecordEvaluation",
     ]);
-    expect(audit.every((a) => a.actor === "patient-demo-001" && a.role === "patient")).toBe(true);
+    const patientRows = audit.slice(0, 3);
+    expect(patientRows.every((a) => a.actor === "patient-demo-001" && a.role === "patient")).toBe(
+      true,
+    );
+    // The evaluation is written by the pipeline, never attributed to the patient or a clinician.
+    expect(audit[3]).toMatchObject({ actor: "system:decision-pipeline", role: "system" });
+    const escalation = await sql<{ data: { reasonCodes: string[] } }[]>`
+      SELECT data FROM events WHERE stream_id = ${"renewal-" + renewalId}
+        AND type = 'RenewalEscalated'`;
+    expect(escalation[0]!.data.reasonCodes).toContain("LLM_FAILURE");
     expect(await verifyAuditChain(sql)).toMatchObject({ valid: true });
   } finally {
     await sql.end();
