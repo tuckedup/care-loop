@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write",
+        "hooks": [{ "type": "command",
+          "command": "node -e \"const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const f=(d.tool_input&&d.tool_input.file_path)||'';const base=f.split(/[\\\\\\\\/]/).pop()||'';if(/^\\.env(\\..+)?$/.test(base)&&base!=='.env.example'){console.error('Blocked: .env files are human-only (.env.example allowed)');process.exit(2)}process.exit(0)\"" }] },
+      { "matcher": "Bash",
+        "hooks": [{ "type": "command",
+          "command": "node -e \"const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const c=(d.tool_input&&d.tool_input.command)||'';if(/push --force|push -f|rm -rf \\/|DROP TABLE events|DELETE FROM events|UPDATE events/.test(c)){console.error('Blocked: destructive or append-only violation');process.exit(2)}process.exit(0)\"" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write",
+        "hooks": [{ "type": "command",
+          "command": "node -e \"const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const f=(d.tool_input&&d.tool_input.file_path)||'';if(/\\.(ts|tsx|js|jsx)$/.test(f)){const{spawnSync}=require('child_process');const cmd=process.platform==='win32'?'npx.cmd':'npx';try{spawnSync(cmd,['prettier','--write',f],{stdio:'ignore',shell:process.platform==='win32'})}catch(e){}}process.exit(0)\"" }] }
+    ]
+  }
+}

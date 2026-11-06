@@ -1,0 +1,9 @@
+minimumReleaseAgeExclude:
+  - "@anthropic-ai/sdk@1.6.0"
+  - "@playwright/test@1.65.0"
+  - playwright-core@1.65.0
+  - playwright@1.65.0
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

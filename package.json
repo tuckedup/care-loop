@@ -1,0 +1,56 @@
+{
+  "name": "care-loop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CareLoop: portfolio demo of an AI-assisted psychiatric prescription-renewal loop. All data is synthetic.",
+  "license": "MIT",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "eval": "vitest run --config vitest.eval.config.ts",
+    "eval:live": "cross-env EVAL_LIVE=1 vitest run --config vitest.eval.config.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:seed": "tsx scripts/db-seed.ts",
+    "projections:rebuild": "tsx scripts/projections-rebuild.ts",
+    "audit:verify": "tsx scripts/audit-verify.ts",
+    "outbox:work": "tsx scripts/outbox-work.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "drizzle-orm": "^0.45.4",
+    "next": "~15.5.29",
+    "postgres": "^3.4.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/postcss": "^4.3.4",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "cross-env": "^7.0.3",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "~15.5.29",
+    "prettier": "^3.9.10",
+    "tailwindcss": "^4.3.4",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

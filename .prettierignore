@@ -1,0 +1,15 @@
+.next
+node_modules
+pnpm-lock.yaml
+playwright-report
+test-results
+coverage
+drizzle
+.init
+feature_list.json
+evals/results
+evals/fixtures
+CLAUDE.md
+docs/SPEC.md
+docs/sources.md
+.claude
