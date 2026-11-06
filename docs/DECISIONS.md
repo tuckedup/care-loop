@@ -74,3 +74,35 @@ Reasons:
 
 - R07: PHQ-9 item 9 >= 1 escalates, more conservative than the KP >= 2 threshold (F025)
 - Hydroxyzine requests escalate until numeric limits are sourced (TODO: source needed)
+
+## ADR-003: R07 escalates on PHQ-9 item 9 >= 1 (not >= 2)
+
+Status: accepted (F025).
+
+### Context
+
+PHQ-9 item 9 asks about thoughts of being better off dead or of self-harm; each item is scored
+0-3. The Kaiser Permanente Washington PHQ-9 item 9 to C-SSRS workflow (listed in
+docs/sources.md) uses a threshold of item 9 >= 2 to trigger follow-up suicide-risk assessment.
+In that workflow a clinician-run assessment follows the screen. CareLoop is different: R07 is the
+only thing standing between a self-harm response and an automatic renewal, with no clinician in
+the loop on the AUTO_ELIGIBLE path. The Utah pilot escalation triggers in the clinical-rules
+skill include suicidality, and the standing guidance is "when in doubt, escalate".
+
+### Decision
+
+R07 escalates when PHQ-9 item 9 >= 1, so any non-zero answer ("several days" or more) goes to a
+clinician with reason code PHQ9_ITEM9_POSITIVE. This is deliberately more conservative than the
+KP >= 2 threshold. Missing, malformed or out-of-range PHQ-9 data also escalates (fail closed).
+The rule is a pure function in src/domain/rules; the LLM can add signals but can never lower
+or override this rule.
+
+### Consequences
+
+- More escalations than a >= 2 threshold would produce (lower specificity), accepted as the
+  cost of removing the unattended-renewal risk. Clinician workload impact is a metric to watch
+  on the dashboard.
+- Value 1 sits below the threshold used by the KP workflow, so results are not comparable to
+  KP's published escalation rates. TODO: source needed for any quantitative sensitivity claim.
+- The threshold is a code constant covered by boundary tests (0, 1, 2, 3); changing it
+  requires a new ADR and clinical-safety review.
