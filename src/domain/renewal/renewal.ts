@@ -28,6 +28,9 @@ export interface VerifyIdentity {
   expected: IdentityFactors;
 }
 
+export const SubmitCheckInSchema = eventSchemas.CheckInSubmitted.omit({ v: true });
+export type SubmitCheckIn = { type: "SubmitCheckIn" } & z.infer<typeof SubmitCheckInSchema>;
+
 export const normalizeName = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
 
 export function identityMatches(provided: IdentityFactors, expected: IdentityFactors): boolean {
@@ -46,7 +49,7 @@ export interface RenewalState {
   checkInSubmitted: boolean;
 }
 
-export type RenewalCommand = RequestRenewal | VerifyIdentity;
+export type RenewalCommand = RequestRenewal | VerifyIdentity | SubmitCheckIn;
 
 export const renewalInitialState: RenewalState = {
   status: "none",
@@ -100,6 +103,22 @@ export function decideRenewal(state: RenewalState, command: RenewalCommand): Dom
           data: { v: 1, renewalId: state.renewalId ?? command.renewalId, method: "dob_lastname" },
         },
       ];
+    }
+    case "SubmitCheckIn": {
+      const payload: Record<string, unknown> = { ...command };
+      delete payload.type;
+      const parsed = SubmitCheckInSchema.safeParse(payload);
+      if (!parsed.success) invalidCommand(parsed.error);
+      if (state.status === "none") {
+        throw new DomainError("RENEWAL_NOT_REQUESTED", "renewal has not been requested");
+      }
+      if (!state.identityVerified) {
+        throw new DomainError("IDENTITY_NOT_VERIFIED", "identity must be verified first");
+      }
+      if (state.checkInSubmitted) {
+        throw new DomainError("ALREADY_SUBMITTED", "check-in already submitted");
+      }
+      return [{ type: "CheckInSubmitted", data: { v: 1, ...parsed.data } }];
     }
   }
 }

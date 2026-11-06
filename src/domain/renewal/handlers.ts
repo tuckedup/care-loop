@@ -7,6 +7,7 @@ import {
   renewalAggregate,
   renewalStreamId,
   type IdentityFactors,
+  SubmitCheckInSchema,
   type RequestRenewal,
 } from "./renewal";
 
@@ -46,6 +47,28 @@ export async function verifyIdentity(
         lastName: registered.data.lastName,
       },
     },
+    ctx,
+  );
+}
+
+/**
+ * Server-side validation is the only trusted path: the raw (untrusted) body is parsed with Zod
+ * here and again inside decide.
+ */
+export async function submitCheckIn(sql: Sql, rawInput: unknown, ctx: AuditContext) {
+  const body = (rawInput ?? {}) as Record<string, unknown>;
+  const parsed = SubmitCheckInSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new DomainError(
+      "INVALID_COMMAND",
+      parsed.error.issues.map((i) => i.path.join(".") + ": " + i.message).join("; "),
+    );
+  }
+  return handleCommand(
+    sql,
+    renewalAggregate,
+    renewalStreamId(parsed.data.renewalId),
+    { type: "SubmitCheckIn", ...parsed.data },
     ctx,
   );
 }
