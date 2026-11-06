@@ -8,6 +8,7 @@ import { verifyAuditChain } from "../src/infra/audit";
 import { loginAsDemoPatient } from "./support/auth";
 import { fillCheckIn } from "./support/checkin";
 import { resetAndSeedDb } from "./support/db";
+import { confirmPharmacy } from "./support/pharmacy";
 
 test.beforeAll(async () => {
   await resetAndSeedDb();
@@ -29,7 +30,8 @@ test("patient renews sertraline: renew -> verify -> check-in -> status", async (
   await page.getByLabel("Date of birth").fill(DEMO_PATIENT_IDENTITY.dateOfBirth);
   await page.getByRole("button", { name: "Verify identity" }).click();
 
-  // check-in
+  // pharmacy (confirm-before-send; recorded on the renewal), then check-in
+  await confirmPharmacy(page);
   await expect(page.getByRole("heading", { name: "Check-in" })).toBeVisible();
   await fillCheckIn(page, { score: 0, pregnancy: "no" });
   await page.getByRole("button", { name: "Submit check-in" }).click();
@@ -57,6 +59,7 @@ test("patient renews sertraline: renew -> verify -> check-in -> status", async (
     expect(events.map((e) => e.type)).toEqual([
       "RenewalRequested",
       "IdentityVerified",
+      "PharmacySelected",
       "CheckInSubmitted",
       // No RiskSignalsExtracted: failed AI with no local tripwire hit emits no signals event.
       "EligibilityEvaluated",
@@ -68,15 +71,16 @@ test("patient renews sertraline: renew -> verify -> check-in -> status", async (
     expect(audit.map((a) => a.action)).toEqual([
       "patient:RequestRenewal",
       "patient:VerifyIdentity",
+      "patient:SelectPharmacy",
       "patient:SubmitCheckIn",
       "system:RecordEvaluation",
     ]);
-    const patientRows = audit.slice(0, 3);
+    const patientRows = audit.slice(0, 4);
     expect(patientRows.every((a) => a.actor === "patient-demo-001" && a.role === "patient")).toBe(
       true,
     );
     // The evaluation is written by the pipeline, never attributed to the patient or a clinician.
-    expect(audit[3]).toMatchObject({ actor: "system:decision-pipeline", role: "system" });
+    expect(audit[4]).toMatchObject({ actor: "system:decision-pipeline", role: "system" });
     const escalation = await sql<{ data: { reasonCodes: string[] } }[]>`
       SELECT data FROM events WHERE stream_id = ${"renewal-" + renewalId}
         AND type = 'RenewalEscalated'`;

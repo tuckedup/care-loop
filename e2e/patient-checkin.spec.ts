@@ -3,6 +3,7 @@ import { buildSeedPlan } from "../src/domain/seed";
 import { loginAsPatient } from "./support/auth";
 import { fillCheckIn } from "./support/checkin";
 import { E2E_SEED, resetAndSeedDb } from "./support/db";
+import { confirmPharmacy } from "./support/pharmacy";
 
 // Seeded patient with a prior PHQ-9 on file (escitalopram). Identity comes from the seed plan so
 // the test never hardcodes data the RNG owns.
@@ -31,6 +32,7 @@ async function toCheckIn() {
   await page.getByLabel("Last name").fill(patient.lastName);
   await page.getByLabel("Date of birth").fill(patient.dateOfBirth);
   await page.getByRole("button", { name: "Verify identity" }).click();
+  await confirmPharmacy(page);
   await expect(page.getByRole("heading", { name: "Check-in" })).toBeVisible();
 }
 

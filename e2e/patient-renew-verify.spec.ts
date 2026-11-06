@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { DEMO_PATIENT_IDENTITY } from "../src/domain/seed";
 import { loginAsDemoPatient, loginAsPatient } from "./support/auth";
 import { resetAndSeedDb } from "./support/db";
+import { confirmPharmacy } from "./support/pharmacy";
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async () => {
@@ -50,6 +51,7 @@ test("starting a renewal then verifying identity (mismatch, then match)", async 
   await page.getByLabel("Last name").fill(`  ${DEMO_PATIENT_IDENTITY.lastName.toLowerCase()} `);
   await page.getByLabel("Date of birth").fill(DEMO_PATIENT_IDENTITY.dateOfBirth);
   await page.getByRole("button", { name: "Verify identity" }).click();
+  await confirmPharmacy(page);
   await expect(page.getByRole("heading", { name: "Check-in" })).toBeVisible();
   await expect(page).toHaveURL(/\/check-in$/);
 

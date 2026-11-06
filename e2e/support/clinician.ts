@@ -4,6 +4,7 @@ import { expect } from "@playwright/test";
 import postgres from "postgres";
 import { SESSION_COOKIE, signSession, type Role } from "../../src/infra/auth/session";
 import { fillCheckIn } from "./checkin";
+import { confirmPharmacy } from "./pharmacy";
 
 export async function loginAs(context: BrowserContext, role: Role, sub: string) {
   await context.clearCookies();
@@ -43,6 +44,7 @@ export async function submitRenewalAsPatient(
   await page.getByLabel("Last name").fill(who.lastName);
   await page.getByLabel("Date of birth").fill(who.dateOfBirth);
   await page.getByRole("button", { name: "Verify identity" }).click();
+  await confirmPharmacy(page);
   await expect(page.getByRole("heading", { name: "Check-in" })).toBeVisible({ timeout: 30_000 });
   await fillCheckIn(page, { score: who.score ?? 0 });
   await page.getByRole("button", { name: "Submit check-in" }).click();

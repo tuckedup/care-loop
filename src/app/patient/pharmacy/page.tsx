@@ -1,5 +1,7 @@
-import { selectPharmacy, toPharmacyConfirmation, type Pharmacy } from "@/domain/pharmacy";
-import { requirePatient } from "../_lib/session";
+import { selectPharmacy, toPharmacyConfirmation } from "@/domain/pharmacy";
+import { listPharmacies } from "../_lib/pharmacy-service";
+import { loadRenewalForStep, requirePatient } from "../_lib/session";
+import { confirmRenewalPharmacyAction } from "./actions";
 
 const ERRORS: Record<string, string> = {
   INVALID_ID: "Please choose a pharmacy from the list.",
@@ -8,20 +10,21 @@ const ERRORS: Record<string, string> = {
 
 /**
  * Confirm-before-send step: choose a (fake, synthetic) pharmacy, then see its name, address and
- * phone and confirm. State lives in the URL; recording the selection in a renewal event needs an
- * event-schema change and is tracked separately (see the F047 deferral note).
+ * phone and confirm. With `?renewalId=` (the renewal flow, after identity verification and before
+ * the check-in) confirming records PharmacySelected on that renewal; without it the page is a
+ * read-only preview and nothing is recorded.
  */
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ pharmacyId?: string; confirmed?: string }>;
+  searchParams: Promise<{ pharmacyId?: string; confirmed?: string; renewalId?: string }>;
 }) {
-  const { sql } = await requirePatient();
-  const { pharmacyId, confirmed } = await searchParams;
-  const rows = await sql.unsafe<Pharmacy[]>(
-    `SELECT id, name, address, phone FROM pharmacies ORDER BY name, id`,
-  );
-  const pharmacies = [...rows];
+  const { pharmacyId, confirmed, renewalId } = await searchParams;
+  // In the renewal flow: must be the patient's own renewal, verified and not yet checked in.
+  const sql = renewalId
+    ? (await loadRenewalForStep(renewalId, "check-in")).sql
+    : (await requirePatient()).sql;
+  const pharmacies = await listPharmacies(sql);
   const selection = pharmacyId === undefined ? null : selectPharmacy(pharmacies, pharmacyId);
   const chosen = selection?.ok ? toPharmacyConfirmation(selection.pharmacy) : null;
 
@@ -42,7 +45,7 @@ export default async function Page({
         </p>
       ) : null}
 
-      {chosen && confirmed === "1" ? (
+      {chosen && confirmed === "1" && !renewalId ? (
         <section
           aria-labelledby="done-heading"
           data-testid="pharmacy-confirmed"
@@ -70,22 +73,34 @@ export default async function Page({
             <dt className="text-slate-600 dark:text-slate-400">Phone</dt>
             <dd data-testid="confirm-phone">{chosen.phone}</dd>
           </dl>
-          <form method="get" className="mt-4 flex flex-wrap gap-3">
+          <form
+            {...(renewalId ? { action: confirmRenewalPharmacyAction } : { method: "get" })}
+            className="mt-4 flex flex-wrap gap-3"
+          >
+            {renewalId ? <input type="hidden" name="renewalId" value={renewalId} /> : null}
             <input type="hidden" name="pharmacyId" value={chosen.pharmacyId} />
-            <input type="hidden" name="confirmed" value="1" />
+            {renewalId ? null : <input type="hidden" name="confirmed" value="1" />}
             <button
               type="submit"
               className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"
             >
               Confirm pharmacy
             </button>
-            <a href="/patient/pharmacy" className="px-2 py-2 text-sm underline">
+            <a
+              href={
+                renewalId
+                  ? `/patient/pharmacy?renewalId=${encodeURIComponent(renewalId)}`
+                  : "/patient/pharmacy"
+              }
+              className="px-2 py-2 text-sm underline"
+            >
               Choose a different pharmacy
             </a>
           </form>
         </section>
       ) : (
         <form method="get" className="mt-6">
+          {renewalId ? <input type="hidden" name="renewalId" value={renewalId} /> : null}
           <fieldset>
             <legend className="font-medium">Pharmacies</legend>
             <ul className="mt-3 flex flex-col gap-2">

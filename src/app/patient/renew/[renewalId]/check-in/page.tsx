@@ -1,10 +1,16 @@
+import { redirect } from "next/navigation";
+import { renewalHasPharmacy } from "../../../_lib/pharmacy-service";
 import { loadRenewalForStep } from "../../../_lib/session";
 import { submitCheckInAction } from "../actions";
 import { CheckInForm } from "./check-in-form";
 
 export default async function CheckInPage({ params }: { params: Promise<{ renewalId: string }> }) {
   const { renewalId } = await params;
-  const { renewal } = await loadRenewalForStep(renewalId, "check-in");
+  const { renewal, sql } = await loadRenewalForStep(renewalId, "check-in");
+  // The pharmacy is confirmed (and recorded) before the check-in.
+  if (!(await renewalHasPharmacy(sql, renewalId))) {
+    redirect(`/patient/pharmacy?renewalId=${encodeURIComponent(renewalId)}`);
+  }
   const action = submitCheckInAction.bind(null, renewalId);
 
   return (

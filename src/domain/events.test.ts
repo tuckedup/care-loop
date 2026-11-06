@@ -31,6 +31,14 @@ const valid: Record<EventType, unknown> = {
     prescriberId: "c1",
   },
   RenewalRequested: { v: 1, renewalId: "r1", patientId: "p1", prescriptionId: "rx1" },
+  PharmacySelected: {
+    v: 1,
+    renewalId: "r1",
+    pharmacyId: "1234567",
+    name: "Maple Street Pharmacy (synthetic #1)",
+    address: "100 Elm Street, Faketown, UT 84001",
+    phone: "(555) 010-0001",
+  },
   IdentityVerified: { v: 1, renewalId: "r1", method: "dob_lastname" },
   CheckInSubmitted: {
     v: 1,
@@ -67,19 +75,21 @@ const valid: Record<EventType, unknown> = {
   PharmacyStatusReceived: { v: 1, renewalId: "r1", messageId: "m2", status: "OK" },
   PharmacyErrorReceived: { v: 1, renewalId: "r1", messageId: "m3", code: "E1", retryable: true },
   RxFillReceived: { v: 1, renewalId: "r1", messageId: "m4" },
+  RxCancelAcknowledged: { v: 1, renewalId: "r1", messageId: "m6" },
   FollowUpRequired: { v: 1, renewalId: "r1", patientId: "p1", reason: "refill limit" },
   VisitBooked: { v: 1, visitId: "v1", patientId: "p1", start: T, end: "2026-01-02T03:34:05Z" },
   VisitNoteSigned: { v: 1, visitId: "v1", noteId: "n1", clinicianId: "c1" },
   CalendarSlotCreated: { v: 1, slotId: "s1", start: T, end: "2026-01-02T03:34:05Z" },
   FollowUpTaskCreated: { v: 1, taskId: "t1", patientId: "p1" },
   PharmacistEscalationReceived: { v: 1, renewalId: "r1", messageId: "m5", message: "call me" },
+  PharmacyAlertAcknowledged: { v: 1, renewalId: "r1", messageId: "m5", acknowledgedBy: "pharm1" },
   AuditSampleSelected: { v: 1, renewalId: "r1" },
   RetroReviewRecorded: { v: 1, renewalId: "r1", reviewerId: "c1", concur: true },
 };
 
 describe("event schemas v1 (F005)", () => {
   it("covers every SPEC section 3 event", () => {
-    const spec = [
+    const spec: string[] = [
       "PatientRegistered",
       "MedicationPrescribed",
       "RenewalRequested",
@@ -105,6 +115,8 @@ describe("event schemas v1 (F005)", () => {
       "AuditSampleSelected",
       "RetroReviewRecorded",
     ];
+    // Additive events beyond SPEC section 3 (F047, F049, F054).
+    spec.push("PharmacySelected", "RxCancelAcknowledged", "PharmacyAlertAcknowledged");
     expect([...EVENT_TYPES].sort()).toEqual([...spec].sort());
     expect(Object.keys(valid).sort()).toEqual([...spec].sort());
   });

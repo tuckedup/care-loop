@@ -10,6 +10,7 @@ const id = z.string().min(1).max(200);
 const isoDate = z.iso.date();
 const isoDateTime = z.iso.datetime({ offset: true });
 const v1 = z.literal(EVENT_VERSION);
+const pharmacyId = z.string().regex(/^[0-9]{7}$/, "pharmacy id must be exactly 7 digits");
 
 export const ControlledScheduleSchema = z.enum(["II", "III", "IV", "V"]);
 
@@ -98,6 +99,18 @@ const payloads = {
     patientId: id,
     prescriptionId: id,
   }),
+  /**
+   * Additive (F047): the pharmacy the patient confirmed before the check-in, with the name,
+   * address and phone they were shown (a snapshot of what was confirmed).
+   */
+  PharmacySelected: z.object({
+    v: v1,
+    renewalId: id,
+    pharmacyId,
+    name: z.string().min(1).max(200),
+    address: z.string().min(1).max(300),
+    phone: z.string().min(1).max(40),
+  }),
   IdentityVerified: z.object({
     v: v1,
     renewalId: id,
@@ -145,6 +158,9 @@ const payloads = {
     renewalId: id,
     prescriptionId: id,
     idempotencyKey: id,
+    /** Additive (F048): where and under which message id the outbox row will transmit it. */
+    pharmacyId: pharmacyId.optional(),
+    messageId: id.optional(),
   }),
   RxRenewalTransmitted: z.object({
     v: v1,
@@ -166,6 +182,8 @@ const payloads = {
     retryable: z.boolean(),
   }),
   RxFillReceived: z.object({ v: v1, renewalId: id, messageId: id }),
+  /** Additive (F049): the pharmacy acknowledged a CancelRx. */
+  RxCancelAcknowledged: z.object({ v: v1, renewalId: id, messageId: id }),
   FollowUpRequired: z.object({
     v: v1,
     renewalId: id,
@@ -200,6 +218,14 @@ const payloads = {
     renewalId: id,
     messageId: id,
     message: z.string().min(1).max(FREE_TEXT_MAX),
+  }),
+  /** Additive (F054): a pharmacist/admin acknowledged a pharmacy alert (escalation or error). */
+  PharmacyAlertAcknowledged: z.object({
+    v: v1,
+    renewalId: id,
+    /** The messageId of the PharmacistEscalationReceived / PharmacyErrorReceived acknowledged. */
+    messageId: id,
+    acknowledgedBy: id,
   }),
   AuditSampleSelected: z.object({ v: v1, renewalId: id }),
   RetroReviewRecorded: z.object({
