@@ -192,3 +192,28 @@ export const phq9Trend = pgTable(
   },
   (t) => [index("phq9_trend_patient_idx").on(t.patientId, t.position)],
 );
+
+// Transactional outbox (docs/SPEC.md section 7). Rows are inserted in the SAME transaction as the
+// events and audit entry that cause them; a worker claims them with FOR UPDATE SKIP LOCKED.
+// Unlike events/audit_log this table is mutable (status, attempts, lease): it is queue state.
+export const outbox = pgTable(
+  "outbox",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    type: text("type").notNull(),
+    payload: jsonb("payload").notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("outbox_claim_idx").on(t.status, t.nextAttemptAt),
+    check("outbox_status_check", sql`${t.status} in ('pending', 'processing', 'done', 'dead')`),
+    check("outbox_attempts_check", sql`${t.attempts} >= 0`),
+  ],
+);

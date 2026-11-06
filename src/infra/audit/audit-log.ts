@@ -3,6 +3,8 @@ import type { Sql } from "postgres";
 import { z } from "zod";
 import { insertEventsInTx } from "@/infra/event-store/store";
 import type { Db, ExpectedVersion, NewEvent, StoredEvent } from "@/infra/event-store/types";
+import { insertOutboxInTx, validateOutboxBatch } from "@/infra/outbox/enqueue";
+import type { OutboxMessageInput } from "@/infra/outbox/messages";
 import { canonicalJson } from "./canonical";
 
 export const GENESIS_HASH = "0".repeat(64);
@@ -133,8 +135,8 @@ export interface AppendResult {
 
 /**
  * THE write path for events: appends events and one audit entry in a single transaction.
- * A ConcurrencyError (or any failure) rolls back both. `alsoInTx` lets callers add same-transaction
- * writes such as outbox rows.
+ * A ConcurrencyError (or any failure) rolls back both. `outbox` messages are validated, then
+ * inserted in the same transaction. `alsoInTx` lets callers add other same-transaction writes.
  */
 export async function appendToStream(
   sql: Sql,
@@ -143,15 +145,23 @@ export async function appendToStream(
   events: readonly NewEvent[],
   ctx: AuditContext,
   alsoInTx?: (tx: Db, stored: StoredEvent[]) => Promise<void>,
+  outbox: readonly OutboxMessageInput[] = [],
 ): Promise<AppendResult> {
   if (events.length === 0) throw new Error("appendToStream requires at least one event");
+  // Validated before any write: a bad message type/payload/key never opens a transaction.
+  const outboxMessages = validateOutboxBatch(outbox);
   const { result, audit } = await auditedTransaction(sql, ctx, streamId, async (tx) => {
     const stored = await insertEventsInTx(tx, streamId, expectedVersion, events);
     if (alsoInTx) await alsoInTx(tx, stored);
+    // Same transaction as events + audit: a rollback leaves none of the three.
+    await insertOutboxInTx(tx, outboxMessages);
     return {
       result: stored,
       detail: {
         streamId,
+        ...(outboxMessages.length > 0
+          ? { outbox: outboxMessages.map((m) => ({ type: m.type, key: m.idempotencyKey })) }
+          : {}),
         events: stored.map((e) => ({
           type: e.type,
           streamVersion: e.streamVersion,
