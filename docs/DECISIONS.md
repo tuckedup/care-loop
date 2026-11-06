@@ -236,3 +236,34 @@ monitoring.
   such events in `projection_anomalies` instead.
 - A schema-invalid `RenewalRequested` with no readable `patientId` cannot be attributed to a patient, so
   P02 cannot detect it.
+
+## ADR: Pharmacy transmission, responses and inbox (F047-F054)
+
+- **Selection event.** The confirmed pharmacy is a new additive event `PharmacySelected` (id plus
+  the name/address/phone the patient was shown), appended after identity verification and before
+  the check-in. It is locked once the check-in exists. The check-in page and action redirect to the
+  pharmacy step while none is recorded.
+- **One append for approval.** `Approve` emits `RenewalApproved` and, when a pharmacy was confirmed,
+  `RxRenewalQueued` (deterministic idempotency key `rx-renewal:<renewalId>`, messageId
+  `rxmsg-<renewalId>`) in one append; `handleCommandWithOutbox` writes the
+  `pharmacy.RxRenewalResponse` outbox row in the same transaction as the events and audit entry.
+  Without a pharmacy nothing is queued (fail closed; never guess). Existing approval guards
+  (REJECT / R01-R03 / controlled / follow-up refused) are untouched.
+- **Transmit guard.** The handler re-derives approval, rules outcome, medication schedule (rx-*
+  stream) and the patient-confirmed pharmacy from the streams, and refuses (dead-letter) otherwise.
+  Controlled substances therefore cannot be transmitted even if queued.
+- **Idempotency.** Idempotency-Key header + body messageId; `RxRenewalTransmitted` is appended once
+  per key and only after a clean accepted answer; a settled message is never re-sent.
+- **Responses.** Status/Error/RxFill/CancelRx/PharmacistEscalation become events deduplicated on the
+  pharmacy messageId. Retryable errors throw a retryable error so the existing worker backoff
+  applies; non-retryable errors are recorded, dead-lettered and shown as alerts. RxFill requires a
+  queued renewal and is ignored after a cancel acknowledgement; `filled`/`cancelled` are terminal in
+  rx_status.
+- **Alerts.** Projection `pharmacy_alerts` (migration 0012) feeds /pharmacist/inbox (pharmacist and
+  admin) and a read-only /clinician/pharmacy-alerts. Acknowledging is the additive event
+  `PharmacyAlertAcknowledged`. Retryable errors are not alerts.
+- **Mock.** The request takes an optional `attempt` (later attempts draw anew); `MOCK_PHARMACY_FORCE`
+  (`retry-then-fill`, `escalation`) scripts scenarios for e2e. The mock is NOT a real e-prescribing
+  network; no EPCS. Data is synthetic.
+- **Known gaps.** A retryable error that exhausts 5 attempts dead-letters without a person-facing
+  alert (TODO). The patient result page maps pharmacy_error/cancelled to "under review".

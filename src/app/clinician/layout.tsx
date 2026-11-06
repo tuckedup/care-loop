@@ -14,6 +14,9 @@ export default async function ClinicianLayout({ children }: { children: ReactNod
         <Link href="/clinician/queue" className="underline">
           Renewal queue
         </Link>
+        <Link href="/clinician/pharmacy-alerts" className="underline">
+          Pharmacy alerts
+        </Link>
         <Link href="/login" className="ml-auto underline">
           Switch role (demo auth)
         </Link>
