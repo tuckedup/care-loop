@@ -37,3 +37,4 @@ pnpm-debug.log*
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 evals/results/live-latest.json
+.next-*/

@@ -223,3 +223,23 @@ Lessons / rules for future parallel agents:
   hookTimeout 60s, maxWorkers 4.
 - `prettier --write .` is safe now (protected files + generated evals/required-cases.json are in
   .prettierignore); eval case JSON was reformatted (pins hash parsed content, still current).
+
+## 2026-11-06 — F041 (cited AI summary) passing after three safety reviews
+
+Round 1 FAIL: patient free text could forge source lines in the prompt; no deny-list for approval /
+reassurance wording; fixture gate failed open; cache skipped the AI gate; anchor collisions.
+Round 2 FAIL: deny-list bypass via accents/Cyrillic lookalikes, mistyped /cleared?/ regex, duplicate
+source/DOM ids. Round 3: all structural guarantees held; only gap was the French stem `approuv`
+lacking a spaced variant (fixed in d91a931 with tests, plus 10 more reassurance phrases).
+Verified by the orchestrator: pnpm test src/ai src/app (420), eval 47, visit-summary + visit-view
+e2e in BOTH fixture modes (7 passed, 1 skipped each), typecheck, lint, format.
+
+Accepted heuristic limits (documented in MODEL_CARD): the deny-list is NOT exhaustive. The filter
+guarantees only id membership; claims are not verified against source text. Reviewer examples of
+phrasings that still pass: 'Seems fine overall', 'Doing great, no problems', 'Fully stable',
+'Everything is in order' (now blocked), etc. The banner + reason codes always render regardless of
+summary content.
+
+Infra: next.config.ts distDir is now configurable (NEXT_DIST_DIR) so concurrent dev servers/e2e runs
+can use separate build dirs (.next-<name>/, ignored by git/eslint/prettier). Use it with
+per-agent DATABASE_URL (…_e2e) and PORT.

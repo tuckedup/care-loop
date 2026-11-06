@@ -612,7 +612,7 @@
       "pnpm test src/ai/summarize.test.ts",
       "pnpm e2e e2e/visit-summary.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F042",
