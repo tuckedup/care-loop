@@ -53,6 +53,7 @@ export const QUEUE_ANOMALY = {
   INVALID_EVENT_FOR_RENEWAL: "INVALID_EVENT_FOR_RENEWAL",
   INVALID_REQUEST_EVENT: "INVALID_REQUEST_EVENT",
   MISSING_REQUEST_EVENT: "MISSING_REQUEST_EVENT",
+  APPROVAL_OF_REJECTED_RENEWAL: "APPROVAL_OF_REJECTED_RENEWAL",
 } as const;
 
 /** Reason code the rules use (R13) for any LLM risk signal. */
@@ -94,6 +95,9 @@ function gateApproval(
   current: RenewalQueueRow,
   data: { by: "system" | "clinician"; clinicianId?: string | undefined },
 ): Gate {
+  // Defence in depth: an approval never completes a renewal whose recorded eligibility outcome is
+  // REJECT (identity, formulary or controlled-substance class failures), whoever authored it.
+  if (current.outcome === "REJECT") return refuse(QUEUE_ANOMALY.APPROVAL_OF_REJECTED_RENEWAL);
   const escalated = isEscalated(current);
   if (data.by === "system") {
     return escalated

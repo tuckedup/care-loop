@@ -9,6 +9,7 @@
 import type { Sql } from "postgres";
 import { isAiPathPermitted } from "@/ai/ai-path-gate";
 import { runRiskExtraction, toRulesAiResult, type RunRiskDeps } from "@/ai/fail-closed";
+import { detectInjection } from "@/ai/injection";
 import { detectTripwire } from "@/ai/tripwire";
 import type { RiskTextInput } from "@/ai/types";
 import type { VerifiedSignal } from "@/ai/verify-quotes";
@@ -202,12 +203,12 @@ export async function evaluateRenewal(
     freeText: checkIn.data.freeText,
     sideEffects: checkIn.data.sideEffects.join("; "),
   };
-  // Local tripwire: pure deterministic code (not an LLM) that only ADDS escalation signals. It runs
+  // Local tripwire + injection scan: pure deterministic code (not an LLM) that only ADDS escalation signals. It runs
   // even when the AI path is blocked, so a safety phrase is never lost behind an admin REJECT.
   let localSignals: VerifiedSignal[] = [];
   const extraEscalationCodes: string[] = [];
   try {
-    localSignals = detectTripwire(text);
+    localSignals = [...detectTripwire(text), ...detectInjection(text)];
   } catch {
     extraEscalationCodes.push("LOCAL_SAFETY_SCAN_FAILED");
   }

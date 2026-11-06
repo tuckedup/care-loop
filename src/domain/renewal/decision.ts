@@ -93,6 +93,11 @@ export function doseInNameProblems(drugName: string, doseMg: number): string[] {
     problems.push("name contains non-ASCII digits or numerals");
   }
   if (NUMBER_WORDS.test(text)) problems.push("name contains a number written as a word");
+  // A '.' or ',' directly before a digit run that no digit precedes (".5", ",50", "-.5") is a
+  // leading-decimal / separator form whose value cannot be trusted: escalate, never read it as 5.
+  if (/(?<![0-9])[.,][0-9]/.test(text)) {
+    problems.push("name has a number starting with a decimal or thousands separator");
+  }
   const re = /\d[\d.,]*\d|\d/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {

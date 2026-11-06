@@ -123,6 +123,8 @@ export interface ReviewState {
   controlled: boolean;
   /** R01 / R02 / R03 failed: the renewal can be denied or followed up, never approved. */
   blocked: boolean;
+  /** Escalated by the pipeline-error marker (no evaluation yet); a clinician may still resolve it. */
+  pipelineError: boolean;
   /** Clinician from the FIRST ClinicianReviewStarted (never reassigned, like the queue). */
   reviewerId: string | null;
   decision: Decision | null;
@@ -141,6 +143,7 @@ export const reviewInitialState: ReviewState = {
   reasonCodes: [],
   controlled: false,
   blocked: false,
+  pipelineError: false,
   reviewerId: null,
   decision: null,
   decidedBy: null,
@@ -178,6 +181,7 @@ export function evolveReview(state: ReviewState, event: DomainEvent): ReviewStat
         ...state,
         escalated: true,
         reasonCodes: [...state.reasonCodes, ...event.data.reasonCodes],
+        pipelineError: state.pipelineError || event.data.reasonCodes.includes("PIPELINE_ERROR"),
         controlled: state.controlled || event.data.reasonCodes.includes("CONTROLLED_SUBSTANCE"),
       };
     case "ClinicianReviewStarted":
@@ -246,6 +250,7 @@ function decideRecordEvaluation(state: ReviewState, cmd: RecordEvaluation): Doma
   }
   // Idempotent on replay: a renewal is evaluated exactly once.
   if (state.evaluated) return [];
+  const alreadyDecided = state.decision !== null;
 
   const { renewalId, patientId, ai, evaluation } = c;
   const events: DomainEvent[] = [];
@@ -287,6 +292,9 @@ function decideRecordEvaluation(state: ReviewState, cmd: RecordEvaluation): Doma
   // integrity check, tripwire hit or AI signal anywhere. Anything else is seen by a person.
   const administrativeReject =
     evaluation.outcome === "REJECT" && !safetyFailure && aiSignals === 0 && !aiFailed && !forced;
+  // The facts are recorded either way. If a person already decided, or the renewal is already
+  // escalated, no further system decision (denial / follow-up) is ever emitted on top of it.
+  if (alreadyDecided) return events;
 
   // Escalation only ever ADDS: it is emitted for ESCALATE, any AI/tripwire signal, any AI failure,
   // a controlled substance, and for every REJECT that is not purely administrative.
@@ -313,6 +321,7 @@ function decideRecordEvaluation(state: ReviewState, cmd: RecordEvaluation): Doma
   }
   switch (evaluation.outcome) {
     case "REJECT":
+      if (state.escalated) return events; // recorded; a clinician resolves it
       events.push({
         type: "RenewalDenied",
         data: {
@@ -324,6 +333,7 @@ function decideRecordEvaluation(state: ReviewState, cmd: RecordEvaluation): Doma
       });
       return events;
     case "FOLLOW_UP_REQUIRED":
+      if (state.escalated) return events;
       events.push({
         type: "FollowUpRequired",
         data: {
@@ -347,10 +357,14 @@ function requireClinician(role: ActorRole, clinicianId: string): void {
   if (clinicianId.trim() === "") throw new DomainError("NOT_A_CLINICIAN", "clinician id required");
 }
 
-function requireOpen(state: ReviewState): void {
+/**
+ * `allowPipelineError`: a renewal escalated ONLY by the pipeline-error marker has no evaluation
+ * yet; a clinician may start review, deny or book a visit for it, but never approve it.
+ */
+function requireOpen(state: ReviewState, allowPipelineError = false): void {
   if (!state.requested)
     throw new DomainError("RENEWAL_NOT_REQUESTED", "renewal has not been requested");
-  if (!state.evaluated)
+  if (!state.evaluated && !(allowPipelineError && state.pipelineError))
     throw new DomainError("NOT_EVALUATED", "renewal has not been evaluated yet");
   if (state.decision !== null) throw new DomainError("ALREADY_DECIDED", "renewal already decided");
 }
@@ -387,7 +401,7 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
     case "StartReview": {
       const c = parse(StartReviewSchema, command);
       requireClinician(c.actorRole, c.clinicianId);
-      requireOpen(state);
+      requireOpen(state, true);
       if (state.reviewerId === c.clinicianId) return []; // idempotent
       if (state.reviewerId !== null) {
         throw new DomainError(
@@ -439,7 +453,7 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
     case "Deny": {
       const c = parse(DenySchema, command);
       requireClinician(c.actorRole, c.clinicianId);
-      requireOpen(state);
+      requireOpen(state, true);
       requireSameReviewer(state, c.clinicianId);
       return [
         {
@@ -460,7 +474,7 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
       if (!state.requested || state.patientId === null) {
         throw new DomainError("RENEWAL_NOT_REQUESTED", "renewal has not been requested");
       }
-      if (!state.evaluated)
+      if (!state.evaluated && !state.pipelineError)
         throw new DomainError("NOT_EVALUATED", "renewal has not been evaluated yet");
       if (Date.parse(c.end) <= Date.parse(c.start)) {
         throw new DomainError("INVALID_COMMAND", "visit end must be after start");

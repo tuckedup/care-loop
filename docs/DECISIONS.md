@@ -154,7 +154,7 @@ monitoring.
 ## ADR-0xx: Renewal decision pipeline and clinician actions (F036, F037, F042)
 
 - Status: accepted
-- Date: 2026-11-06
+- Date: 2026-11-06 (amended after two independent safety reviews)
 
 ### Decision
 
@@ -162,68 +162,71 @@ monitoring.
   `RiskSignalsExtracted`, `EligibilityEvaluated` and one of `RenewalEscalated`, `RenewalDenied{by:system}`,
   `FollowUpRequired` or nothing (AUTO_ELIGIBLE awaits a clinician; autonomy modes are F059). All of it is
   recorded by ONE `RecordEvaluation` command on the renewal stream, so the events are atomic and a second
-  evaluation decides nothing (idempotent). It never emits `RenewalApproved`.
-- The AI gate (`isAiPathAllowed` and `isAiPathPermitted`) is consulted before `runRiskExtraction`; a
-  blocked path records no `RiskSignalsExtracted` and calls no client. An AI failure or any signal adds an
-  escalation; it can never approve.
-- Medication name and dose both come from the prescribed order (`MedicationPrescribed`). A number in the
-  order's name text that differs from `dose.amountMg`, a missing order, or an order owned by another
-  patient fails a pipeline check `P01` (persisted next to the rule results) and forces ESCALATE
-  (`MEDICATION_IDENTITY_MISMATCH` / `ORDER_NOT_FOUND`), even over a REJECT. This closes the rules-review
-  follow-up (dose in the name was not compared with doseMg).
-- A REJECT whose failed rules include R03 (controlled substance) is escalated to a person instead of
-  being auto-denied. Reviewers can then only deny (approval of REJECT or controlled is refused).
+  evaluation decides nothing (idempotent). It never emits `RenewalApproved`. `evaluateRenewal` is called
+  by the patient check-in action (fail closed) and by the cron catch-up route `/api/cron/decisions`.
+- The AI gate (`isAiPathAllowed`, `isAiPathPermitted` and the P01 order-integrity check) is consulted
+  before `runRiskExtraction`; a blocked path calls no client. An AI failure or any signal adds an
+  escalation; the LLM can never approve.
+- Local safety scans are pure deterministic code (not an LLM): `detectTripwire` and `detectInjection` run
+  on the free text even when the AI path is blocked. Their signals are stored in `RiskSignalsExtracted`
+  (model `local-tripwire:<reason>`) and count as escalation signals (`LLM_RISK_SIGNAL`).
+- Medication name and dose both come from the prescribed order (`MedicationPrescribed`). P01 (order
+  integrity, persisted next to the rule results) fails for: a missing order, an order owned by another
+  patient, or a dose written in the name text that does not equal `dose.amountMg`. It compares only mass
+  units (mg, g, mcg/ug/micro-g, converted exactly) and reads a bare number as mg. Other units, ambiguous
+  separators ("1,5", "1.000"), a number that starts with "." or "," (".5"), non-ASCII digits and number
+  words are mismatches. P01 failing blocks the LLM call and forces an escalation
+  (`MEDICATION_IDENTITY_MISMATCH` / `ORDER_NOT_FOUND`).
+- The rules' outcome is never overwritten: a REJECT stays REJECT, and escalation is a separate fact
+  (`RenewalEscalated`). Approve is refused when the outcome is REJECT or any of R01/R02/R03 failed
+  (controlled substances give `CONTROLLED_NOT_APPROVABLE`); the clinician may still deny or book a visit.
+- A system denial (`RenewalDenied` by system) is emitted ONLY when the REJECT rests purely on
+  administrative failures (R01/R02) with no safety rule (R00, R04-R12, drug-specific), no integrity check
+  (P01/P02), no tripwire/injection hit and no AI signal or failure, AND the renewal is not already
+  escalated or decided. Otherwise a clinician sees it: `RenewalEscalated` carries the union of every
+  failed rule's reason codes plus `LLM_RISK_SIGNAL` / `LLM_FAILURE` where they apply. A blocked AI path
+  is reported as `AI_PATH_BLOCKED`, not as an LLM failure. Controlled drugs are always escalated, never
+  silently denied. When the renewal is already escalated (for example by the pipeline-error marker) the
+  REJECT is recorded in `EligibilityEvaluated` but no denial or follow-up is emitted on top of it.
+- P02 (refill counter integrity): a schema-invalid RenewalRequested / RenewalApproved / RenewalDenied /
+  CheckInSubmitted / VisitBooked / VisitNoteSigned in the patient's history makes the counter unknown
+  and forces an escalation (`REFILL_COUNT_UNKNOWN`). The counter is computed from events (not a
+  projection): approvals of the same patient and prescription after the patient's last signed visit
+  note (matched through `VisitBooked.patientId`) PLUS in-flight renewals of the same prescription (a
+  check-in after the last visit, neither approved nor denied, not the current one). Concurrent renewals
+  therefore each see the others and cannot all slip under the limit. This over-counts stuck, unresolved
+  renewals until a visit resets it: intended.
 - Clinician actions (`src/domain/renewal/review.ts`): the clinician id on every event is the session
   subject. Approve requires the same clinician's `ClinicianReviewStarted` on escalated renewals; Deny and
   BookVisit always require it (the renewal_queue attributes a denial only through the review start).
   `BookVisit` emits `VisitBooked` and a clinician `RenewalDenied` on the renewal stream (the queue only
   completes an escalated row through a clinician decision); after a system follow-up it emits only
   `VisitBooked`. `evolve` ignores events the queue would refuse (forged system approval, other
-  clinician's id) so a forged event cannot lock out the legitimate reviewer.
-- `RenewalDenied` gained optional `by` / `clinicianId`; `VisitBooked` gained optional `clinicianId` /
-  `renewalId` (additive, v1).
-- Renewals since the last visit are counted from events (approvals of the same patient and prescription
-  after the patient's last `VisitNoteSigned`, matched through `VisitBooked.patientId`), not from a
-  projection, because projections are read-only for this feature.
-
-### Known gaps
-
-- The seed's prior renewals have no `RenewalApproved`, so the seeded "refill-limit" patient counts 0 until
-  the seed emits approvals (TODO).
-- The LLM request has no idempotency-key parameter in `RiskLlmRequest`; replay safety comes from the
-  aggregate (one evaluation per renewal), not from the provider. TODO in src/ai.
-- Nothing calls `evaluateRenewal` after check-in yet except the cron catch-up route
-  (`/api/cron/decisions`); the patient check-in action should call it (outside this feature's files).
-- Verified/unverified quote flags and signal origin are not persisted (`RiskSignalsExtracted` has no
-  field for them).
-
-### Amendments after the independent safety review (F036/F037/F042)
-
-- A system denial (`RenewalDenied` by system) rests ONLY on purely administrative failures (R01/R02).
-  If any safety rule (R04-R12, drug-specific, R00), an integrity check (P01/P02), a local tripwire hit
-  or any AI signal/failure exists, a clinician sees the renewal: `RenewalEscalated` carries the union of
-  every failed rule's reason codes plus `LLM_RISK_SIGNAL` / `LLM_FAILURE` where they apply. A blocked AI
-  path is reported as `AI_PATH_BLOCKED`, not as an LLM failure.
-- The local tripwire (`detectTripwire`, pure deterministic code, not an LLM) runs even when the AI path
-  is blocked; its signals are stored in `RiskSignalsExtracted` with model `local-tripwire:<reason>`.
-- The rules' outcome is never overwritten: a REJECT stays REJECT and escalation is a separate fact.
-  Approve is refused when the outcome is REJECT or any of R01/R02/R03 failed (controlled substances give
-  `CONTROLLED_NOT_APPROVABLE`); the clinician may still deny or book a visit.
-- P01 (order integrity) compares only mass units (mg, g, mcg/ug/micro-g, converted exactly), reads a bare
-  number as mg, and treats other units, ambiguous separators ("1,5", "1.000"), non-ASCII digits and
-  number words as mismatches. P01 failing also blocks the LLM call.
-- P02 (refill counter integrity): a schema-invalid RenewalRequested / RenewalApproved / RenewalDenied /
-  CheckInSubmitted / VisitBooked / VisitNoteSigned in the patient's history makes the counter unknown
-  and forces an escalation (`REFILL_COUNT_UNKNOWN`). The counter counts approvals since the last signed
-  visit PLUS in-flight renewals of the same prescription (a check-in after the last visit, neither
-  approved nor denied, not the current one), so concurrent renewals each see the others and cannot all
-  slip under the limit. This over-counts stuck, unresolved renewals until a visit resets it: intended.
+  clinician's id) so a forged event cannot lock out the legitimate reviewer. A renewal escalated ONLY by
+  the pipeline-error marker (no evaluation yet) can be started, denied or booked by a clinician but
+  never approved until an `EligibilityEvaluated` exists.
 - The catch-up runner isolates each renewal, pages past failures with a cursor, and escalates a failing
   renewal with `RenewalEscalated{PIPELINE_ERROR}` (best effort); failure counts and opaque renewal ids
   are returned by the cron route and unmarkable failures are logged with a non-PHI code.
-- ACCEPTED DEVIATION (flag for the owner): the extraction call has no idempotency key because
-  `RiskLlmRequest` has none and `src/ai` is out of scope. The call is read-only inference with no
-  side effects and the aggregate stores one result per renewal, so a duplicate call is wasteful but
-  harmless. This departs from "every external call takes an idempotency key" for read-only LLM inference.
-- Observed outside this scope: the `patient_med_list` projection throws on a schema-invalid
-  `MedicationPrescribed` event, which halts that projection run.
+- Defence in depth in projections: `renewal_queue` refuses to complete a row whose recorded outcome is
+  REJECT on an approval (anomaly `APPROVAL_OF_REJECTED_RENEWAL`), and `rx_status` ignores a denial or
+  approval on an escalated renewal that has no earlier `ClinicianReviewStarted`, so the patient is never
+  shown a decision the queue refuses to honour.
+- `RenewalDenied` gained optional `by` / `clinicianId`; `VisitBooked` gained optional `clinicianId` /
+  `renewalId` (additive, v1).
+
+### Accepted deviation (flag for the owner)
+
+- The extraction call has no idempotency key because `RiskLlmRequest` has none and `src/ai` is out of
+  scope. The call is read-only inference with no side effects and the aggregate stores one result per
+  renewal, so a duplicate call is wasteful but harmless. This departs from "every external call takes an
+  idempotency key" for read-only LLM inference.
+
+### Known gaps
+
+- Verified/unverified quote flags and signal origin are not persisted (`RiskSignalsExtracted` has no
+  field for them).
+- The `patient_med_list` projection throws on a schema-invalid `MedicationPrescribed` event, which halts
+  that projection run (outside this feature's files).
+- A schema-invalid `RenewalRequested` with no readable `patientId` cannot be attributed to a patient, so
+  P02 cannot detect it.

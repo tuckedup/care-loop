@@ -145,6 +145,21 @@ export const rxStatusProjection: Projection = {
       [renewalId],
     );
     const current = existing ? toRxRow(existing) : null;
+    // The patient must never be told "approved" or "denied" by a decision the clinician queue
+    // refuses to honour: a decision on an escalated renewal with no ClinicianReviewStarted before it
+    // (a system denial, a forged approval) leaves the patient status unchanged.
+    if (event.type === "RenewalDenied" || event.type === "RenewalApproved") {
+      const [facts] = await tx.unsafe<{ esc: boolean; rev: boolean }[]>(
+        `SELECT
+           EXISTS (SELECT 1 FROM events WHERE stream_id = $1 AND global_position < $2::bigint
+                    AND (type = 'RenewalEscalated'
+                         OR (type = 'EligibilityEvaluated' AND data->>'outcome' = 'ESCALATE'))) AS esc,
+           EXISTS (SELECT 1 FROM events WHERE stream_id = $1 AND global_position < $2::bigint
+                    AND type = 'ClinicianReviewStarted') AS rev`,
+        [stored.streamId, stored.globalPosition.toString()],
+      );
+      if (facts?.esc && !facts.rev) return;
+    }
     const next = reduceRxStatus(current, event, {
       position: stored.globalPosition,
       at: stored.createdAt.toISOString(),
