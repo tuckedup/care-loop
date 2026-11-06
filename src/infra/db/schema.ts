@@ -9,6 +9,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -167,6 +168,12 @@ export const renewalQueue = pgTable(
     requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     lastPosition: bigint("last_position", { mode: "bigint" }).notNull(),
+    // Global position of RenewalRequested: immutable, used as the stable ordering tiebreaker.
+    requestPosition: bigint("request_position", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
+    // Codes such as SYSTEM_APPROVAL_ON_ESCALATED that a clinician must look at.
+    anomalies: jsonb("anomalies").notNull().default([]),
   },
   (t) => [
     index("renewal_queue_status_idx").on(t.status, t.requestedAt),
@@ -182,15 +189,36 @@ export const renewalQueue = pgTable(
 export const phq9Trend = pgTable(
   "phq9_trend",
   {
-    renewalId: text("renewal_id").primaryKey(),
-    patientId: text("patient_id").notNull(),
+    renewalId: text("renewal_id").notNull(),
+    // NULL + orphan=true when the check-in has no RenewalRequested yet (repaired when it arrives).
+    patientId: text("patient_id"),
+    orphan: boolean("orphan").notNull().default(false),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
     phq9Total: integer("phq9_total"),
     gad7Total: integer("gad7_total"),
     item9: integer("item9"),
     position: bigint("position", { mode: "bigint" }).notNull(),
   },
-  (t) => [index("phq9_trend_patient_idx").on(t.patientId, t.position)],
+  (t) => [
+    primaryKey({ columns: [t.renewalId, t.position] }),
+    index("phq9_trend_patient_idx").on(t.patientId, t.position),
+  ],
+);
+
+// Events a projection skipped (schema-invalid, or stream/renewal id mismatch). Rebuildable:
+// each projection clears its own rows on reset.
+export const projectionAnomalies = pgTable(
+  "projection_anomalies",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    projection: text("projection").notNull(),
+    eventPosition: bigint("event_position", { mode: "bigint" }).notNull(),
+    streamId: text("stream_id").notNull(),
+    eventType: text("event_type").notNull(),
+    code: text("code").notNull(),
+    detail: text("detail").notNull(),
+  },
+  (t) => [unique("projection_anomalies_unique").on(t.projection, t.eventPosition, t.code)],
 );
 
 // Transactional outbox (docs/SPEC.md section 7). Rows are inserted in the SAME transaction as the

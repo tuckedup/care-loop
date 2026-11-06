@@ -64,6 +64,13 @@
       "when": 1793954560650,
       "tag": "0008_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793960713561,
+      "tag": "0009_projection_safety",
+      "breakpoints": true
     }
   ]
 }
