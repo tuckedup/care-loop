@@ -292,7 +292,7 @@
     "verification": [
       "pnpm test src/domain/rules/scoring.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F021",
@@ -307,7 +307,7 @@
     "verification": [
       "pnpm test src/domain/rules/r01-r02.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F022",
@@ -322,7 +322,7 @@
     "verification": [
       "pnpm test src/domain/rules/r03-controlled.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F023",
@@ -337,7 +337,7 @@
     "verification": [
       "pnpm test src/domain/rules/r04-r05.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F024",
@@ -352,7 +352,7 @@
     "verification": [
       "pnpm test src/domain/rules/r06-refill-limit.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F025",
@@ -367,7 +367,7 @@
     "verification": [
       "pnpm test src/domain/rules/r07-item9.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F026",
@@ -382,7 +382,7 @@
     "verification": [
       "pnpm test src/domain/rules/r08-phq9-total.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F027",
@@ -397,7 +397,7 @@
     "verification": [
       "pnpm test src/domain/rules/r09-r12-structured.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F028",
@@ -412,7 +412,7 @@
     "verification": [
       "pnpm test src/domain/rules/drug-specific.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F029",
@@ -429,7 +429,7 @@
       "pnpm test src/domain/rules/evaluate.test.ts",
       "pnpm test src/domain/rules/purity.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F030",

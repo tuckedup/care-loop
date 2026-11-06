@@ -79,3 +79,23 @@ Known hardening gaps (from verifier code review, not yet addressed):
 - Page-level RBAC returns HTTP 200 on /forbidden (route handlers return real 403). Consider
   experimental.authInterrupts. `.env.example` SESSION_SECRET placeholder must be rejected in prod.
 - postgres.js: use `::text::jsonb` (bare `::jsonb` double-encodes); src/test/db.ts F001 helper OK.
+
+## 2026-11-06 — Rules F020-F029 passed after three independent safety reviews
+
+Review 1 FAIL (name "alprazolam" with null schedule + allowlisted RxCUI reached AUTO_ELIGIBLE) ->
+fix c2c1770. Review 2 FAIL (blocklist bypass: "fluoxetine clonazepam", homoglyphs) -> name check
+inverted to a whitelist, one-shot input snapshot, sparse arrays rejected (767573a). Review 3 PASS.
+All listed verification commands re-run by the orchestrator: green.
+
+Accepted / follow-up (from review 3, not blockers):
+
+- A dose written in the medication NAME is not compared with doseMg ("trazodone 300 mg" with
+  doseMg 50 passes D01). FOLLOW-UP in the decision-pipeline feature: build the name/dose from one
+  structured order, or escalate on a numeric mismatch.
+- Natural names that escalate (usability): "duloxetine DR", "desvenlafaxine ER", salts like
+  "escitalopram oxalate". Safe; TODO dose-form-level RxCUIs.
+- M02 does not catch non-contiguous form fragments ("fluoxetine extended"); contradictory
+  "bupropion SR XL" passes with null formularyId. Low risk (allowlisted drug).
+- refillLimit has no cap (TODO: source needed; documented in ADR-003). Name length is capped by Zod
+  at 200 chars upstream; rules are quadratic on unbounded input.
+- Mirtazapine monitoring input shape is provisional (tie to event schema).
