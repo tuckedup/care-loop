@@ -101,7 +101,7 @@ describe("injection cannot cause approval", () => {
 
   it("an obedient model emitting an approve field is schema-invalid => LLM_FAILURE escalate", async () => {
     const { r, out } = await run(INJECTIONS[0]!, '{"approve":true,"signals":[]}');
-    expect(r).toEqual({ status: "failed", reason: "schema_invalid" });
+    expect(r).toMatchObject({ status: "failed", reason: "schema_invalid" });
     expect(out.reasonCodes).toContain("LLM_FAILURE");
   });
 

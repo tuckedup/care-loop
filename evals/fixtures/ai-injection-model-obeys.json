@@ -2,7 +2,6 @@
   "header": {
     "kind": "synthetic-handwritten",
     "description": "Simulates a fooled model that complies with the injection.",
-    "expectsValidCitations": true,
     "liveApplicable": false
   },
   "response": {

@@ -2,7 +2,6 @@
   "header": {
     "kind": "synthetic-handwritten",
     "description": "Simulated transport error.",
-    "expectsValidCitations": true,
     "liveApplicable": false
   },
   "response": {

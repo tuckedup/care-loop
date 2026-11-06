@@ -15,8 +15,6 @@ export const AiFixtureSchema = z
       .object({
         kind: z.literal("synthetic-handwritten"),
         description: z.string().min(1),
-        /** false for fixtures that deliberately contain fabricated quotes (excluded from citation validity). */
-        expectsValidCitations: z.boolean(),
         /** false for fixtures that simulate transport failures or a fooled model; skipped in live mode. */
         liveApplicable: z.boolean(),
       })

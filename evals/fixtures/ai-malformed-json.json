@@ -2,7 +2,6 @@
   "header": {
     "kind": "synthetic-handwritten",
     "description": "Simulated non-JSON model output.",
-    "expectsValidCitations": true,
     "liveApplicable": false
   },
   "response": {

@@ -63,7 +63,8 @@ export type FailureReason =
   | "llm_error"
   | "malformed_json"
   | "schema_invalid"
-  | "prompt_error";
+  | "prompt_error"
+  | "input_too_long";
 
 /** Thrown by the low-level call; the fail-closed wrapper turns it into {status:"failed"}. */
 export class RiskExtractionError extends Error {

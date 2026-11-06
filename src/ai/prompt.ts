@@ -1,5 +1,6 @@
 // Prompt construction. Patient free text is untrusted DATA, delimited and labelled as such.
 import { createHash } from "node:crypto";
+import { normalizeWithMap } from "./normalize";
 import { RiskExtractionError, SIGNAL_TYPES, SOURCE_FIELDS, type RiskTextInput } from "./types";
 
 export const PROMPT_VERSION = "risk-signals-v1";
@@ -28,11 +29,14 @@ export interface RiskPrompt {
 }
 
 const MARKER_FRAGMENT = "UNTRUSTED_DATA_";
+const MARKER_CANON = "untrusteddata";
 
 /** Builds the prompt. Throws RiskExtractionError("prompt_error") if the text forges a marker. */
 export function buildRiskPrompt(input: RiskTextInput): RiskPrompt {
   for (const f of SOURCE_FIELDS) {
-    if (input[f].includes(MARKER_FRAGMENT)) {
+    // Case-insensitive and unicode-normalised, with spaces/underscores ignored.
+    const canon = normalizeWithMap(input[f]).text.replace(/[\s_]+/g, "");
+    if (canon.includes(MARKER_CANON) || input[f].toUpperCase().includes(MARKER_FRAGMENT)) {
       throw new RiskExtractionError("prompt_error", "patient text contains a reserved marker");
     }
   }

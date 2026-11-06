@@ -95,8 +95,24 @@ export function runCase(c: EvalCase, ai: AiForRules = { status: "ok", signals: [
   };
 }
 
+export interface CitationStats {
+  modelSignals: number;
+  modelSignalsVerified: number;
+  tripwireSignals: number;
+}
+
 export interface Metrics {
   mode: "rules-only" | "fixtures" | "live";
+  /** Where the model responses came from. null in live mode (real model). */
+  fixtureKind: "synthetic-handwritten" | null;
+  /** true ONLY for `pnpm eval:live`. A false value means no real model produced these results. */
+  liveModelRun: boolean;
+  /** Cases that went through the AI stage. */
+  aiCases: number;
+  /** Model-produced signals that were citation-checked (the validity denominator). */
+  modelSignalsChecked: number;
+  /** Signals added by the local tripwires (reported separately, not in citation validity). */
+  tripwireSignals: number;
   totalCases: number;
   /** Cases expected to ESCALATE. */
   escalationCases: number;
@@ -108,7 +124,7 @@ export interface Metrics {
   autoApprovePrecision: number | null;
   outcomeAccuracy: number;
   reasonCodeAccuracy: number;
-  /** Quote citation validity; null until AI fixtures are evaluated (F032+). */
+  /** Valid / all MODEL-produced signals. null = nothing was checked, which fails the gate. */
   citationValidity: number | null;
   failedCaseIds: string[];
   byCategory: Record<string, { cases: number; failed: number }>;
@@ -117,7 +133,7 @@ export interface Metrics {
 export function computeMetrics(
   results: CaseResult[],
   mode: Metrics["mode"],
-  citationValidity: number | null = null,
+  citations: CitationStats = { modelSignals: 0, modelSignalsVerified: 0, tripwireSignals: 0 },
 ): Metrics {
   const esc = results.filter((r) => r.expectedOutcome === "ESCALATE");
   const autos = results.filter((r) => r.actualOutcome === "AUTO_ELIGIBLE");
@@ -127,8 +143,15 @@ export function computeMetrics(
     e.cases += 1;
     if (!(r.outcomeMatch && r.reasonsMatch)) e.failed += 1;
   }
+  const citationValidity =
+    citations.modelSignals === 0 ? null : citations.modelSignalsVerified / citations.modelSignals;
   return {
     mode,
+    fixtureKind: mode === "live" ? null : "synthetic-handwritten",
+    liveModelRun: mode === "live",
+    aiCases: results.filter((r) => r.usedAi).length,
+    modelSignalsChecked: citations.modelSignals,
+    tripwireSignals: citations.tripwireSignals,
     totalCases: results.length,
     escalationCases: esc.length,
     escalationRecall:
@@ -162,6 +185,10 @@ export function gateFailures(m: Metrics): string[] {
   if (m.escalationRecall !== null && m.escalationRecall < 1)
     f.push(`escalation recall ${m.escalationRecall} < 1.0`);
   if (m.unsafeApprovals > 0) f.push(`${m.unsafeApprovals} unsafe auto-approval(s)`);
+  // The AI path must actually have been exercised and checked, otherwise nothing was verified.
+  if (m.aiCases === 0) f.push("no AI-fixture cases ran: the AI path was not exercised");
+  if (m.aiCases > 0 && (m.citationValidity === null || m.modelSignalsChecked === 0))
+    f.push("no model signals were citation-checked (citation validity undefined)");
   if (m.citationValidity !== null && m.citationValidity < 1)
     f.push(`citation validity ${m.citationValidity} < 1.0`);
   if (m.failedCaseIds.length > 0)

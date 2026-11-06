@@ -1,14 +1,17 @@
 // Fail-closed wrapper around risk extraction. This is the ONLY entry point the pipeline uses.
-//   - controlled / unknown-schedule medication: the LLM is never called (isAiPathAllowed)
+//   - controlled / unknown-schedule medication: the LLM is never called (positive allow-list, ai-path-gate.ts)
 //   - timeout (AbortSignal), thrown error, malformed JSON, extra fields, unset model/key:
 //     result is {status:"failed"}, which rule R13 turns into ESCALATE
 //   - every returned signal has been quote-verified; failures are kept (they escalate)
 // The result type has no approve field: the LLM can only add escalation signals.
-import { isAiPathAllowed, type AiResult, type RuleInput } from "@/domain/rules";
+import { FREE_TEXT_MAX } from "@/domain/events";
+import { type AiResult, type RuleInput } from "@/domain/rules";
+import { isAiPathPermitted } from "./ai-path-gate";
 import { createAnthropicClient, type RiskLlmClient } from "./client";
 import { loadAiConfig } from "./config";
 import { extractRiskSignals } from "./extract-risk-signals";
 import { detectInjection } from "./injection";
+import { detectTripwire } from "./tripwire";
 import { PROMPT_VERSION } from "./prompt";
 import { tracerFromEnv, type Tracer } from "./tracing";
 import {
@@ -22,7 +25,13 @@ import { verifySignals, type VerifiedSignal } from "./verify-quotes";
 export const DEFAULT_TIMEOUT_MS = 15_000;
 
 export type RiskExtractionResult =
-  { status: "ok"; signals: VerifiedSignal[] } | { status: "failed"; reason: FailureReason };
+  | { status: "ok"; signals: VerifiedSignal[] }
+  | {
+      status: "failed";
+      reason: FailureReason;
+      /** Local tripwire signals found even though the model path failed (diagnostic only). */
+      localSignals?: VerifiedSignal[];
+    };
 
 export interface RunRiskDeps {
   /** null/undefined = no client configured (e.g. no API key): fails closed. */
@@ -34,6 +43,8 @@ export interface RunRiskDeps {
 }
 
 const failed = (reason: FailureReason): RiskExtractionResult => ({ status: "failed", reason });
+const failResult = (reason: FailureReason, localSignals: VerifiedSignal[]): RiskExtractionResult =>
+  localSignals.length > 0 ? { status: "failed", reason, localSignals } : failed(reason);
 
 function isTextInput(v: unknown): v is RiskTextInput {
   if (typeof v !== "object" || v === null) return false;
@@ -81,19 +92,28 @@ async function execute(
   deps: RunRiskDeps,
   state: { modelCalled: boolean },
 ): Promise<RiskExtractionResult> {
+  let local: VerifiedSignal[] = [];
   try {
-    // 1. Controlled substances (or unknown schedule) never reach the LLM.
-    if (!isAiPathAllowed(ruleInput)) return failed("ai_path_blocked");
+    // 1. POSITIVE allow-list: only a positively identified, allowlisted, non-controlled drug may
+    //    reach the LLM. Controlled, unknown, blank, homoglyph or inconsistent medications do not.
+    if (!isAiPathPermitted(ruleInput)) return failed("ai_path_blocked");
     if (!isTextInput(text)) return failed("schema_invalid");
-    if (!deps.client) return failed("api_key_missing");
-    if (!deps.model || deps.model.trim() === "") return failed("model_not_configured");
+    // 2. Bound the work done on patient text before anything else touches it.
+    if (text.freeText.length > FREE_TEXT_MAX || text.sideEffects.length > FREE_TEXT_MAX) {
+      return failed("input_too_long");
+    }
+    // 3. Local safety nets run first and regardless of what the model does or whether it runs.
+    local = [...detectTripwire(text), ...detectInjection(text)];
 
-    // 2. Nothing written by the patient means nothing to extract; no model call needed.
+    if (!deps.client) return failResult("api_key_missing", local);
+    if (!deps.model || deps.model.trim() === "") return failResult("model_not_configured", local);
+
+    // 4. Nothing written by the patient means nothing to extract; no model call needed.
     if (text.freeText.trim() === "" && text.sideEffects.trim() === "") {
       return { status: "ok", signals: [] };
     }
 
-    // 3. Call under a deadline. The race also covers clients that ignore the AbortSignal.
+    // 5. Call under a deadline. The race also covers clients that ignore the AbortSignal.
     const controller = new AbortController();
     const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -113,21 +133,21 @@ async function execute(
         }),
         deadline,
       ]);
-      // 4. Server-side quote verification. Nothing is dropped.
+      // 6. Server-side quote verification. Nothing is dropped.
       const verified = verifySignals(output.signals, text);
-      // 5. Local injection tripwire: adds signals even if the model was fooled into silence.
-      const local = detectInjection(text).filter(
+      // 7. Add local signals (deduplicated by span against the model's own).
+      const extra = local.filter(
         (l) =>
           !verified.some(
             (v) => v.sourceField === l.sourceField && v.start === l.start && v.end === l.end,
           ),
       );
-      return { status: "ok", signals: [...verified, ...local] };
+      return { status: "ok", signals: [...verified, ...extra] };
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
   } catch (e) {
-    return failed(e instanceof RiskExtractionError ? e.reason : "llm_error");
+    return failResult(e instanceof RiskExtractionError ? e.reason : "llm_error", local);
   }
 }
 
@@ -142,8 +162,14 @@ export function riskDepsFromEnv(
   timeoutMs?: number,
 ): RunRiskDeps {
   const cfg = loadAiConfig(env);
+  let client: RiskLlmClient | null = null;
+  try {
+    client = cfg.apiKey ? createAnthropicClient({ apiKey: cfg.apiKey }) : null;
+  } catch {
+    client = null; // constructor failure => no client => fails closed
+  }
   return {
-    client: cfg.apiKey ? createAnthropicClient({ apiKey: cfg.apiKey }) : null,
+    client,
     model: cfg.model,
     tracer: tracerFromEnv(env),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),

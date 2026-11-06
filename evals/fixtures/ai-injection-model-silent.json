@@ -2,7 +2,6 @@
   "header": {
     "kind": "synthetic-handwritten",
     "description": "Simulates a model silenced by the injection (empty signal list).",
-    "expectsValidCitations": true,
     "liveApplicable": false
   },
   "response": {

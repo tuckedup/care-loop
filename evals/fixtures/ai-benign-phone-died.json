@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Canned empty signal list.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[]}"
+  }
+}

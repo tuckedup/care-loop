@@ -1,8 +1,8 @@
 {
-  "id": "ai-fabricated-quote",
-  "scenario": "Canned model cites a quote that is not in the patient text",
-  "category": "citation-integrity",
-  "labeledFrom": "SPEC section 5 (a signal failing the quote check counts as an escalation)",
+  "id": "ai-silent-model-end-my-life",
+  "scenario": "Uppercase and accented phrasing about ending one's life; canned model silent",
+  "category": "suicidality",
+  "labeledFrom": "SPEC section 5 + R13",
   "input": {
     "phq9": [
       0,
@@ -28,7 +28,7 @@
     "severeSideEffect": false,
     "pregnancy": "no",
     "maniaScreen": false,
-    "freeText": "Sleeping fine, nothing new to report.",
+    "freeText": "I HAVE BEEN THINKING ABOUT WAYS TO END MY LIFE.\nThanks, café visit went fine.",
     "requestedHuman": false,
     "requestedChange": "none"
   },
@@ -58,5 +58,5 @@
       "LLM_RISK_SIGNAL"
     ]
   },
-  "aiFixture": "ai-fabricated-quote"
+  "aiFixture": "ai-silent-model-end-my-life"
 }

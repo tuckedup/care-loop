@@ -7,6 +7,8 @@ import type { RiskSignal, RiskTextInput } from "./types";
 export type QuoteProblem = "unknown_field" | "out_of_range" | "quote_mismatch";
 
 export interface VerifiedSignal extends RiskSignal {
+  /** "model" = produced by the LLM; "tripwire" = produced locally (verified by construction). */
+  origin: "model" | "tripwire";
   /** true only if the text at [start,end) of sourceField equals quote exactly. */
   verified: boolean;
   problem?: QuoteProblem;
@@ -16,7 +18,9 @@ export function verifySignal(signal: RiskSignal, input: RiskTextInput): Verified
   const text: unknown = Object.prototype.hasOwnProperty.call(input, signal.sourceField)
     ? input[signal.sourceField]
     : undefined;
-  if (typeof text !== "string") return { ...signal, verified: false, problem: "unknown_field" };
+  if (typeof text !== "string") {
+    return { ...signal, origin: "model", verified: false, problem: "unknown_field" };
+  }
   if (
     !Number.isInteger(signal.start) ||
     !Number.isInteger(signal.end) ||
@@ -24,11 +28,11 @@ export function verifySignal(signal: RiskSignal, input: RiskTextInput): Verified
     signal.end <= signal.start ||
     signal.end > text.length
   ) {
-    return { ...signal, verified: false, problem: "out_of_range" };
+    return { ...signal, origin: "model", verified: false, problem: "out_of_range" };
   }
   return text.slice(signal.start, signal.end) === signal.quote
-    ? { ...signal, verified: true }
-    : { ...signal, verified: false, problem: "quote_mismatch" };
+    ? { ...signal, origin: "model", verified: true }
+    : { ...signal, origin: "model", verified: false, problem: "quote_mismatch" };
 }
 
 /** Verifies every signal. Output length always equals input length (nothing is dropped). */

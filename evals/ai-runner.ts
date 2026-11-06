@@ -13,9 +13,11 @@ export interface AiStageResult {
   ai: AiForRules;
   /** Model calls made. Must be 0 for controlled medications. */
   calls: number;
-  signalsTotal: number;
-  signalsVerified: number;
-  expectsValidCitations: boolean;
+  /** Model-produced signals (tripwire signals are excluded). */
+  modelSignals: number;
+  modelSignalsVerified: number;
+  /** Locally produced tripwire / injection signals, reported separately. */
+  tripwireSignals: number;
   /** Excluded from this run (fixture-only case during a live run). */
   skipped: boolean;
 }
@@ -31,9 +33,9 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
     return {
       ai: { status: "ok", signals: [] },
       calls: 0,
-      signalsTotal: 0,
-      signalsVerified: 0,
-      expectsValidCitations: true,
+      modelSignals: 0,
+      modelSignalsVerified: 0,
+      tripwireSignals: 0,
       skipped: true,
     };
   }
@@ -81,13 +83,15 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
     throw new Error(`case ${c.id}: controlled medication reached the LLM (${calls} call(s))`);
   }
   const signals = result.status === "ok" ? result.signals : [];
-  // Counts every returned signal; local tripwire signals are verified by construction.
+  // Citation validity covers ONLY model-produced signals; tripwire signals are verified by
+  // construction and are counted separately.
+  const modelSigs = signals.filter((s) => s.origin === "model");
   return {
     ai: toRulesAiResult(result),
     calls,
-    signalsTotal: signals.length,
-    signalsVerified: signals.filter((s) => s.verified).length,
-    expectsValidCitations: fixture.header.expectsValidCitations,
+    modelSignals: modelSigs.length,
+    modelSignalsVerified: modelSigs.filter((s) => s.verified).length,
+    tripwireSignals: signals.length - modelSigs.length,
     skipped: false,
   };
 }

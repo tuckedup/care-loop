@@ -28,11 +28,21 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 - Metrics: escalation recall (must be 1.0), auto-approve precision, citation validity (must be 1.0),
   CREOLA-style summary labels from an LLM judge.
-- Results: TODO (written to evals/results/latest.json and the README)
+- Results: written to `evals/results/latest.json` by `pnpm eval` (synthetic-handwritten fixtures only; see Implementation notes). They show the pipeline handles those canned responses, not how any real model behaves.
 
 ## Known limitations
 
-TODO (filled in as evals surface failures; never weaken cases to pass).
+- The model can miss risk. A model that returns no signals for risky text is only caught if a
+  tripwire phrase happens to match; a structured check-in answer is the other safeguard.
+- The tripwire lexicons are small, English-only and not exhaustive; they will miss many phrasings
+  and over-escalate on some innocent uses of the same words. Not clinically validated.
+- Offsets from a live model are often wrong, which makes real signals unverifiable (they still
+  escalate) and can fail the live citation gate.
+- A live model has never been run in this repo: `pnpm eval:live` and the Anthropic client are
+  untested against the real API, and all eval fixtures are hand-written.
+- The Langfuse request shape has not been verified against a live instance.
+- Known fixture-set gaps: far fewer cases than the SPEC target (60+, 25+ risk cases); per-category
+  minimums are not yet met.
 
 ## Implementation notes (F030-F035)
 
@@ -48,7 +58,18 @@ TODO (filled in as evals surface failures; never weaken cases to pass).
 - Prompt injection: patient text is delimited as untrusted data, a local heuristic tripwire adds a
   `prompt_injection_attempt` signal for common instruction-like strings (not exhaustive), and the
   model cannot approve regardless.
-- Controlled substances never reach the LLM (`isAiPathAllowed` is checked before any call).
+- AI-path gate (positive allow-list): the LLM is called only if the medication positively resolves
+  to an allowlisted, non-controlled formulary entry. That means the RxCUI maps to such an entry, any
+  formularyId agrees, and the medication name passes the rules' own identity and dose-form checks
+  (R02, M01, M02, reused from `src/domain/rules`). Controlled, unknown, blank, mismatched or
+  look-alike medications make zero LLM calls and the request escalates. The guarantee is only as
+  strong as those rule checks and the bundled formulary data; it is covered by tests, not proven.
+- Input bound: patient text over 2000 characters per field (`FREE_TEXT_MAX`) fails closed with zero
+  model calls. Stop reasons other than `end_turn`/`stop_sequence` (including `refusal`) fail closed.
+- Local tripwires (`src/ai/tripwire.ts`, `src/ai/injection.ts`): deterministic phrase lists that
+  only ever ADD escalation signals, run regardless of what the model returns or whether the call
+  fails. The self-harm/violence list is a HEURISTIC SAFETY NET, NOT CLINICALLY VALIDATED
+  (TODO: clinical review of the lexicon). No sensitivity or specificity is claimed.
 
 ### Eval fixtures are synthetic-handwritten
 
@@ -59,6 +80,12 @@ show that the pipeline handles those responses correctly, not how any real model
 `ANTHROPIC_MODEL`); it is implemented but has NOT been run or tested in this repo.
 Fixture-only cases (simulated failures, fooled-model outputs) are skipped in live mode.
 Rules-only cases (no `aiFixture`) assume an "ok, no signals" AI result.
+
+`evals/results/latest.json` carries `fixtureKind: "synthetic-handwritten"` and `liveModelRun: false`
+(true only for `pnpm eval:live`), plus `aiCases`, `modelSignalsChecked` and `tripwireSignals`, so it
+cannot be mistaken for a live-model result. Citation validity is computed over ALL model-produced
+signals (tripwire signals are excluded and counted separately). The gate fails if no AI-fixture case
+ran, if no model signal was citation-checked, or if citation validity is below 1.0.
 
 ### Tracing and patient text
 
