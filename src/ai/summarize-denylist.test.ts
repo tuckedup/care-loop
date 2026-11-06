@@ -64,7 +64,18 @@ const PHRASES = [
   "no concerns",
   "ok to renew",
   "nothing concerning",
+  "approuvé",
 ];
+
+describe("French stem approuv has spacing and separator variants (round-3 review)", () => {
+  it.each(["a.p.p.r.o.u.v.é", "a_p_p_r_o_u_v_é", "a-p-p-r-o-u-v-é", "a p p r o u v é", "approuvé"])(
+    "drops %s",
+    (line) => {
+      expect(bad(line, true)).toBe(true);
+      expect(bad(line, false)).toBe(true);
+    },
+  );
+});
 
 describe("the exact inputs from the review are dropped", () => {
   it.each([
@@ -158,5 +169,23 @@ describe("legitimate factual lines still pass", () => {
   ])("keeps %j (escalated and not)", (t) => {
     expect(bad(t, true)).toBe(false);
     expect(bad(t, false)).toBe(false);
+  });
+});
+
+describe("plain-text reassurance phrases from the round-3 review (word match only)", () => {
+  it.each([
+    "Nothing to flag.",
+    "No issues identified.",
+    "Renew it.",
+    "Go for it.",
+    "Everything is in order.",
+    "Passes all checks.",
+    "Straightforward renewal.",
+    "Not a concern.",
+    "Risk is not elevated.",
+    "Renewal is reasonable.",
+  ])("drops %s", (line) => {
+    expect(bad(line, true)).toBe(true);
+    expect(bad(line, false)).toBe(true);
   });
 });

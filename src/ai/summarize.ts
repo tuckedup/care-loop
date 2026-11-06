@@ -278,9 +278,21 @@ const FORBIDDEN_WORDS: RegExp[] = [
   /\bunconcerning\b/,
   /\bunremarkable\b/,
   /\breassur\w*/,
+  // Phrasings listed by the F041 round-3 review (heuristic, not exhaustive).
+  /\bnothing to flag\b/,
+  /\bno issues? identified\b/,
+  /\brenew it\b/,
+  /\bgo for it\b/,
+  /\beverything is in order\b/,
+  /\bpasses all checks\b/,
+  /\bstraightforward renewal\b/,
+  /\bnot a concern\b/,
+  /\bnot elevated\b/,
+  /\brenewal is reasonable\b/,
 ];
 // Spacing / obfuscation variants: letters only, every separator removed.
 const FORBIDDEN_SQUEEZED = [
+  "approuv",
   "approv",
   "aprob",
   "aprueb",
