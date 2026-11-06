@@ -36,3 +36,4 @@ pnpm-debug.log*
 # claude local overrides
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+evals/results/live-latest.json
