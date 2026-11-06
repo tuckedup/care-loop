@@ -117,3 +117,22 @@ Follow-ups from the verifier's security review (none blocking):
 - Approved / follow-up-needed result states only have unit coverage until the decision pipeline
   emits those events (F036+).
 - e2e uses its own DB (careloop_e2e) and PORT; only one e2e process at a time.
+
+## 2026-11-06 — Session stopped at usage limit (state for next session)
+
+Flags passing: 29/70 (F001-F020s except below, see feature_list.json). NOT yet flagged, work exists:
+
+- F030-F035 (AI layer + eval gate): built; safety review FAILED twice. Round 2 found a CRITICAL
+  tripwire bug (astral chars/emoji shift offsets so "😀 I want to die" + silent model reached
+  AUTO_ELIGIBLE) plus no eval coverage floor. Fix round 3 was dispatched to the AI builder and may
+  be PARTIAL in the working tree (typecheck had a TS1117 duplicate-key error in src/ai/normalize.ts).
+  Next: check `git status`, finish/repair the fix, then a FRESH clinical-safety-reviewer, then verifier.
+- F038, F044-F046 built and committed (e8c10ba, 5d45f6e, f382add, c1c2cd3): NOT yet independently
+  verified. F038 needs clinical-safety-reviewer (flagged). F047 PARTIAL (0eec6b2): pharmacy
+  confirm page + domain helpers done; "selection recorded in the event" deferred because
+  RenewalRequested has no pharmacyId (needs src/domain/events.ts change).
+- Remaining after that: F036/F037/F039-F043 (decision pipeline, clinician UI, summary, actions),
+  F048-F058 (transmit, responses, follow-up, audit coverage/verify/admin), F059-F070 (autonomy,
+  evals to 60+ cases, docs, deploy). Also the dose-in-name vs doseMg follow-up from the rules review.
+- Full `pnpm test` had load-dependent timeouts (audit-log scan test 5s default); raise its timeout.
+- v0.1 is complete; tagging v0.1.0 is up to the user.
