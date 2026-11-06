@@ -4,6 +4,7 @@ import { phq9TrendProjection } from "./phq9-trend";
 import { projectionRegistry } from "./registry";
 import { renewalQueueProjection } from "./renewal-queue";
 import { rxStatusProjection } from "./rx-status";
+import { visitScheduleProjection } from "./visit-schedule";
 
 let done = false;
 
@@ -15,7 +16,8 @@ export function registerAllProjections() {
       .register(rxStatusProjection)
       .register(renewalQueueProjection)
       .register(phq9TrendProjection)
-      .register(pharmacyAlertsProjection);
+      .register(pharmacyAlertsProjection)
+      .register(visitScheduleProjection);
     done = true;
   }
   return projectionRegistry;

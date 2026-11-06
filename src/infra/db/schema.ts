@@ -277,3 +277,55 @@ export const pharmacyAlerts = pgTable(
     check("pharmacy_alerts_status_check", sql`${t.status} in ('open', 'acknowledged')`),
   ],
 );
+
+// Projection visit_schedule (F052): booked follow-up visits, the calendar slots created when a note
+// is signed, and the FHIR-Task-style follow-up tasks. Rebuildable from events.
+export const visitSchedule = pgTable(
+  "visit_schedule",
+  {
+    visitId: text("visit_id").primaryKey(),
+    patientId: text("patient_id").notNull(),
+    renewalId: text("renewal_id"),
+    clinicianId: text("clinician_id"),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    // booked | note_signed
+    status: text("status").notNull().default("booked"),
+    noteId: text("note_id"),
+    bookedPosition: bigint("booked_position", { mode: "bigint" }).notNull(),
+  },
+  (t) => [
+    index("visit_schedule_clinician_idx").on(t.clinicianId, t.startAt),
+    index("visit_schedule_patient_idx").on(t.patientId),
+    check("visit_schedule_status_check", sql`${t.status} in ('booked', 'note_signed')`),
+  ],
+);
+
+export const calendarSlots = pgTable(
+  "calendar_slots",
+  {
+    slotId: text("slot_id").primaryKey(),
+    visitId: text("visit_id").notNull(),
+    clinicianId: text("clinician_id"),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    position: bigint("position", { mode: "bigint" }).notNull(),
+  },
+  (t) => [index("calendar_slots_visit_idx").on(t.visitId)],
+);
+
+export const followUpTasks = pgTable(
+  "follow_up_tasks",
+  {
+    taskId: text("task_id").primaryKey(),
+    patientId: text("patient_id").notNull(),
+    visitId: text("visit_id"),
+    // FHIR Task.status; only "requested" exists until a completion event is modelled.
+    status: text("status").notNull().default("requested"),
+    position: bigint("position", { mode: "bigint" }).notNull(),
+  },
+  (t) => [
+    index("follow_up_tasks_visit_idx").on(t.visitId),
+    check("follow_up_tasks_status_check", sql`${t.status} in ('requested')`),
+  ],
+);

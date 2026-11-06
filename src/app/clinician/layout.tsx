@@ -14,6 +14,9 @@ export default async function ClinicianLayout({ children }: { children: ReactNod
         <Link href="/clinician/queue" className="underline">
           Renewal queue
         </Link>
+        <Link href="/clinician/visits" className="underline">
+          Follow-up visits
+        </Link>
         <Link href="/clinician/pharmacy-alerts" className="underline">
           Pharmacy alerts
         </Link>
