@@ -115,3 +115,25 @@ text: form-specific entries (bupropion SR/XL, venlafaxine ER) need an allowed fo
 other recognised form word (IR, immediate release, CR, ...) escalates with
 DOSE_FORM_NOT_ALLOWLISTED. This is a text heuristic, not a coded dose form. TODO: source needed
 for dose-form-level RxCUIs, after which M02 should compare coded forms instead.
+
+### Note: medication name check is an allow-vocabulary, not a drug blocklist
+
+M01 does not try to list bad drugs. After normalisation (NFKC, diacritics and zero-width
+characters removed, lowercase) it removes the expected drug's own names and requires every
+remaining word to be benign (numbers, units, dosage-form words, salts). Any unexplained word or
+leftover non-ASCII character escalates with MEDICATION_IDENTITY_MISMATCH. This deliberately
+over-escalates (brand names and typos go to a clinician). The small controlled-name matcher in
+R03 stays as an extra hard signal.
+
+### Note: accepted risk, no upper bound on REFILL_LIMIT
+
+SPEC gives no maximum for REFILL_LIMIT, so none is invented (TODO: source needed). A very large
+configured limit effectively disables R06. Validating the configured value belongs to the config
+loader, which is out of scope for the pure rules; the rule only rejects non-integer, negative or
+non-finite values. A test documents this behaviour.
+
+### Note: input snapshot
+
+evaluateEligibility copies the input once as plain data, reading each property a single time and
+never invoking getters, and evaluates only that copy. Getters, functions, symbols, class
+instances, cyclic or very deep structures fail closed with ESCALATE / INVALID_INPUT.

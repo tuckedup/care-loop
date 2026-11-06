@@ -11,6 +11,7 @@ import { ruleR08 } from "./r08-phq9-total";
 import { ruleR09, ruleR10, ruleR11, ruleR12 } from "./r09-r12-structured";
 import { ruleR13 } from "./r13-ai-signal";
 import { scoreGad7 } from "./scoring";
+import { snapshotInput } from "./snapshot";
 import {
   fail,
   pass,
@@ -124,14 +125,12 @@ function unusableInput(): EligibilityResult {
  * evaluation throw yield ESCALATE with INVALID_INPUT. It never throws and never approves.
  */
 export function evaluateEligibility(input: RuleInput): EligibilityResult {
-  const isObj = (v: unknown) => typeof v === "object" && v !== null;
   try {
-    if (!isObj(input) || !isObj(input.medication) || !isObj(input.checkIn)) return unusableInput();
-  } catch {
-    return unusableInput();
-  }
-  try {
-    return evaluateInner(input);
+    // One snapshot, read once; every rule and the final guards see only this copy.
+    const snap = snapshotInput(input);
+    const isObj = (v: unknown) => typeof v === "object" && v !== null;
+    if (!isObj(snap) || !isObj(snap.medication) || !isObj(snap.checkIn)) return unusableInput();
+    return evaluateInner(snap);
   } catch {
     return unusableInput();
   }

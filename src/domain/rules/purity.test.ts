@@ -72,6 +72,31 @@ describe("rules purity", () => {
     }
   });
 
+  // Aliasing guard: ambient-global identifiers must not appear at all (catches
+  // `const D = globalThis["Da"+"te"]`, `const M = Math`, `Reflect`/`Proxy` tricks and so on).
+  // Explicit per-file allowlist; currently nothing needs any of them.
+  const AMBIENT =
+    /\b(Date|Math|process|globalThis|global|window|self|Reflect|Proxy|Intl|eval|Function)\b/;
+  const AMBIENT_ALLOW: Record<string, string[]> = {};
+
+  it.each(sources)("%s uses no ambient globals beyond its allowlist", (f, src) => {
+    const hits = [...code(src).matchAll(new RegExp(AMBIENT.source, "g"))].map((m) => m[1]!);
+    const allowed = AMBIENT_ALLOW[f] ?? [];
+    expect(hits.filter((h) => !allowed.includes(h))).toEqual([]);
+  });
+
+  it("the ambient-global pattern detects aliasing attempts", () => {
+    for (const s of [
+      'globalThis["Date"]',
+      "const M = Math;",
+      "new Proxy(a, b)",
+      "Reflect.get(a)",
+      "process",
+    ]) {
+      expect(AMBIENT.test(s), s).toBe(true);
+    }
+  });
+
   it.each(sources)("%s imports only sibling rule modules or the pure formulary", (_f, src) => {
     const c = code(src);
     const specs = [...c.matchAll(/(?:from|import)\s*["']([^"']+)["']/g)].map((m) => m[1]!);

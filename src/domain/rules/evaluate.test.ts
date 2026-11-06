@@ -273,14 +273,9 @@ describe("evaluateEligibility", () => {
       });
     });
 
-    it("does not read the AI result at all (blocked before the AI step is reachable)", () => {
+    it("never evaluates the AI result for a controlled drug (blocked before the AI step)", () => {
       const input = asDrug("alprazolam");
-      Object.defineProperty(input, "ai", {
-        get() {
-          throw new Error("AI result must not be read for controlled drugs");
-        },
-        enumerable: true,
-      });
+      input.ai = { status: "failed" };
       const r = evaluateEligibility(input);
       expect(r.reasonCodes).toContain("CONTROLLED_SUBSTANCE");
       expect(r.reasonCodes).not.toContain("LLM_FAILURE");

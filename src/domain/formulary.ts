@@ -114,11 +114,27 @@ export function isAllowlistedRxcui(rxcui: string | null | undefined): boolean {
 
 /** Lowercase, punctuation to single spaces, trimmed. "Extended-Release" -> "extended release". */
 export function normalizeMedText(text: unknown): string {
-  if (typeof text !== "string") return "";
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return canonicalizeMedText(text).text;
+}
+
+/**
+ * Canonical form of free medication text: NFKC, zero-width/format characters removed,
+ * diacritics stripped, lowercased, every non-[a-z0-9] run collapsed to one space.
+ * `nonAscii` is true when any non-ASCII character survives normalisation (e.g. Cyrillic
+ * homoglyphs), which callers must treat as suspicious. Non-strings give { "", true }.
+ */
+export function canonicalizeMedText(text: unknown): { text: string; nonAscii: boolean } {
+  if (typeof text !== "string") return { text: "", nonAscii: true };
+  const folded = text
+    .normalize("NFKC")
+    .replace(/\p{Cf}/gu, "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+  return {
+    nonAscii: /[^\x00-\x7f]/.test(folded),
+    text: folded.replace(/[^a-z0-9]+/g, " ").trim(),
+  };
 }
 
 /** True if `alias` occurs in the text, also when letters were split by spaces ("alpra zolam"). */

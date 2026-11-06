@@ -3,10 +3,16 @@
 export type Phq9Band = "minimal" | "mild" | "moderate" | "moderately_severe" | "severe";
 export type Gad7Band = "minimal" | "mild" | "moderate" | "severe";
 
-const validItems = (items: unknown, length: number): items is readonly number[] =>
-  Array.isArray(items) &&
-  items.length === length &&
-  items.every((n) => Number.isInteger(n) && n >= 0 && n <= 3);
+// Every index 0..length-1 must be present (sparse arrays skip holes in every/reduce) and valid.
+const validItems = (items: unknown, length: number): items is readonly number[] => {
+  if (!Array.isArray(items) || items.length !== length) return false;
+  for (let i = 0; i < length; i++) {
+    if (!(i in items)) return false;
+    const n: unknown = items[i];
+    if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > 3) return false;
+  }
+  return true;
+};
 
 /** Sum of nine items scored 0-3 (0-27). Item 9 is also reported separately. null if invalid. */
 export function scorePhq9(items: readonly number[]): number | null {
