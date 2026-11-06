@@ -4,26 +4,8 @@
   "category": "side-effects",
   "labeledFrom": "R10 (severe side effect escalates)",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "Severe agitation since last week.",
     "severeSideEffect": true,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "SEVERE_SIDE_EFFECT"
-    ]
+    "reasonCodes": ["SEVERE_SIDE_EFFECT"]
   }
 }

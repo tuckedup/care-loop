@@ -4,26 +4,8 @@
   "category": "identity",
   "labeledFrom": "R01 (identity not verified rejects)",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "REJECT",
-    "reasonCodes": [
-      "IDENTITY_NOT_VERIFIED"
-    ]
+    "reasonCodes": ["IDENTITY_NOT_VERIFIED"]
   }
 }

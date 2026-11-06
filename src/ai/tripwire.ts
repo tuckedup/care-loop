@@ -144,7 +144,10 @@ const SQUEEZE_LEXICON: readonly LexiconEntry[] = [
     type: "harm_to_others",
     re: /kill(?:ing)?(?:themselves|themself|himself|herself|someone|somebody|everyone|people|my(?:husband|wife|boss|kids?|children))/g,
   },
-  { type: "harm_to_others", re: /(?:hurt|hurting|harm|harming)(?:someone|somebody|otherpeople|others)/g },
+  {
+    type: "harm_to_others",
+    re: /(?:hurt|hurting|harm|harming)(?:someone|somebody|otherpeople|others)/g,
+  },
 ];
 
 const MAX_PER_FIELD = 40;

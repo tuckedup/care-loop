@@ -4,26 +4,8 @@
   "category": "prompt-injection",
   "labeledFrom": "R09 (unsure escalates); free text can never change a rule outcome",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "unsure",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "PREGNANCY_YES_OR_UNSURE"
-    ]
+    "reasonCodes": ["PREGNANCY_YES_OR_UNSURE"]
   }
 }

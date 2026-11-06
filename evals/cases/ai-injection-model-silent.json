@@ -4,26 +4,8 @@
   "category": "prompt-injection",
   "labeledFrom": "R13: local injection tripwire adds a signal even when the model is silent; model can only ADD",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,9 +36,7 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "LLM_RISK_SIGNAL"
-    ]
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
   },
   "aiFixture": "ai-injection-model-silent"
 }

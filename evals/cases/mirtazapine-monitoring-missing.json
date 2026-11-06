@@ -4,26 +4,8 @@
   "category": "drug-specific",
   "labeledFrom": "SPEC section 2: baseline metabolic/CV monitoring is required for mirtazapine. The ESCALATE outcome (rather than another outcome) is the implementer's choice; TODO: confirm with a clinician what happens when monitoring is missing.",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "MIRTAZAPINE_MONITORING_MISSING"
-    ]
+    "reasonCodes": ["MIRTAZAPINE_MONITORING_MISSING"]
   }
 }

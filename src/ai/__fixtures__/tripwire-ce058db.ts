@@ -178,7 +178,9 @@ function collapseSpacedLetters(n: NormalizedText): NormalizedText {
   while (i < t.length) {
     // A run starts at a single-letter token: letter at i, boundary before and after.
     const isTok = (j: number) =>
-      LETTER.test(t[j] ?? "") && (j === 0 || t[j - 1] === " ") && (j + 1 === t.length || t[j + 1] === " ");
+      LETTER.test(t[j] ?? "") &&
+      (j === 0 || t[j - 1] === " ") &&
+      (j + 1 === t.length || t[j + 1] === " ");
     if (!isTok(i)) {
       i += 1;
       continue;

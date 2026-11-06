@@ -4,26 +4,8 @@
   "category": "drug-specific",
   "labeledFrom": "SPEC section 2: baseline AND six-month metabolic/CV monitoring are required for mirtazapine; seven months is clearly past six months, so six-month monitoring is due and missing. ESCALATE as the outcome is the implementer's choice; TODO: confirm with a clinician (also the recurrence interval after the first six-month check is unsourced).",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -58,8 +40,6 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "MIRTAZAPINE_MONITORING_MISSING"
-    ]
+    "reasonCodes": ["MIRTAZAPINE_MONITORING_MISSING"]
   }
 }

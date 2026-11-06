@@ -47,7 +47,7 @@ AI renewal features (F031 onward, anything in `src/ai` or the AI decision path) 
   input, medication, history, expected label and the id and contents of its AI fixture (the
   free-form `scenario`, `category` and `labeledFrom` notes are not pinned). Changing any of them
   makes the gate fail until the pin is regenerated with `pnpm eval:pins` (`pnpm eval:pins --
-  --check` verifies the pins are current; `scripts/eval-pins.ts`). Regenerating a pin is a
+--check` verifies the pins are current; `scripts/eval-pins.ts`). Regenerating a pin is a
   reviewed act: state in the change why the case changed, and never edit a case or its pin just to
   make a failing run pass. `eval:pins` also ratchets `minTotalCases` upward, never down. The
   requirement table itself (ids, kind, outcome, reason code, `signalTypes`) is edited by hand;

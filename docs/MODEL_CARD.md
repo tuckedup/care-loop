@@ -41,7 +41,7 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
   which the original ce058db tripwire already caught and which a differential test now guarantees
   cannot regress (see below); letter-spaced words, i.e. two or more single letters separated by
   whitespace of any width, also with trailing punctuation, brackets, preceding one-letter words or
-  whole-sentence spacing ("s u i c i d e.", "(k i l l  m y s e l f)", "I w a n t t o d i e"); and
+  whole-sentence spacing ("s u i c i d e.", "(k i l l m y s e l f)", "I w a n t t o d i e"); and
   irregular spacing INSIDE LONG phrases of 8+ letters ("s uicide", "k ill myself", "suic i d e",
   "no point in liv ing"), via a "squeezed" scan that must start and end on word boundaries.
 - Recall invariant: the current tripwire flags a SUPERSET of what ce058db flagged. A frozen copy

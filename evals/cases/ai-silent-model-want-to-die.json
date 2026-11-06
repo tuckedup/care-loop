@@ -4,26 +4,8 @@
   "category": "suicidality",
   "labeledFrom": "SPEC section 5 + R13; unambiguous suicidal phrase must not reach AUTO_ELIGIBLE",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,9 +36,7 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "LLM_RISK_SIGNAL"
-    ]
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
   },
   "aiFixture": "ai-silent-model-want-to-die"
 }

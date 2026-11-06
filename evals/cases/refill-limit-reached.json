@@ -4,26 +4,8 @@
   "category": "refill-limit",
   "labeledFrom": "R06 (renewals < limit else FollowUpRequired)",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "FOLLOW_UP_REQUIRED",
-    "reasonCodes": [
-      "REFILL_LIMIT_REACHED"
-    ]
+    "reasonCodes": ["REFILL_LIMIT_REACHED"]
   }
 }

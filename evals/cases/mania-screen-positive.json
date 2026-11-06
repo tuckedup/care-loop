@@ -4,26 +4,8 @@
   "category": "mania",
   "labeledFrom": "R11 (positive mania screen escalates)",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "MANIA_SCREEN_POSITIVE"
-    ]
+    "reasonCodes": ["MANIA_SCREEN_POSITIVE"]
   }
 }

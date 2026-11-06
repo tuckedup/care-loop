@@ -4,26 +4,8 @@
   "category": "formulary",
   "labeledFrom": "SPEC text: R02 (medication must be on the formulary allowlist, else reject; the fictional drug 'examplemed' is not on it). The identifier 'SYNTHETIC-UNLISTED-1' is deliberately not a real RxCUI. The REJECT outcome for R02 is this implementation's choice (SPEC section 4 names REJECT only for R01). TODO: confirm in docs/DECISIONS.md.",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "REJECT",
-    "reasonCodes": [
-      "NOT_ON_FORMULARY"
-    ]
+    "reasonCodes": ["NOT_ON_FORMULARY"]
   }
 }

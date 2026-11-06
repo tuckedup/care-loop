@@ -582,7 +582,7 @@
     "verification": [
       "pnpm e2e e2e/clinician-queue.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F040",
@@ -596,7 +596,7 @@
     "verification": [
       "pnpm e2e e2e/visit-view.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F041",

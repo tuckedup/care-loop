@@ -207,3 +207,19 @@ the session; the AI call needs allow-list gate + verified identity + P01 + P02. 
 LLM extraction has no idempotency key (read-only inference; aggregate stores one result).
 Known gaps: patient_med_list halts on a schema-invalid MedicationPrescribed; cron catch-up evaluates
 only undecided renewals; check-in wiring (evaluateAfterCheckIn) done by the UI stream (0f334b1).
+
+## 2026-11-06 — Clean full verification; F039/F040 passing; vitest config
+
+On a quiet machine (no agent processes): typecheck, lint, format:check, pnpm test (69 files / 1254
+tests), pnpm eval (47), eval:pins --check, full pnpm e2e (34 passed, 1 skipped) and
+visit-summary in SUMMARY_FIXTURE mode all green. F039 (queue UI) and F040 (visit view) flagged
+passing (verifier code review PASS + clean e2e). F041 awaiting a fresh safety review after 7 fixes.
+
+Lessons / rules for future parallel agents:
+
+- Parallel agents sharing one e2e database/port/.next cause false failures: give each agent its own
+  DATABASE_URL (careloop_e2e_<name>) and PORT, or run e2e serially.
+- vitest default 5s timeouts failed under load: vitest.config.ts now sets testTimeout 30s,
+  hookTimeout 60s, maxWorkers 4.
+- `prettier --write .` is safe now (protected files + generated evals/required-cases.json are in
+  .prettierignore); eval case JSON was reformatted (pins hash parsed content, still current).

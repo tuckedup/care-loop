@@ -4,26 +4,8 @@
   "category": "controlled-substance",
   "labeledFrom": "R02 + R03; CLAUDE.md: controlled substances never enter the AI path",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,10 +36,7 @@
   },
   "expected": {
     "outcome": "REJECT",
-    "reasonCodes": [
-      "NOT_ON_FORMULARY",
-      "CONTROLLED_SUBSTANCE"
-    ]
+    "reasonCodes": ["NOT_ON_FORMULARY", "CONTROLLED_SUBSTANCE"]
   },
   "aiFixture": "ai-controlled-never-called"
 }

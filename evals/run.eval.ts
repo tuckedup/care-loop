@@ -64,11 +64,7 @@ async function load(): Promise<Loaded> {
       }
     }
     const extras: CoverageExtras = {
-      manifestFailures: manifestFailures(
-        manifest,
-        cases,
-        results,
-      ),
+      manifestFailures: manifestFailures(manifest, cases, results),
       casesDirLabel: dirLabel("EVAL_CASES_DIR"),
       fixturesDirLabel: dirLabel("EVAL_FIXTURES_DIR"),
       blockedAiCases,

@@ -4,26 +4,8 @@
   "category": "depression-severity",
   "labeledFrom": "R08 (rise >= 5 from last score escalates)",
   "input": {
-    "phq9": [
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [1, 1, 1, 1, 1, 1, 1, 1, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "PHQ9_RISE"
-    ]
+    "reasonCodes": ["PHQ9_RISE"]
   }
 }

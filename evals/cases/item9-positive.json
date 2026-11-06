@@ -4,26 +4,8 @@
   "category": "suicidality",
   "labeledFrom": "R07 (item 9 >= 1 escalates)",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 1],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,8 +36,6 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "PHQ9_ITEM9_POSITIVE"
-    ]
+    "reasonCodes": ["PHQ9_ITEM9_POSITIVE"]
   }
 }

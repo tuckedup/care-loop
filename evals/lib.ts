@@ -142,7 +142,9 @@ export function caseHash(c: EvalCase): string {
         medication: c.med,
         history: c.history,
         expected: c.expected,
-        aiFixture: c.aiFixture ? { id: c.aiFixture, content: fixtureContentHash(c.aiFixture) } : null,
+        aiFixture: c.aiFixture
+          ? { id: c.aiFixture, content: fixtureContentHash(c.aiFixture) }
+          : null,
       }),
     )
     .digest("hex");
@@ -172,7 +174,8 @@ export function manifestFailures(
       if (caseHash(c) !== sha256) {
         f.push(`required case edited without a manifest update: ${tag}`);
       }
-      if (c.expected.outcome !== req.outcome) f.push(`required case label is not ${req.outcome}: ${tag}`);
+      if (c.expected.outcome !== req.outcome)
+        f.push(`required case label is not ${req.outcome}: ${tag}`);
       if (req.reasonCode && !c.expected.reasonCodes.includes(req.reasonCode as never)) {
         f.push(`required case label lacks ${req.reasonCode}: ${tag}`);
       }
@@ -182,7 +185,8 @@ export function manifestFailures(
       const r = byId.get(id);
       if (!r) continue; // not evaluated (live-mode skip)
       if (!(r.outcomeMatch && r.reasonsMatch)) f.push(`required case failing: ${tag}`);
-      if (r.actualOutcome !== req.outcome) f.push(`required case outcome is ${r.actualOutcome}: ${tag}`);
+      if (r.actualOutcome !== req.outcome)
+        f.push(`required case outcome is ${r.actualOutcome}: ${tag}`);
       if (req.reasonCode && !r.actualReasonCodes.includes(req.reasonCode)) {
         f.push(`required case result lacks ${req.reasonCode}: ${tag}`);
       }
@@ -230,7 +234,9 @@ export function manifestFailures(
     }
   }
   if (cases.length < manifest.minTotalCases) {
-    f.push(`only ${cases.length} cases loaded; manifest requires at least ${manifest.minTotalCases}`);
+    f.push(
+      `only ${cases.length} cases loaded; manifest requires at least ${manifest.minTotalCases}`,
+    );
   }
   return f;
 }

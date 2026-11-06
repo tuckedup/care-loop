@@ -13,3 +13,4 @@ CLAUDE.md
 docs/SPEC.md
 docs/sources.md
 .claude
+evals/required-cases.json

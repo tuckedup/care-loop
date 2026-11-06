@@ -57,7 +57,10 @@ export function createAnthropicClient(opts: {
       );
       // Only a natural stop is trusted: max_tokens, refusal, tool_use, pause_turn, null, ... fail.
       if (msg.stop_reason !== "end_turn" && msg.stop_reason !== "stop_sequence") {
-        throw new RiskExtractionError("llm_error", `unusable stop_reason: ${String(msg.stop_reason)}`);
+        throw new RiskExtractionError(
+          "llm_error",
+          `unusable stop_reason: ${String(msg.stop_reason)}`,
+        );
       }
       return msg.content
         .filter((b) => b.type === "text" && typeof b.text === "string")

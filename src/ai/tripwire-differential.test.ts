@@ -342,7 +342,8 @@ describe("squeezed scan: irregular spacing of long phrases", () => {
       expect(newSigs(t), t).toEqual([]);
     }
     // Short single words are deliberately not squeezed, so these irregular spacings are known misses.
-    for (const t of ["d ie", "k m s", "d e ad"]) expect(newSigs(t).length, t).toBeGreaterThanOrEqual(0);
+    for (const t of ["d ie", "k m s", "d e ad"])
+      expect(newSigs(t).length, t).toBeGreaterThanOrEqual(0);
   });
 
   it("is linear on 1e6 characters (squeeze building blocks)", () => {

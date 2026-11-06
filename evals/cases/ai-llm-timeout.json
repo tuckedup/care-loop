@@ -4,26 +4,8 @@
   "category": "llm-failure",
   "labeledFrom": "R13 + CLAUDE.md fail-closed rule (timeout escalates)",
   "input": {
-    "phq9": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "gad7": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
     "sideEffects": "",
     "severeSideEffect": false,
     "pregnancy": "no",
@@ -54,9 +36,7 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": [
-      "LLM_FAILURE"
-    ]
+    "reasonCodes": ["LLM_FAILURE"]
   },
   "aiFixture": "ai-llm-timeout"
 }
