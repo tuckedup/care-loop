@@ -701,7 +701,7 @@
       "pnpm test src/domain/pharmacy.test.ts",
       "pnpm e2e e2e/confirm-pharmacy.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F048",
@@ -731,7 +731,7 @@
     "verification": [
       "pnpm test src/domain/renewal/pharmacy-responses.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F050",
@@ -742,9 +742,9 @@
       "Patient status page shows the progression"
     ],
     "verification": [
-      "pnpm e2e e2e/pharmacy-retry-fill.spec.ts"
+      "pnpm exec cross-env MOCK_PHARMACY_FORCE=retry-then-fill CRON_SECRET=e2e-secret pnpm e2e e2e/pharmacy-retry-fill.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F051",
@@ -800,7 +800,7 @@
       "pnpm test src/domain/pharmacist.test.ts",
       "pnpm e2e e2e/pharmacist-inbox.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F055",

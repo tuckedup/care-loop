@@ -243,3 +243,13 @@ summary content.
 Infra: next.config.ts distDir is now configurable (NEXT_DIST_DIR) so concurrent dev servers/e2e runs
 can use separate build dirs (.next-<name>/, ignored by git/eslint/prettier). Use it with
 per-agent DATABASE_URL (…_e2e) and PORT.
+
+## 2026-11-06 — Pharmacy stream: F047, F049, F050, F054 passing (F048 pending fresh safety review)
+
+Verifier PASS at 5f2bcd7 (1380 unit tests, eval 47, lint/typecheck clean). F050's listed command skipped
+silently without MOCK_PHARMACY_FORCE and CRON_SECRET: verification now uses `pnpm exec cross-env ...`
+so it really runs (3 tests). The pharmacy builder's own safety review of F048/F049 FAILED once
+(duplicate in-flight renewal of the same prescription could double-transmit; fill+retryable error could
+re-send; cross-attributed fills) and was fixed in 5f2bcd7; a FRESH independent review is still required
+before F048 (safety-flagged) is flagged. NOTE: after pulling migrations always run `pnpm db:migrate`
+before `pnpm projections:rebuild` (0012_pharmacy_alerts).
