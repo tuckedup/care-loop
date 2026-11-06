@@ -7,6 +7,7 @@ import {
   verifyPatientIdentity,
 } from "../../_lib/renewal-service";
 import type { CheckInFormState } from "../../_lib/check-in-content";
+import { evaluateAfterCheckIn } from "../../_lib/post-checkin";
 import { requirePatient, stepPath } from "../../_lib/session";
 
 /** Identity verification. Wrong input redirects back with a generic message (no factor leaked). */
@@ -43,7 +44,12 @@ export async function submitCheckInAction(
     if (!(e instanceof PatientInputError)) throw e;
     redirect(`/patient/renew?error=${encodeURIComponent(e.code)}`);
   }
-  if (outcome.ok) redirect(stepPath(renewalId, "result"));
+  if (outcome.ok) {
+    // Decision pipeline (rules + fail-closed AI). Never throws; on failure the check-in is still
+    // saved and the renewal stays open/unevaluated for the cron catch-up.
+    await evaluateAfterCheckIn(sql, renewalId);
+    redirect(stepPath(renewalId, "result"));
+  }
   return {
     attempt: _prev.attempt + 1,
     fieldErrors: outcome.fieldErrors,

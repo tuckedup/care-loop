@@ -2,14 +2,18 @@
 // audited appendToStream); formulary and pharmacies are plain reference tables.
 // Idempotent: existing streams are skipped, reference rows are upserted.
 import type { Sql } from "postgres";
-import type { AuditContext } from "../src/infra/audit";
+import { appendToStream, type AuditContext } from "../src/infra/audit";
+import { handleCommand, loadStream } from "../src/domain/aggregate-handler";
+import { makeEvent } from "../src/domain/events";
+import { approveRenewal, startReview } from "../src/domain/clinician/handlers";
+import { reviewAggregate } from "../src/domain/renewal/review";
 import { streamVersion } from "../src/infra/event-store";
 import { seedFormulary } from "../src/infra/db/formulary-repo";
 import { registerPatient, prescribeMedication } from "../src/domain/patient/handlers";
 import { patientStreamId, rxStreamId } from "../src/domain/patient/patient";
 import { requestRenewal, submitCheckIn, verifyIdentity } from "../src/domain/renewal/handlers";
 import { renewalStreamId } from "../src/domain/renewal/renewal";
-import { buildSeedPlan } from "../src/domain/seed";
+import { buildSeedPlan, type SeedPatient, type SeedPriorRenewal } from "../src/domain/seed";
 import { registerAllProjections } from "../src/infra/projections/all";
 import { runAllProjections } from "../src/infra/projections/registry";
 
@@ -92,34 +96,96 @@ export async function runSeed(sql: Sql, opts: { seed: number }): Promise<SeedSum
       summary.prescriptionsCreated++;
     }
 
-    for (const r of patient.priorRenewals) {
-      if ((await streamVersion(sql, renewalStreamId(r.renewalId))) > 0) {
+    // Visit history first: a signed note resets renewals-since-last-visit. Audited appends only.
+    for (const v of patient.visits) {
+      const streamId = `visit-${v.visitId}`;
+      if ((await streamVersion(sql, streamId)) > 0) {
         summary.skipped++;
         continue;
       }
-      await requestRenewal(
+      await appendToStream(
         sql,
-        {
-          type: "RequestRenewal",
-          renewalId: r.renewalId,
-          patientId: patient.patientId,
-          prescriptionId: r.prescriptionId,
-        },
-        ctx("seed:RequestRenewal"),
+        streamId,
+        0,
+        [
+          makeEvent("VisitBooked", {
+            v: 1,
+            visitId: v.visitId,
+            patientId: patient.patientId,
+            start: v.start,
+            end: v.end,
+            clinicianId: v.clinicianId,
+          }),
+          makeEvent("VisitNoteSigned", {
+            v: 1,
+            visitId: v.visitId,
+            noteId: v.noteId,
+            clinicianId: v.clinicianId,
+          }),
+        ],
+        ctx("seed:VisitHistory"),
       );
-      await verifyIdentity(
-        sql,
-        {
-          renewalId: r.renewalId,
-          provided: { dateOfBirth: patient.dateOfBirth, lastName: patient.lastName },
-        },
-        ctx("seed:VerifyIdentity"),
-      );
-      await submitCheckIn(sql, { renewalId: r.renewalId, ...r.checkIn }, ctx("seed:SubmitCheckIn"));
-      summary.renewalsCreated++;
+    }
+
+    for (const r of patient.priorRenewals) {
+      if ((await streamVersion(sql, renewalStreamId(r.renewalId))) === 0) {
+        await seedRenewalRequest(sql, patient, r);
+        summary.renewalsCreated++;
+      } else summary.skipped++;
+      if (r.approvedBy) await seedApproval(sql, patient.patientId, r.renewalId, r.approvedBy);
     }
   }
 
   await runAllProjections(sql, registerAllProjections());
   return summary;
+}
+
+/** Synthetic evaluation, review start and clinician approval; each step skipped if already done. */
+async function seedApproval(sql: Sql, patientId: string, renewalId: string, clinicianId: string) {
+  const has = async (type: string) =>
+    (await loadStream(sql, renewalStreamId(renewalId))).events.some((e) => e.type === type);
+  if (!(await has("EligibilityEvaluated"))) {
+    await handleCommand(
+      sql,
+      reviewAggregate,
+      renewalStreamId(renewalId),
+      {
+        type: "RecordEvaluation",
+        renewalId,
+        patientId,
+        ai: { status: "ok", signals: [], model: "synthetic-seed-fixture", latencyMs: 0 },
+        evaluation: {
+          outcome: "AUTO_ELIGIBLE",
+          results: [{ ruleId: "SEED", passed: true, detail: "synthetic seed history" }],
+          reasonCodes: [],
+        },
+      },
+      ctx("seed:RecordEvaluation"),
+    );
+  }
+  const actor = { role: "clinician", id: clinicianId } as const;
+  if (!(await has("ClinicianReviewStarted"))) await startReview(sql, actor, { renewalId });
+  if (!(await has("RenewalApproved"))) await approveRenewal(sql, actor, { renewalId });
+}
+
+async function seedRenewalRequest(sql: Sql, patient: SeedPatient, r: SeedPriorRenewal) {
+  await requestRenewal(
+    sql,
+    {
+      type: "RequestRenewal",
+      renewalId: r.renewalId,
+      patientId: patient.patientId,
+      prescriptionId: r.prescriptionId,
+    },
+    ctx("seed:RequestRenewal"),
+  );
+  await verifyIdentity(
+    sql,
+    {
+      renewalId: r.renewalId,
+      provided: { dateOfBirth: patient.dateOfBirth, lastName: patient.lastName },
+    },
+    ctx("seed:VerifyIdentity"),
+  );
+  await submitCheckIn(sql, { renewalId: r.renewalId, ...r.checkIn }, ctx("seed:SubmitCheckIn"));
 }

@@ -57,6 +57,20 @@ export interface SeedPriorRenewal {
   renewalId: string;
   prescriptionId: string;
   checkIn: CheckInAnswers;
+  /**
+   * When set, the renewal is carried through the real clinician path after check-in:
+   * synthetic evaluation recorded, ClinicianReviewStarted, then RenewalApproved by this clinician.
+   */
+  approvedBy?: string;
+}
+
+/** A completed visit (booked, then its note signed) that happened before the prior renewals. */
+export interface SeedVisit {
+  visitId: string;
+  noteId: string;
+  clinicianId: string;
+  start: string;
+  end: string;
 }
 
 export interface SeedPatient {
@@ -69,6 +83,8 @@ export interface SeedPatient {
   medications: SeedMedication[];
   /** Completed (request, verify, check-in) renewals that happened before now. */
   priorRenewals: SeedPriorRenewal[];
+  /** Visit history, seeded BEFORE the prior renewals (resets renewals-since-last-visit). */
+  visits: SeedVisit[];
 }
 
 export interface SeedPlan {
@@ -177,7 +193,8 @@ export function buildSeedPlan(seed: number): SeedPlan {
     who: { firstName: string; lastName: string; dateOfBirth: string },
     medications: SeedMedication[],
     priorRenewals: SeedPriorRenewal[] = [],
-  ) => patients.push({ scenario, patientId, ...who, medications, priorRenewals });
+    visits: SeedVisit[] = [],
+  ) => patients.push({ scenario, patientId, ...who, medications, priorRenewals, visits });
 
   // 1. Clean stable patient: the demo-auth patient. Two non-controlled maintenance meds.
   add("clean-stable", DEMO_PATIENT_ID, DEMO_PATIENT_IDENTITY, [
@@ -209,7 +226,9 @@ export function buildSeedPlan(seed: number): SeedPlan {
     ],
   );
 
-  // 3. At the refill limit (default REFILL_LIMIT 2): two prior renewals, no visit since.
+  // 3. At the refill limit (default REFILL_LIMIT 2): a signed visit note, then two renewals that
+  //    a clinician approved after starting review. Renewals-since-last-visit == 2, so a third
+  //    request must go to follow-up.
   add(
     "refill-limit",
     "patient-refill-limit",
@@ -228,7 +247,17 @@ export function buildSeedPlan(seed: number): SeedPlan {
       renewalId: `renewal-refill-limit-${n}`,
       prescriptionId: "rx-refill-limit-fluoxetine",
       checkIn: { ...CALM },
+      approvedBy: clinician,
     })),
+    [
+      {
+        visitId: "visit-refill-limit-1",
+        noteId: "note-refill-limit-1",
+        clinicianId: clinician,
+        start: "2026-05-04T15:00:00Z",
+        end: "2026-05-04T15:30:00Z",
+      },
+    ],
   );
 
   // 4. Drug-specific agreement conditions. Doses are plausible synthetic values, not thresholds.

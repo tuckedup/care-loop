@@ -23,7 +23,7 @@ const COPY: Record<ResultState, { title: string; body: string; tone: string }> =
 export default async function ResultPage({ params }: { params: Promise<{ renewalId: string }> }) {
   const { renewalId } = await params;
   const { renewal } = await loadRenewalForStep(renewalId, "result");
-  // Until the decision pipeline lands, nothing emits approval events, so this is "under review".
+  // State comes from the rx_status projection (fed by the decision pipeline and clinician commands); unknown => under review.
   const state = resultStateFor(renewal.status);
   const copy = COPY[state];
 

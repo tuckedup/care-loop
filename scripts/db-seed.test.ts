@@ -115,3 +115,71 @@ describe("seed hygiene", () => {
     expect(src).not.toMatch(/insertEventsInTx/);
   });
 });
+
+describe("refill-limit patient history (database)", () => {
+  it("has real visit + clinician-approval events making renewals-since-last-visit == REFILL_LIMIT", async () => {
+    const { evaluateRenewal } = await import("../src/domain/pipeline/process-manager");
+    const { aiDepsFor, spyClient } = await import("../src/domain/pipeline/testing");
+    const types = async (stream: string) =>
+      (
+        await a.sql.unsafe<{ type: string }[]>(
+          `SELECT type FROM events WHERE stream_id = $1 ORDER BY stream_version`,
+          [stream],
+        )
+      ).map((r) => r.type);
+    expect(await types("visit-visit-refill-limit-1")).toEqual(["VisitBooked", "VisitNoteSigned"]);
+    for (const n of [1, 2]) {
+      expect(await types(`renewal-renewal-refill-limit-${n}`)).toEqual([
+        "RenewalRequested",
+        "IdentityVerified",
+        "CheckInSubmitted",
+        "RiskSignalsExtracted",
+        "EligibilityEvaluated",
+        "ClinicianReviewStarted",
+        "RenewalApproved",
+      ]);
+    }
+    const approvals = await a.sql.unsafe<{ data: { by: string; clinicianId: string } }[]>(
+      `SELECT data FROM events WHERE type = 'RenewalApproved'
+         AND data->>'renewalId' LIKE 'renewal-refill-limit-%'`,
+    );
+    expect(approvals.every((r) => r.data.by === "clinician" && r.data.clinicianId)).toBe(true);
+
+    // A third request is held back by the real rules (refill limit since the last visit).
+    const p = buildSeedPlan(42).patients.find((x) => x.scenario === "refill-limit")!;
+    const { requestRenewal, verifyIdentity, submitCheckIn } =
+      await import("../src/domain/renewal/handlers");
+    const { CALM_CHECK_IN } = await import("../src/domain/pipeline/testing");
+    const ctx = { actor: p.patientId, role: "patient", action: "test" } as const;
+    const renewalId = "renewal-refill-limit-3";
+    await requestRenewal(
+      a.sql,
+      {
+        type: "RequestRenewal",
+        renewalId,
+        patientId: p.patientId,
+        prescriptionId: "rx-refill-limit-fluoxetine",
+      },
+      ctx,
+    );
+    await verifyIdentity(
+      a.sql,
+      { renewalId, provided: { dateOfBirth: p.dateOfBirth, lastName: p.lastName } },
+      ctx,
+    );
+    await submitCheckIn(a.sql, { renewalId, ...CALM_CHECK_IN }, ctx);
+    const out = await evaluateRenewal(a.sql, renewalId, {
+      ai: aiDepsFor(spyClient()),
+      refillLimit: 2,
+      now: () => new Date("2026-11-06T12:00:00Z"),
+    });
+    expect(out.status).toBe("evaluated");
+    const ev = await a.sql.unsafe<
+      { data: { results: { ruleId: string; passed: boolean; detail: string }[] } }[]
+    >(
+      `SELECT data FROM events WHERE stream_id = 'renewal-renewal-refill-limit-3' AND type = 'EligibilityEvaluated'`,
+    );
+    const failed = ev[0]!.data.results.filter((r) => !r.passed);
+    expect(failed.some((r) => /refill|renewals|visit|limit/i.test(r.detail + r.ruleId))).toBe(true);
+  }, 60_000);
+});
