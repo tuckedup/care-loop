@@ -27,7 +27,7 @@
     "verification": [
       "pnpm test src/infra/db/append-only.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F003",
@@ -43,7 +43,7 @@
       "pnpm test src/infra/event-store/event-store.test.ts",
       "pnpm typecheck"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F004",
@@ -58,7 +58,7 @@
     "verification": [
       "pnpm test src/infra/audit/audit-log.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F005",
@@ -73,7 +73,7 @@
     "verification": [
       "pnpm test src/domain/events.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F006",
@@ -88,7 +88,7 @@
     "verification": [
       "pnpm test src/domain/aggregate.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F007",
@@ -102,7 +102,7 @@
     "verification": [
       "pnpm test src/domain/patient/patient.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F008",
@@ -116,7 +116,7 @@
     "verification": [
       "pnpm test src/domain/renewal/renewal-request.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F009",
@@ -130,7 +130,7 @@
     "verification": [
       "pnpm test src/domain/renewal/checkin.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F010",
@@ -144,7 +144,7 @@
     "verification": [
       "pnpm test src/infra/projections/runner.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F011",
@@ -158,7 +158,7 @@
     "verification": [
       "pnpm test src/infra/projections/patient-med-list.test.ts src/infra/projections/rx-status.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F012",
@@ -173,7 +173,7 @@
       "pnpm test src/infra/projections/rebuild.test.ts",
       "pnpm projections:rebuild"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F013",
@@ -320,7 +320,7 @@
       "Blocks before any AI step is reachable"
     ],
     "verification": [
-      "pnpm test src/domain/rules/r03.test.ts"
+      "pnpm test src/domain/rules/r03-controlled.test.ts"
     ],
     "passes": false
   },
@@ -350,7 +350,7 @@
       "Boundary tests at limit-1, limit, limit+1 and custom limits"
     ],
     "verification": [
-      "pnpm test src/domain/rules/r06.test.ts"
+      "pnpm test src/domain/rules/r06-refill-limit.test.ts"
     ],
     "passes": false
   },
@@ -365,7 +365,7 @@
       "Tests for 0, 1, 2, 3"
     ],
     "verification": [
-      "pnpm test src/domain/rules/r07.test.ts"
+      "pnpm test src/domain/rules/r07-item9.test.ts"
     ],
     "passes": false
   },
@@ -380,7 +380,7 @@
       "Boundary tests 14/15 and rise 4/5"
     ],
     "verification": [
-      "pnpm test src/domain/rules/r08.test.ts"
+      "pnpm test src/domain/rules/r08-phq9-total.test.ts"
     ],
     "passes": false
   },
@@ -395,7 +395,7 @@
       "Tests for every branch, including pregnancy 'no'"
     ],
     "verification": [
-      "pnpm test src/domain/rules/r09-r12.test.ts"
+      "pnpm test src/domain/rules/r09-r12-structured.test.ts"
     ],
     "passes": false
   },

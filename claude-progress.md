@@ -55,3 +55,27 @@ Notes:
 - pnpm eval still passes with zero cases (passWithNoTests) until F030 removes it.
 
 Next session: F002 (append-only enforcement on events).
+
+## 2026-11-06 — Multi-agent build, wave 1 (spine, rules, auth)
+
+Orchestration: builders (sonnet) worked disjoint paths in parallel; every feature was then run by an
+independent `verifier` subagent before `passes` was flipped; rules/AI also get a fresh
+`clinical-safety-reviewer`. Event store is HAND-ROLLED (ADR-002): Emmett had no license found and
+unconfirmed pooler support.
+
+Verified PASS and flagged: F001-F012, F014.
+Rules F020-F029: first safety review FAILED (mislabelled controlled drug reached AUTO_ELIGIBLE);
+fixed in c2c1770 (name matching, M01 identity-mismatch, M02 dose-form, total evaluateEligibility,
+stronger purity test); awaiting re-review before flags flip.
+F013: only the pure formulary + RxCUI cache is done (DB table/seed pending).
+
+Known hardening gaps (from verifier code review, not yet addressed):
+
+- App DB role is not stripped of UPDATE/DELETE/TRUNCATE on events/audit_log (triggers only; a
+  privileged user can disable them). Add a migration role split + REVOKE.
+- audit_chain_head has no trigger protection; a coordinated rewrite of audit_log+head is undetected.
+- Projection rebuild reset and replay are separate transactions (recoverable, not atomic).
+- insertEventsInTx is exported from store.ts; only convention + a source-scan test prevent misuse.
+- Page-level RBAC returns HTTP 200 on /forbidden (route handlers return real 403). Consider
+  experimental.authInterrupts. `.env.example` SESSION_SECRET placeholder must be rejected in prod.
+- postgres.js: use `::text::jsonb` (bare `::jsonb` double-encodes); src/test/db.ts F001 helper OK.
