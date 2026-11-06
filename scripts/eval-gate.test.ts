@@ -401,7 +401,7 @@ describe("coverage floor, environment guard and live mode (process level)", () =
 
   it("REPRO: editing the emoji-prefix tripwire case to harmless text with AUTO_ELIGIBLE fails the gate", () => {
     const s = stageEdited((cases) => {
-      const c = cases.get("ai-silent-model-emoji-prefix");
+      const c = cases.get("ai-silent-model-emoji-prefix")!;
       c.input.freeText = "hello";
       c.expected = { outcome: "AUTO_ELIGIBLE", reasonCodes: [] };
     });
@@ -415,7 +415,7 @@ describe("coverage floor, environment guard and live mode (process level)", () =
 
   it("editing only a label (same text) is caught by the pin", () => {
     const s = stageEdited((cases) => {
-      cases.get("item9-positive").expected.reasonCodes = ["PHQ9_ITEM9_POSITIVE", "PHQ9_TOTAL_HIGH"];
+      cases.get("item9-positive")!.expected.reasonCodes = ["PHQ9_ITEM9_POSITIVE", "PHQ9_TOTAL_HIGH"];
     });
     const r = runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
