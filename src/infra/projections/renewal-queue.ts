@@ -157,7 +157,6 @@ export function reduceRenewalQueue(
     holdIfUnattributed(
       next({ escalated: true, reasonCodes: union(current.reasonCodes, codes) }),
       current,
-      meta,
     );
 
   switch (event.type) {
@@ -225,11 +224,7 @@ export function reduceRenewalQueue(
 }
 
 /** Re-open `row` (derived from `before`) if `before` was completed without clinician attribution. */
-function holdIfUnattributed(
-  row: RenewalQueueRow,
-  before: RenewalQueueRow,
-  _meta: { position: bigint; at: string },
-): RenewalQueueRow {
+function holdIfUnattributed(row: RenewalQueueRow, before: RenewalQueueRow): RenewalQueueRow {
   if (before.status !== "completed" || before.decision === null) return row;
   if (attributableToClinician(row)) return row;
   return {
@@ -266,7 +261,7 @@ export function reduceInvalidEvent(
     updatedAt: meta.at,
     lastPosition: meta.position,
   };
-  return holdIfUnattributed(flagged, current, meta);
+  return holdIfUnattributed(flagged, current);
 }
 
 interface Row {
