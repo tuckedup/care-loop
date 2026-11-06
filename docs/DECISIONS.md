@@ -265,5 +265,32 @@ monitoring.
 - **Mock.** The request takes an optional `attempt` (later attempts draw anew); `MOCK_PHARMACY_FORCE`
   (`retry-then-fill`, `escalation`) scripts scenarios for e2e. The mock is NOT a real e-prescribing
   network; no EPCS. Data is synthetic.
-- **Known gaps.** A retryable error that exhausts 5 attempts dead-letters without a person-facing
-  alert (TODO). The patient result page maps pharmacy_error/cancelled to "under review".
+- **Transmit gate is a positive allow-list.** Besides the schedule flag, the medication must resolve
+  (the rules' R02/M01/M02 via isAiPathPermitted, which also rejects every controlled signal) to an
+  allowlisted, non-controlled formulary entry, both when Approve would queue a transmission (the
+  approval is refused with MEDICATION_NOT_TRANSMITTABLE) and in the worker. "alprazolam" with a null
+  schedule, homoglyphs and unknown drugs never transmit.
+- **Dead letters surface.** The worker runs dead-letter hooks every pass (idempotent). For
+  pharmacy.RxRenewalResponse a queued renewal whose send is refused, fatal or out of retries gets a
+  terminal PharmacyErrorReceived{TRANSMIT_DEAD_LETTERED}: rx_status shows a problem, clinician and
+  pharmacist see an alert, the patient sees "there was a problem sending your prescription", and the
+  patient may renew again. A forged row for a renewal that was never queued gets no event (nothing
+  was promised); it stays visible as a dead outbox row.
+- **Stalled renewals.** A renewal in queued/transmitted/pharmacy_status with no fill after
+  PHARMACY_STALE_HOURS (default 72; demo config, TODO: source needed for a real value, not a
+  clinical threshold) is swept (clock injected at the cron/script edge) into a non-retryable
+  PharmacyErrorReceived{STALLED_NO_FILL}: alert, no longer blocks a new renewal. The duplicate-SEND
+  guard still counts it as unsettled, so it is never sent twice; a late fill still wins.
+- **Race-safe start + deterministic duplicates.** startRenewal checks inside the append transaction
+  (the audit chain-head row lock serialises writers; no session-level locks): a competing open
+  renewal is resumed, an in-flight one refuses. If two renewals of one prescription are queued
+  anyway, the earliest RxRenewalQueued position sends; the later is dead-lettered WITH the alert.
+- **Hardening.** Mock outcomes depend on (seed, idempotency key / messageId), not the attempt;
+  MOCK_PHARMACY_FORCE is honoured only when NODE_ENV is exactly development or test; pharmacy answers
+  are capped (64 KiB, 50 messages) and over-cap is a fatal parse error; pharmacy_alerts is keyed on
+  (renewal_id, message_id) (migration 0013); terminal rx_status outcomes (filled, cancelled, fatal
+  error) are not overwritten by late Status/Transmitted/retryable messages (fill still beats a fatal
+  error, cancel beats all); the Langfuse call carries an Idempotency-Key.
+- **Known gaps.** The patient result page maps cancelled to the same "problem sending" copy. A dead
+  letter for a renewal that is escalated but not yet decided is not possible (nothing is queued
+  before approval).

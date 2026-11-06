@@ -90,19 +90,32 @@ const ESCALATIONS = [
  */
 export type ForcedScenario = "retry-then-fill" | "escalation";
 
+/**
+ * MOCK_PHARMACY_FORCE is honoured ONLY when NODE_ENV is exactly "development" or "test"
+ * (default deny: production, unset, "Production" and anything else ignore it).
+ */
+export function forcedScenario(env: {
+  NODE_ENV?: string | undefined;
+  MOCK_PHARMACY_FORCE?: string | undefined;
+}): ForcedScenario | undefined {
+  if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") return undefined;
+  const f = env.MOCK_PHARMACY_FORCE;
+  return f === "retry-then-fill" || f === "escalation" ? f : undefined;
+}
+
 export function simulate(
   seed: number,
   req: MockPharmacyRequest,
   rates: SimulationRates = DEFAULT_RATES,
   force?: ForcedScenario,
+  /** The Idempotency-Key header, if any. The outcome depends on (seed, key), never on the attempt. */
+  idempotencyKey?: string | null,
 ): Simulation {
   const attempt = req.attempt ?? 1;
-  const rng = mulberry32(
-    (seed ^ hashString(attempt > 1 ? `${req.messageId}#a${attempt}` : req.messageId)) >>> 0,
-  );
+  // Same key (or messageId) => same outcome, so a crash-resend gets a consistent answer.
+  const rng = mulberry32((seed ^ hashString(idempotencyKey || req.messageId)) >>> 0);
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rng() * xs.length)]!;
-  const mid = (suffix: string) =>
-    `${req.messageId}:${suffix}${attempt > 1 && suffix === "error" ? `:a${attempt}` : ""}`;
+  const mid = (suffix: string) => `${req.messageId}:${suffix}`;
   // Always draw the same number of values in the same order, so rates do not shift later draws.
   const rError = rng();
   const rDelay = rng();

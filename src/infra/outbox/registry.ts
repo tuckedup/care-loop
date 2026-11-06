@@ -1,5 +1,5 @@
 import type { Sql } from "postgres";
-import { createTransmitHandler } from "./transmit";
+import { createTransmitDeadLetterHook, createTransmitHandler } from "./transmit";
 import { HandlerRegistry } from "./worker";
 
 export interface RegistryDeps {
@@ -18,6 +18,10 @@ export function createDefaultRegistry(deps?: RegistryDeps): HandlerRegistry {
   const registry = new HandlerRegistry();
   if (deps) {
     registry.register("pharmacy.RxRenewalResponse", createTransmitHandler(deps));
+    registry.registerDeadLetter(
+      "pharmacy.RxRenewalResponse",
+      createTransmitDeadLetterHook(deps.sql),
+    );
   }
   return registry;
 }

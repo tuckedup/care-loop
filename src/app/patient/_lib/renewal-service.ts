@@ -7,7 +7,9 @@ import type { Sql } from "postgres";
 import { z } from "zod";
 import { DomainError } from "@/domain/aggregate";
 import { CheckInAnswersSchema, FREE_TEXT_MAX, type CheckInAnswers } from "@/domain/events";
-import { requestRenewal, submitCheckIn, verifyIdentity } from "@/domain/renewal/handlers";
+import { isInFlight, staleHoursFrom } from "@/domain/pharmacy-stall";
+import { RenewalConflictError, requestRenewalExclusive } from "@/domain/renewal/exclusive-request";
+import { submitCheckIn, verifyIdentity } from "@/domain/renewal/handlers";
 import { IdentityFactorsSchema } from "@/domain/renewal/renewal";
 import { findFormularyByRxcui } from "@/infra/db/formulary-repo";
 import { registerAllProjections } from "@/infra/projections/all";
@@ -73,16 +75,11 @@ const RESUMABLE = new Set(["requested", "identity_verified"]);
  * renewal of the same prescription may start. "approved" (not "queued") means the approval never
  * produced a transmission. Anything unknown counts as in flight (fail closed).
  */
-const TERMINAL = new Set(["approved", "denied", "follow_up_required", "filled", "cancelled"]);
-
-export function isRenewalInFlight(r: { status: string; pharmacyStatus: string | null }): boolean {
-  if (RESUMABLE.has(r.status)) return false; // handled by resume, not a block
-  if (TERMINAL.has(r.status)) return false;
-  // A pharmacy error is final only when it is explicitly not retryable.
-  if (r.status === "pharmacy_error") {
-    return !(r.pharmacyStatus?.startsWith("ERROR:") && !r.pharmacyStatus.endsWith(":retryable"));
-  }
-  return true;
+export function isRenewalInFlight(
+  r: { status: string; pharmacyStatus: string | null; updatedAt?: string },
+  opts: { now?: Date; staleHours?: number } = {},
+): boolean {
+  return isInFlight(r, opts);
 }
 
 export type NextStep = "verify" | "check-in" | "result";
@@ -93,7 +90,7 @@ export function nextStepFor(status: string): NextStep {
   return "result";
 }
 
-export type ResultState = "approved" | "under_review" | "follow_up_needed";
+export type ResultState = "approved" | "under_review" | "follow_up_needed" | "pharmacy_problem";
 
 /**
  * Maps the rx_status projection value to what the patient sees. Anything not explicitly known
@@ -110,6 +107,10 @@ export function resultStateFor(status: string): ResultState {
     case "denied":
     case "follow_up_required":
       return "follow_up_needed";
+    case "pharmacy_error":
+    case "cancelled":
+      // Never "approved/sent": something went wrong after the approval and people were alerted.
+      return "pharmacy_problem";
     default:
       return "under_review";
   }
@@ -174,7 +175,11 @@ export async function startRenewal(
   sql: Sql,
   patientId: string,
   rawPrescriptionId: unknown,
+  /** The clock is injected (tests); production passes nothing. */
+  opts: { now?: Date; staleHours?: number } = {},
 ): Promise<{ renewalId: string; next: NextStep; resumed: boolean }> {
+  const now = opts.now ?? new Date();
+  const staleHours = opts.staleHours ?? staleHoursFrom(process.env);
   const parsed = PrescriptionIdSchema.safeParse(rawPrescriptionId);
   if (!parsed.success) throw new PatientInputError("INVALID_INPUT", "Choose a medication.");
   const prescriptionId = parsed.data;
@@ -205,7 +210,7 @@ export async function startRenewal(
     return { renewalId: existing.renewalId, next: nextStepFor(existing.status), resumed: true };
   }
   // Never a second renewal of the same prescription while another is still in flight.
-  if (sameRx.some(isRenewalInFlight)) {
+  if (sameRx.some((r) => isRenewalInFlight(r, { now, staleHours }))) {
     throw new PatientInputError(
       "ALREADY_IN_PROGRESS",
       "A renewal for this medication is already in progress.",
@@ -213,11 +218,26 @@ export async function startRenewal(
   }
 
   const renewalId = randomUUID();
-  await requestRenewal(
-    sql,
-    { type: "RequestRenewal", renewalId, patientId, prescriptionId },
-    auditCtx(patientId, "patient:RequestRenewal"),
-  );
+  try {
+    // Race-safe: the in-flight check runs inside the append transaction (see exclusive-request).
+    await requestRenewalExclusive(
+      sql,
+      { type: "RequestRenewal", renewalId, patientId, prescriptionId },
+      auditCtx(patientId, "patient:RequestRenewal"),
+      { now, staleHours },
+    );
+  } catch (e) {
+    if (e instanceof RenewalConflictError) {
+      if (e.kind === "resume" && e.renewalId && e.status) {
+        return { renewalId: e.renewalId, next: nextStepFor(e.status), resumed: true };
+      }
+      throw new PatientInputError(
+        "ALREADY_IN_PROGRESS",
+        "A renewal for this medication is already in progress.",
+      );
+    }
+    throw e;
+  }
   await syncProjections(sql);
   return { renewalId, next: "verify", resumed: false };
 }

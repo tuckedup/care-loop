@@ -19,7 +19,12 @@ import { listPharmacyAlerts } from "@/infra/projections/pharmacy-alerts";
 import { runAllProjections } from "@/infra/projections/registry";
 import { getRxStatus } from "@/infra/projections/rx-status";
 import { createTestDb, type TestDb } from "@/test/db";
-import { decidePharmacyResponse, parsePharmacyBody } from "./pharmacy-responses";
+import {
+  decidePharmacyResponse,
+  MAX_RESPONSE_MESSAGES,
+  OVERSIZE_BODY,
+  parsePharmacyBody,
+} from "./pharmacy-responses";
 
 // ---------------------------------------------------------------------------------------------
 // Pure decision
@@ -100,6 +105,33 @@ describe("decidePharmacyResponse (pure)", () => {
     expect(types(decidePharmacyResponse([queued, cancelled], input(200, [fill])))).not.toContain(
       "RxFillReceived",
     );
+  });
+
+  it("an oversized answer (too many messages / too many bytes) is fatal and records no events", () => {
+    const many = Array.from({ length: 5000 }, (_, i) => ({
+      type: "Status",
+      messageId: `s${i}`,
+      status: "OK",
+    }));
+    const r = decidePharmacyResponse([queued], input(200, many));
+    expect(r.events).toEqual([]);
+    expect(r.outcome).toMatchObject({ kind: "fatal" });
+    expect(
+      decidePharmacyResponse([queued], input(200, { messages: [status], ...{} })).outcome.kind,
+    ).toBe("ok");
+    const big = decidePharmacyResponse([queued], input(200, OVERSIZE_BODY));
+    expect(big.events).toEqual([]);
+    expect(big.outcome).toMatchObject({
+      kind: "fatal",
+      reason: expect.stringContaining("too large"),
+    });
+    // Exactly at the cap is still fine.
+    const atCap = Array.from({ length: MAX_RESPONSE_MESSAGES }, (_, i) => ({
+      type: "Status",
+      messageId: `s${i}`,
+      status: "OK",
+    }));
+    expect(decidePharmacyResponse([queued], input(200, atCap)).outcome.kind).toBe("ok");
   });
 
   it("an RxFill naming another renewal or prescription is not attributed to this renewal", () => {

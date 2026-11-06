@@ -1,5 +1,4 @@
-// Projection pharmacy_alerts (F049/F054): things a person must look at that came from the
-// pharmacy, keyed by the pharmacy's messageId (so a duplicate message is one row).
+// pharmacy, keyed by (renewal, pharmacy messageId): a duplicate message is one row, a reused id elsewhere is not hidden.
 //   - PharmacistEscalationReceived          -> kind "escalation"
 //   - PharmacyErrorReceived (not retryable) -> kind "error"   (retryable errors retry, no alert)
 //   - RxCancelAcknowledged                  -> kind "cancel"
@@ -32,6 +31,17 @@ const RELEVANT = new Set([
   "PharmacyAlertAcknowledged",
 ]);
 
+/** Plain-language alert text for the codes this system raises itself; otherwise the pharmacy's. */
+function errorMessage(code: string): string {
+  if (code === "TRANSMIT_DEAD_LETTERED") {
+    return "The prescription could not be sent to the pharmacy (delivery gave up or was refused). The patient has been told there was a problem.";
+  }
+  if (code === "STALLED_NO_FILL") {
+    return "The pharmacy accepted the prescription but no fill has been reported within the expected time. Please check with the pharmacy.";
+  }
+  return `Pharmacy rejected the renewal (${code}); it will not be retried.`;
+}
+
 async function patientOf(tx: Db, streamId: string): Promise<string | null> {
   const [row] = await tx.unsafe<{ pid: string | null }[]>(
     `SELECT data->>'patientId' AS pid FROM events
@@ -56,7 +66,7 @@ async function raise(
     `INSERT INTO pharmacy_alerts (message_id, renewal_id, patient_id, kind, code, message,
                                   raised_at, raised_position)
      VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8::bigint)
-     ON CONFLICT (message_id) DO NOTHING`,
+     ON CONFLICT (renewal_id, message_id) DO NOTHING`,
     [
       a.messageId,
       a.renewalId,
@@ -99,7 +109,7 @@ export const pharmacyAlertsProjection: Projection = {
           renewalId: event.data.renewalId,
           kind: "error",
           code: event.data.code,
-          message: `Pharmacy rejected the renewal (${event.data.code}); it will not be retried.`,
+          message: errorMessage(event.data.code),
         });
         return;
       case "RxCancelAcknowledged":

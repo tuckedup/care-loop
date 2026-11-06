@@ -28,6 +28,11 @@ export async function ensurePharmacy(sql: Sql, id = PHARMACY_ID) {
 
 export interface ScenarioOptions {
   controlledSchedule?: "II" | "III" | "IV" | "V" | null;
+  /** Override the prescribed drug (schedule stays null unless controlledSchedule is given). */
+  drugName?: string;
+  rxcui?: string;
+  /** Reuse an existing patient + prescription (a second renewal of the same prescription). */
+  reuse?: { patientId: string; prescriptionId: string };
   /** Skip PharmacySelected. */
   noPharmacy?: boolean;
   /** Evaluation outcome recorded before the decision. */
@@ -39,33 +44,35 @@ export interface ScenarioOptions {
 export async function readyRenewal(sql: Sql, o: ScenarioOptions = {}) {
   await ensurePharmacy(sql);
   const renewalId = randomUUID();
-  const patientId = `p-${randomUUID().slice(0, 8)}`;
-  const prescriptionId = `rx-${randomUUID().slice(0, 8)}`;
-  await push(
-    sql,
-    `patient-${patientId}`,
-    ev("PatientRegistered", {
-      patientId,
-      firstName: "Sam",
-      lastName: "Synthetic",
-      dateOfBirth: "1990-05-17",
-    }),
-  );
-  await push(
-    sql,
-    `rx-${prescriptionId}`,
-    ev("MedicationPrescribed", {
-      prescriptionId,
-      patientId,
-      rxcui: "36437",
-      drugName: "sertraline",
-      dose: { amountMg: 50 },
-      frequency: { timesPerDay: 1, timing: "morning" },
-      sig: "1 tablet daily",
-      controlledSchedule: o.controlledSchedule ?? null,
-      prescriberId: "c-presc",
-    }),
-  );
+  const patientId = o.reuse?.patientId ?? `p-${randomUUID().slice(0, 8)}`;
+  const prescriptionId = o.reuse?.prescriptionId ?? `rx-${randomUUID().slice(0, 8)}`;
+  if (!o.reuse) {
+    await push(
+      sql,
+      `patient-${patientId}`,
+      ev("PatientRegistered", {
+        patientId,
+        firstName: "Sam",
+        lastName: "Synthetic",
+        dateOfBirth: "1990-05-17",
+      }),
+    );
+    await push(
+      sql,
+      `rx-${prescriptionId}`,
+      ev("MedicationPrescribed", {
+        prescriptionId,
+        patientId,
+        rxcui: o.rxcui ?? "36437",
+        drugName: o.drugName ?? "sertraline",
+        dose: { amountMg: 50 },
+        frequency: { timesPerDay: 1, timing: "morning" },
+        sig: "1 tablet daily",
+        controlledSchedule: o.controlledSchedule ?? null,
+        prescriberId: "c-presc",
+      }),
+    );
+  }
   const events: Ev[] = [
     ev("RenewalRequested", { renewalId, patientId, prescriptionId }),
     ev("IdentityVerified", { renewalId, method: "dob_lastname" }),
@@ -118,6 +125,55 @@ export async function approvedRenewal(sql: Sql, o: ScenarioOptions = {}) {
   await startReview(sql, clinician, { renewalId: r.renewalId });
   await approveRenewal(sql, clinician, { renewalId: r.renewalId });
   return r;
+}
+
+/**
+ * Forge what a compromised or buggy path might leave behind: a clinician approval plus a queued
+ * transmission and its outbox row, bypassing every command-level guard. For worker backstop tests.
+ */
+export async function forgeApprovedQueued(
+  sql: Sql,
+  r: { renewalId: string; prescriptionId: string },
+) {
+  await startReview(sql, clinician, { renewalId: r.renewalId });
+  const stream = `renewal-${r.renewalId}`;
+  const key = `rx-renewal:${r.renewalId}`;
+  const messageId = `rxmsg-${r.renewalId}`;
+  await appendToStream(
+    sql,
+    stream,
+    (await readStream(sql, stream)).length,
+    [
+      ev("RenewalApproved", {
+        renewalId: r.renewalId,
+        by: "clinician",
+        clinicianId: clinician.id,
+        autonomyMode: "SHADOW",
+      }),
+      ev("RxRenewalQueued", {
+        renewalId: r.renewalId,
+        prescriptionId: r.prescriptionId,
+        idempotencyKey: key,
+        pharmacyId: PHARMACY_ID,
+        messageId,
+      }),
+    ],
+    sys,
+    undefined,
+    [
+      {
+        type: "pharmacy.RxRenewalResponse",
+        idempotencyKey: key,
+        payload: {
+          renewalId: r.renewalId,
+          prescriptionId: r.prescriptionId,
+          pharmacyId: PHARMACY_ID,
+          messageId,
+          response: "Approved",
+        },
+      },
+    ],
+  );
 }
 
 export async function streamTypes(sql: Sql, renewalId: string): Promise<string[]> {

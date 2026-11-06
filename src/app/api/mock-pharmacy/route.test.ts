@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { POST } from "./route";
-import { simulate, type MockPharmacyRequest } from "./simulate";
+import { forcedScenario, simulate, type MockPharmacyRequest } from "./simulate";
 
 const base = {
   renewalId: "r1",
@@ -165,5 +165,71 @@ describe("POST /api/mock-pharmacy (F046)", () => {
       }
     }
     throw new Error("no retryable outcome found");
+  });
+});
+
+describe("idempotent outcomes and the forced scenario guard (review items 5 and 6)", () => {
+  const req = (over: Partial<MockPharmacyRequest> = {}) =>
+    ({
+      type: "NewRx",
+      messageId: "m-1",
+      renewalId: "r-1",
+      prescriptionId: "rx-1",
+      pharmacyId: "1234567",
+      ...over,
+    }) as MockPharmacyRequest;
+
+  it("the same idempotency key / messageId gets the SAME answer on every attempt", () => {
+    for (const seed of [1, 7, 42, 99]) {
+      for (let i = 0; i < 40; i++) {
+        const base = req({ messageId: `m-${i}` });
+        const first = simulate(
+          seed,
+          { ...base, attempt: 1 } as MockPharmacyRequest,
+          undefined,
+          undefined,
+          `key-${i}`,
+        );
+        for (const attempt of [2, 3, 5]) {
+          const again = simulate(
+            seed,
+            { ...base, attempt } as MockPharmacyRequest,
+            undefined,
+            undefined,
+            `key-${i}`,
+          );
+          expect(again).toEqual(first);
+        }
+      }
+    }
+  });
+
+  it("a different idempotency key may differ; the key (not the attempt) drives the stream", () => {
+    const outcomes = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      outcomes.add(JSON.stringify(simulate(5, req(), undefined, undefined, `k-${i}`).httpStatus));
+    }
+    expect(outcomes.size).toBeGreaterThan(1);
+  });
+
+  it("MOCK_PHARMACY_FORCE is honoured only in development/test", () => {
+    const f = "retry-then-fill";
+    expect(forcedScenario({ NODE_ENV: "development", MOCK_PHARMACY_FORCE: f })).toBe(f);
+    expect(forcedScenario({ NODE_ENV: "test", MOCK_PHARMACY_FORCE: "escalation" })).toBe(
+      "escalation",
+    );
+    for (const env of [
+      "production",
+      "Production",
+      "PRODUCTION",
+      "",
+      undefined,
+      "staging",
+      " test",
+    ]) {
+      expect(forcedScenario({ NODE_ENV: env, MOCK_PHARMACY_FORCE: f })).toBeUndefined();
+    }
+    expect(forcedScenario({ NODE_ENV: "test", MOCK_PHARMACY_FORCE: "bogus" })).toBeUndefined();
+    expect(forcedScenario({ NODE_ENV: "test" })).toBeUndefined();
   });
 });

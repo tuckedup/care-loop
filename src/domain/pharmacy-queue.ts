@@ -6,7 +6,9 @@ import { withConcurrencyRetry } from "@/infra/event-store";
 import type { OutboxMessageInput } from "@/infra/outbox/messages";
 import { replay, type Aggregate } from "./aggregate";
 import { loadStream } from "./aggregate-handler";
-import { makeEvent, type DomainEvent } from "./events";
+import { isAiPathPermitted } from "@/ai/ai-path-gate";
+import { makeEvent, type DomainEvent, type EventData } from "./events";
+import { buildRuleInput } from "./renewal/decision";
 
 export { rxIdempotencyKey, rxMessageId } from "./pharmacy-keys";
 
@@ -33,6 +35,43 @@ export function outboxFor(events: readonly DomainEvent[]): OutboxMessageInput[] 
   return out;
 }
 
+/**
+ * POSITIVE allow-list at the transmit gate, independent of the schedule flag on the order: the
+ * medication must resolve (RxCUI + name + dose checks, the rules' own R02/M01/M02) to an
+ * allowlisted, non-controlled formulary entry, and no controlled signal may appear anywhere
+ * (schedule flag, RxCUI, formulary id, or a controlled drug named in the text, incl. homoglyphs).
+ * A null schedule alone is never enough: "alprazolam" with schedule null is refused.
+ */
+export function medicationTransmittable(order: EventData<"MedicationPrescribed">): boolean {
+  try {
+    const input = buildRuleInput({
+      renewalId: "transmit-gate",
+      identityVerified: true,
+      order,
+      checkIn: {
+        v: 1,
+        renewalId: "transmit-gate",
+        phq9: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        gad7: [0, 0, 0, 0, 0, 0, 0],
+        sideEffects: [],
+        severeSideEffect: false,
+        pregnancy: "no",
+        maniaScreen: false,
+        freeText: "",
+        requestedHuman: false,
+        requestedChange: "none",
+      },
+      renewalsSinceLastVisit: 0,
+      refillLimit: 2,
+      priorPhq9Total: null,
+      now: new Date(0),
+    });
+    return isAiPathPermitted(input);
+  } catch {
+    return false;
+  }
+}
+
 export interface HandleWithOutboxResult {
   appended: AppendResult | null;
   version: number;
@@ -48,11 +87,14 @@ export function handleCommandWithOutbox<State, Command>(
   streamId: string,
   command: Command,
   ctx: AuditContext,
+  /** Runs after decide, before anything is written; throw to refuse. */
+  guard?: (decided: DomainEvent[]) => Promise<void>,
 ): Promise<HandleWithOutboxResult> {
   return withConcurrencyRetry(async () => {
     const { events: history, version } = await loadStream(sql, streamId);
     const decided = aggregate.decide(replay(aggregate, history), command);
     if (decided.length === 0) return { appended: null, version };
+    if (guard) await guard(decided);
     const appended = await appendToStream(
       sql,
       streamId,
@@ -143,6 +185,9 @@ export function checkTransmittable(
   );
   if (!med || med.type !== "MedicationPrescribed") return no("medication not found");
   if (med.data.controlledSchedule !== null) return no("controlled substance");
+  if (!medicationTransmittable(med.data)) {
+    return no("controlled substance or medication not on the allow-list");
+  }
   if (renewal.some((e) => e.type === "RxCancelAcknowledged")) return no("prescription cancelled");
   return { ok: true };
 }

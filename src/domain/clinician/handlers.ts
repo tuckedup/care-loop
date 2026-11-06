@@ -3,8 +3,10 @@
 // re-checks the role, so a non-clinician can never approve even if a caller forgets RBAC.
 import type { Sql } from "postgres";
 import type { AuditContext } from "@/infra/audit";
-import { handleCommand } from "../aggregate-handler";
-import { handleCommandWithOutbox } from "../pharmacy-queue";
+import { DomainError } from "../aggregate";
+import { handleCommand, loadStream } from "../aggregate-handler";
+import { rxStreamId } from "../patient/patient";
+import { handleCommandWithOutbox, medicationTransmittable } from "../pharmacy-queue";
 import { renewalStreamId } from "../renewal/renewal";
 import {
   reviewAggregate,
@@ -64,6 +66,26 @@ export function approveRenewal(
     renewalStreamId(input.renewalId),
     command,
     ctxFor(actor, "Approve", input.renewalId),
+    // Positive allow-list at the queue step (the worker re-checks it): an approval that would
+    // queue a transmission for an unknown, unidentified or controlled-looking medication is
+    // refused up front instead of silently stranding.
+    async (decided) => {
+      if (!decided.some((e) => e.type === "RxRenewalQueued")) return;
+      const requested = (await loadStream(sql, renewalStreamId(input.renewalId))).events.find(
+        (e) => e.type === "RenewalRequested",
+      );
+      const rx =
+        requested && requested.type === "RenewalRequested"
+          ? await loadStream(sql, rxStreamId(requested.data.prescriptionId))
+          : null;
+      const med = rx?.events.find((e) => e.type === "MedicationPrescribed");
+      if (!med || med.type !== "MedicationPrescribed" || !medicationTransmittable(med.data)) {
+        throw new DomainError(
+          "MEDICATION_NOT_TRANSMITTABLE",
+          "this medication is not on the allow-list (or may be controlled) and cannot be sent to a pharmacy",
+        );
+      }
+    },
   );
 }
 

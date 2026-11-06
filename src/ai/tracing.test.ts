@@ -55,6 +55,8 @@ describe("tracerFromEnv", () => {
     expect(url).toBe("https://lf.example.test/api/public/ingestion");
     expect(init.headers.authorization).toBe(`Basic ${Buffer.from("pk:sk").toString("base64")}`);
     const body = JSON.parse(init.body);
+    const traceId = body.batch.find((b: { type: string }) => b.type === "trace-create").body.id;
+    expect(init.headers["idempotency-key"]).toBe(`langfuse-trace-${traceId}`);
     const gen = body.batch.find((b: { type: string }) => b.type === "generation-create");
     expect(gen.body.model).toBe("m");
     expect(gen.body.metadata).toMatchObject({ latencyMs: 12, valid: true });

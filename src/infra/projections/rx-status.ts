@@ -45,6 +45,19 @@ const STICKY: ReadonlySet<RxStatusValue> = new Set([
   "cancelled",
 ]);
 
+/** filled, cancelled, or a pharmacy error that is explicitly not retryable. */
+export function isTerminalPharmacyOutcome(
+  r: Pick<RxStatusRow, "status" | "pharmacyStatus">,
+): boolean {
+  if (r.status === "filled" || r.status === "cancelled") return true;
+  return (
+    r.status === "pharmacy_error" &&
+    r.pharmacyStatus !== null &&
+    r.pharmacyStatus.startsWith("ERROR:") &&
+    !r.pharmacyStatus.endsWith(":retryable")
+  );
+}
+
 /**
  * Pure reducer: next row for a renewal given its current row and one event.
  * Latest event in global order wins. Events that do not describe renewal progress return the
@@ -79,10 +92,11 @@ export function reduceRxStatus(
       default:
     }
   }
-  // Pharmacy progress: a fill or a cancel acknowledgement ends it. Late or duplicated pharmacy
-  // messages (a delayed Status after the fill) never walk the row backwards, and a fill never
-  // overrides a cancel.
-  if (current !== null && (current.status === "filled" || current.status === "cancelled")) {
+  // Pharmacy outcome is terminal once it is a fill, a cancel acknowledgement or a FATAL (not
+  // retryable) error. Late or duplicated pharmacy messages (a delayed Status after the fill, a
+  // retryable error after a fatal one) never walk the row backwards. A fill still beats a fatal
+  // error (the pharmacy did fill it), and a cancel acknowledgement beats everything.
+  if (current !== null && isTerminalPharmacyOutcome(current)) {
     switch (event.type) {
       case "RxRenewalQueued":
       case "RxRenewalTransmitted":
@@ -90,7 +104,7 @@ export function reduceRxStatus(
       case "PharmacyErrorReceived":
         return current;
       case "RxFillReceived":
-        if (current.status === "cancelled") return current;
+        if (current.status !== "pharmacy_error") return current;
         break;
       default:
     }
@@ -242,6 +256,42 @@ export const rxStatusProjection: Projection = {
     await tx.unsafe(`TRUNCATE rx_status`);
   },
 };
+
+/**
+ * The rx_status row implied by ONE renewal stream's events, computed without the projection tables
+ * (same reducer, same decision gating). Used for atomic checks inside a transaction, where the
+ * projection may lag. Schema-invalid events are skipped, like the projection does.
+ */
+export function foldRxStatus(stored: readonly StoredEvent[]): RxStatusRow | null {
+  let row: RxStatusRow | null = null;
+  let escalated = false;
+  let reviewed = false;
+  for (const s of stored) {
+    if (!KNOWN.has(s.type)) continue;
+    let event: DomainEvent;
+    try {
+      event = parseEvent({ type: s.type, data: s.data });
+    } catch {
+      continue;
+    }
+    if (event.type === "RenewalDenied" || event.type === "RenewalApproved") {
+      if (escalated && !reviewed) continue; // the queue would not honour it either
+    }
+    if (
+      event.type === "RenewalEscalated" ||
+      (event.type === "EligibilityEvaluated" && event.data.outcome === "ESCALATE")
+    ) {
+      escalated = true;
+    }
+    if (event.type === "ClinicianReviewStarted") reviewed = true;
+    const next = reduceRxStatus(row, event, {
+      position: s.globalPosition,
+      at: s.createdAt.toISOString(),
+    });
+    if (next !== null) row = next;
+  }
+  return row;
+}
 
 export async function getRxStatus(sql: Db, renewalId: string): Promise<RxStatusRow | null> {
   const [row] = await sql.unsafe<RxDbRow[]>(`SELECT * FROM rx_status WHERE renewal_id = $1`, [

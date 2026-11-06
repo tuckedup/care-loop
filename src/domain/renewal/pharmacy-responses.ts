@@ -36,10 +36,24 @@ export const PharmacyMessageSchema = z.discriminatedUnion("type", [
 ]);
 export type PharmacyMessage = z.infer<typeof PharmacyMessageSchema>;
 
+/** A pharmacy answer larger than this, or with more messages, is a fatal parse error (fail closed). */
+export const MAX_RESPONSE_BYTES = 64 * 1024;
+export const MAX_RESPONSE_MESSAGES = 50;
+/** Marker body the transport substitutes when the answer exceeded MAX_RESPONSE_BYTES. */
+export const OVERSIZE_BODY = { __oversize: true } as const;
+
 /** Messages that fail validation are dropped (and counted); they never become events. */
-export function parsePharmacyBody(body: unknown): { messages: PharmacyMessage[]; invalid: number } {
+export function parsePharmacyBody(body: unknown): {
+  messages: PharmacyMessage[];
+  invalid: number;
+  tooLarge: boolean;
+} {
+  if ((body as { __oversize?: unknown } | null)?.__oversize === true) {
+    return { messages: [], invalid: 0, tooLarge: true };
+  }
   const list = (body as { messages?: unknown } | null)?.messages;
-  if (!Array.isArray(list)) return { messages: [], invalid: 1 };
+  if (!Array.isArray(list)) return { messages: [], invalid: 1, tooLarge: false };
+  if (list.length > MAX_RESPONSE_MESSAGES) return { messages: [], invalid: 0, tooLarge: true };
   const messages: PharmacyMessage[] = [];
   let invalid = 0;
   for (const m of list) {
@@ -47,7 +61,7 @@ export function parsePharmacyBody(body: unknown): { messages: PharmacyMessage[];
     if (p.success) messages.push(p.data);
     else invalid += 1;
   }
-  return { messages, invalid };
+  return { messages, invalid, tooLarge: false };
 }
 
 export type ConsumeOutcome =
@@ -90,7 +104,14 @@ export function decidePharmacyResponse(
 ): { events: DomainEvent[]; outcome: ConsumeOutcome } {
   const { renewalId } = input;
   const out: DomainEvent[] = [];
-  const { messages, invalid } = parsePharmacyBody(input.body);
+  const { messages, invalid, tooLarge } = parsePharmacyBody(input.body);
+  if (tooLarge) {
+    // Never turn a flood into events: nothing is recorded, the message is dead-lettered and alerted.
+    return {
+      events: [],
+      outcome: { kind: "fatal", reason: "pharmacy response too large", events: 0 },
+    };
+  }
   const queuedEvent = history.find((e) => e.type === "RxRenewalQueued");
   const queued = queuedEvent !== undefined;
   const queuedRx = queuedEvent?.type === "RxRenewalQueued" ? queuedEvent.data.prescriptionId : null;

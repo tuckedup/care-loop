@@ -1,4 +1,4 @@
-import { MockPharmacyRequestSchema, simulate, type ForcedScenario } from "./simulate";
+import { forcedScenario, MockPharmacyRequestSchema, simulate } from "./simulate";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +38,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   const seed = currentSeed();
-  const forced = process.env.MOCK_PHARMACY_FORCE;
-  const force: ForcedScenario | undefined =
-    forced === "retry-then-fill" || forced === "escalation" ? forced : undefined;
-  const sim = simulate(seed, parsed.data, undefined, force);
-  const headers: Record<string, string> = {};
   const idem = request.headers.get("idempotency-key");
+  const sim = simulate(seed, parsed.data, undefined, forcedScenario(process.env), idem);
+  const headers: Record<string, string> = {};
   if (idem) headers["Idempotency-Key"] = idem.slice(0, 200);
   if (sim.httpStatus === 503) headers["Retry-After"] = "5";
   return Response.json(

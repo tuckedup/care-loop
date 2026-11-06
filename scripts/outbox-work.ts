@@ -1,5 +1,9 @@
 // Local outbox worker. `pnpm outbox:work` polls until interrupted; `--once` runs a single pass.
 import postgres from "postgres";
+import { staleHoursFrom } from "../src/domain/pharmacy-stall";
+import { sweepStalledRenewals } from "../src/infra/outbox/stalled";
+import { registerAllProjections } from "../src/infra/projections/all";
+import { runAllProjections } from "../src/infra/projections/registry";
 import { mulberry32 } from "../src/infra/outbox/rng";
 import { createDefaultRegistry, pharmacyBaseUrl } from "../src/infra/outbox/registry";
 import { runOnce } from "../src/infra/outbox/worker";
@@ -21,9 +25,14 @@ async function main() {
   try {
     do {
       const s = await runOnce(sql, { registry, rng });
+      await runAllProjections(sql, registerAllProjections());
+      const stalled = await sweepStalledRenewals(sql, {
+        now: new Date(),
+        staleHours: staleHoursFrom(process.env),
+      });
       console.log(
         `outbox:work: claimed=${s.claimed} done=${s.done} retried=${s.retried} dead=${s.dead} ` +
-          `lost=${s.lost} reaped=${s.reaped.requeued}/${s.reaped.dead} ` +
+          `lost=${s.lost} stalled=${stalled} reaped=${s.reaped.requeued}/${s.reaped.dead} ` +
           `handlers=[${registry.types().join(",")}]`,
       );
       if (once || stop) break;

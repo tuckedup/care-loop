@@ -250,11 +250,11 @@ export const outbox = pgTable(
 );
 
 // Projection: pharmacy alerts for people (F054): pharmacist escalations, non-retryable pharmacy
-// errors and cancel acknowledgements, keyed by the pharmacy's messageId. Rebuildable from events.
+// errors and cancel acknowledgements, keyed by (renewal_id, message_id). Rebuildable from events.
 export const pharmacyAlerts = pgTable(
   "pharmacy_alerts",
   {
-    messageId: text("message_id").primaryKey(),
+    messageId: text("message_id").notNull(),
     renewalId: text("renewal_id").notNull(),
     patientId: text("patient_id"),
     // escalation | error | cancel
@@ -269,6 +269,8 @@ export const pharmacyAlerts = pgTable(
     acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   },
   (t) => [
+    // A messageId reused across renewals must not hide a second alert.
+    primaryKey({ columns: [t.renewalId, t.messageId] }),
     index("pharmacy_alerts_status_idx").on(t.status, t.raisedPosition),
     index("pharmacy_alerts_renewal_idx").on(t.renewalId),
     check("pharmacy_alerts_kind_check", sql`${t.kind} in ('escalation', 'error', 'cancel')`),

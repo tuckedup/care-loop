@@ -165,4 +165,43 @@ describe("pharmacist inbox end to end (DB)", () => {
     await rebuildProjections(db.sql, registerAllProjections());
     expect(await listPharmacyAlerts(db.sql)).toEqual(before);
   });
+
+  it("a messageId reused across renewals yields one alert per renewal, and survives a rebuild", async () => {
+    const mk = async () => {
+      const r = await approvedRenewal(db.sql);
+      const f = scriptedFetch([
+        {
+          status: 200,
+          messages: [
+            { type: "Status", messageId: `s-${r.renewalId}`, status: "OK" },
+            { type: "PharmacistEscalation", messageId: "SAME-ID", message: "reused id" },
+          ],
+        },
+      ]);
+      await runOnce(db.sql, {
+        registry: createDefaultRegistry({ sql: db.sql, baseUrl: "http://p.test", fetch: f.fetch }),
+        rng: mulberry32(1),
+        now: () => new Date(Date.now() + 60_000),
+      });
+      return r;
+    };
+    const a = await mk();
+    const b = await mk();
+    await sync();
+    const same = (await listPharmacyAlerts(db.sql)).filter((x) => x.messageId === "SAME-ID");
+    expect(same.map((x) => x.renewalId).sort()).toEqual([a.renewalId, b.renewalId].sort());
+    // Acknowledging one does not acknowledge the other.
+    await acknowledgeAlert(
+      db.sql,
+      { role: "pharmacist", id: "ph" },
+      { renewalId: a.renewalId, messageId: "SAME-ID" },
+    );
+    await sync();
+    const after = (await listPharmacyAlerts(db.sql)).filter((x) => x.messageId === "SAME-ID");
+    expect(after.find((x) => x.renewalId === a.renewalId)?.status).toBe("acknowledged");
+    expect(after.find((x) => x.renewalId === b.renewalId)?.status).toBe("open");
+    const before = await listPharmacyAlerts(db.sql);
+    await rebuildProjections(db.sql, registerAllProjections());
+    expect(await listPharmacyAlerts(db.sql)).toEqual(before);
+  });
 });

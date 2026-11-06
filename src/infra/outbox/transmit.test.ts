@@ -11,7 +11,14 @@ import { createTestDb, type TestDb } from "@/test/db";
 import { appendWithOutbox } from "./append";
 import { createDefaultRegistry } from "./registry";
 import { mulberry32 } from "./rng";
-import { approvedRenewal, clinician, PHARMACY_ID, readyRenewal, streamTypes } from "./test-fixture";
+import {
+  approvedRenewal,
+  clinician,
+  forgeApprovedQueued,
+  PHARMACY_ID,
+  readyRenewal,
+  streamTypes,
+} from "./test-fixture";
 import { runOnce } from "./worker";
 import { approveRenewal, startReview } from "@/domain/clinician/handlers";
 
@@ -251,9 +258,45 @@ describe("defence in depth: the handler refuses to transmit", () => {
   });
 
   it("a controlled substance, even if it was approved and queued", async () => {
-    const r = await approvedRenewal(db.sql, { controlledSchedule: "IV" });
-    await expectRefused(r, /REFUSED: controlled substance/);
+    const r = await readyRenewal(db.sql, { controlledSchedule: "IV" });
+    // The command layer refuses it outright ...
+    await startReview(db.sql, clinician, { renewalId: r.renewalId });
+    await expect(
+      approveRenewal(db.sql, clinician, { renewalId: r.renewalId }),
+    ).rejects.toMatchObject({
+      code: expect.stringMatching(/CONTROLLED_NOT_APPROVABLE|MEDICATION_NOT_TRANSMITTABLE/),
+    });
+    // ... and the worker refuses it even if a forged approval + queue exist.
+    const f = await readyRenewal(db.sql, { controlledSchedule: "IV" });
+    await forgeApprovedQueued(db.sql, f);
+    await expectRefused(f, /REFUSED: controlled substance/);
   });
+
+  it.each([
+    ["alprazolam", "596"],
+    ["lisdexamfetamine", "700000"],
+    ["аlprazolam", "596"], // Cyrillic a: homoglyph
+    ["totally-unknown-drug", "999999999"],
+    ["sertraline", "596"], // allowlisted name but a controlled RxCUI
+  ])(
+    "%s with a NULL schedule flag is never transmitted (positive allow-list backstop)",
+    async (drugName, rxcui) => {
+      const r = await readyRenewal(db.sql, { drugName, rxcui });
+      await startReview(db.sql, clinician, { renewalId: r.renewalId });
+      // Approve refuses before anything is queued ...
+      await expect(
+        approveRenewal(db.sql, clinician, { renewalId: r.renewalId }),
+      ).rejects.toMatchObject({
+        code: "MEDICATION_NOT_TRANSMITTABLE",
+      });
+      expect(await streamTypes(db.sql, r.renewalId)).not.toContain("RxRenewalQueued");
+      expect(await outboxRow(rxIdempotencyKey(r.renewalId))).toBeUndefined();
+      // ... and the worker refuses a forged queue for the same medication.
+      const f = await readyRenewal(db.sql, { drugName, rxcui });
+      await forgeApprovedQueued(db.sql, f);
+      await expectRefused(f, /REFUSED: controlled substance or medication not on the allow-list/);
+    },
+  );
 
   it("a REJECT / hard-blocked renewal, even with forged approval events", async () => {
     const r = await readyRenewal(db.sql, { outcome: "REJECT", failedRule: "R01" });

@@ -10,14 +10,22 @@
 import type { Sql } from "postgres";
 import { replay } from "@/domain/aggregate";
 import { loadStream } from "@/domain/aggregate-handler";
-import { type DomainEvent } from "@/domain/events";
+import { makeEvent, type DomainEvent } from "@/domain/events";
+import { appendToStream } from "@/infra/audit";
+import { withConcurrencyRetry } from "@/infra/event-store";
 import { checkTransmittable } from "@/domain/pharmacy-queue";
+import { STALLED_CODE } from "@/domain/pharmacy-stall";
 import { rxStreamId } from "@/domain/patient/patient";
 import { renewalStreamId } from "@/domain/renewal/renewal";
 import { reviewAggregate } from "@/domain/renewal/review";
 import { OUTBOX_PAYLOADS } from "./messages";
-import { NonRetryableError, type OutboxHandler } from "./worker";
-import { consumePharmacyResponse, type ConsumeOutcome } from "@/domain/renewal/pharmacy-responses";
+import { NonRetryableError, type DeadLetterHook, type OutboxHandler } from "./worker";
+import {
+  consumePharmacyResponse,
+  MAX_RESPONSE_BYTES,
+  OVERSIZE_BODY,
+  type ConsumeOutcome,
+} from "@/domain/renewal/pharmacy-responses";
 
 export interface TransmitDeps {
   sql: Sql;
@@ -64,17 +72,26 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
     ]);
     if (known.length === 0) throw new NonRetryableError("REFUSED: unknown pharmacy");
 
-    // Another renewal of the same prescription already in flight => never send a second one.
-    const inFlight = await deps.sql.unsafe(
+    // Deterministic duplicate guard: if ANOTHER renewal of this prescription was queued EARLIER and
+    // is not settled, this one is refused (dead-lettered with an alert); the earliest queued renewal
+    // wins, so two renewals can never both send and never both strand. "Settled" = filled,
+    // cancelled, or a fatal pharmacy error; a STALLED one (accepted, never filled) still counts as
+    // unsettled, so a stalled renewal is never silently duplicated.
+    const earlier = await deps.sql.unsafe(
       `SELECT q.stream_id FROM events q
        WHERE q.type = 'RxRenewalQueued' AND q.data->>'prescriptionId' = $1 AND q.stream_id <> $2
+         AND q.global_position < (SELECT min(m.global_position) FROM events m
+                                  WHERE m.stream_id = $2 AND m.type = 'RxRenewalQueued')
          AND NOT EXISTS (SELECT 1 FROM events d WHERE d.stream_id = q.stream_id
                          AND (d.type IN ('RxFillReceived', 'RxCancelAcknowledged')
-                              OR (d.type = 'PharmacyErrorReceived' AND d.data->>'retryable' = 'false')))`,
-      [facts.prescriptionId, renewalStreamId(facts.renewalId)],
+                              OR (d.type = 'PharmacyErrorReceived' AND d.data->>'retryable' = 'false'
+                                  AND d.data->>'code' <> $3)))`,
+      [facts.prescriptionId, renewalStreamId(facts.renewalId), STALLED_CODE],
     );
-    if (inFlight.length > 0) {
-      throw new NonRetryableError("REFUSED: another renewal of this prescription is in flight");
+    if (earlier.length > 0) {
+      throw new NonRetryableError(
+        "REFUSED: an earlier renewal of this prescription is in flight (duplicate send prevented)",
+      );
     }
 
     // A redelivery after the pharmacy already settled the message must not call out again.
@@ -106,7 +123,8 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
     }
     let body: unknown = null;
     try {
-      body = await response.json();
+      const text = await response.text();
+      body = text.length > MAX_RESPONSE_BYTES ? OVERSIZE_BODY : JSON.parse(text);
     } catch {
       body = null;
     }
@@ -117,6 +135,65 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
     );
     if (outcome.kind === "retry") throw new PharmacyRetryableError(outcome.reason);
     if (outcome.kind === "fatal") throw new NonRetryableError(outcome.reason);
+  };
+}
+
+export const DEAD_LETTER_CODE = "TRANSMIT_DEAD_LETTERED";
+
+/**
+ * Dead-letter hook for pharmacy.RxRenewalResponse: a queued renewal whose transmission can never
+ * happen (a refusal by the guard, a fatal HTTP error, retries exhausted) gets a terminal,
+ * non-retryable PharmacyErrorReceived. rx_status then shows a problem (not "approved"), the
+ * clinician and pharmacist see an alert, and the patient may renew again. Idempotent: it appends
+ * nothing if the renewal is not queued under this key, was already settled (fill, cancel, any
+ * fatal pharmacy error already surfaced) or already carries this hook's event.
+ */
+export function createTransmitDeadLetterHook(sql: Sql): DeadLetterHook {
+  return async (m) => {
+    const payload = OUTBOX_PAYLOADS["pharmacy.RxRenewalResponse"].safeParse(m.payload);
+    if (!payload.success) return;
+    const renewalId = payload.data.renewalId;
+    const messageId = `deadletter:${m.idempotencyKey}`;
+    await withConcurrencyRetry(async () => {
+      const { events, version } = await loadStream(sql, renewalStreamId(renewalId));
+      const queued = events.some(
+        (e) => e.type === "RxRenewalQueued" && e.data.idempotencyKey === m.idempotencyKey,
+      );
+      if (!queued) return; // forged / never-queued row: nothing of the patient's was promised
+      const handled = events.some(
+        (e) =>
+          e.type === "RxFillReceived" ||
+          e.type === "RxCancelAcknowledged" ||
+          (e.type === "PharmacyErrorReceived" &&
+            (!e.data.retryable || e.data.messageId === messageId)),
+      );
+      if (handled) return;
+      await appendToStream(
+        sql,
+        renewalStreamId(renewalId),
+        version,
+        [
+          makeEvent("PharmacyErrorReceived", {
+            v: 1,
+            renewalId,
+            messageId,
+            code: DEAD_LETTER_CODE,
+            retryable: false,
+          }),
+        ],
+        {
+          actor: "outbox-worker",
+          role: "system",
+          action: "pharmacy:dead-letter",
+          detail: {
+            renewalId,
+            idempotencyKey: m.idempotencyKey,
+            attempts: m.attempts,
+            error: m.lastError,
+          },
+        },
+      );
+    });
   };
 }
 

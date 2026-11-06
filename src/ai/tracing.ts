@@ -98,7 +98,12 @@ export function createLangfuseTracer(cfg: LangfuseConfig): Tracer {
         await Promise.race([
           doFetch(endpoint, {
             method: "POST",
-            headers: { "content-type": "application/json", authorization: `Basic ${auth}` },
+            headers: {
+              "content-type": "application/json",
+              authorization: `Basic ${auth}`,
+              // Every external call carries an idempotency key; a re-sent trace is the same trace.
+              "idempotency-key": `langfuse-trace-${traceId}`,
+            },
             body: JSON.stringify(body),
             signal: controller.signal,
           }),

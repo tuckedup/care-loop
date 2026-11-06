@@ -31,8 +31,38 @@ export class NonRetryableError extends Error {
   override readonly name = "NonRetryableError";
 }
 
+/** A dead-lettered message, as handed to a dead-letter hook. */
+export interface DeadMessage {
+  id: bigint;
+  idempotencyKey: string;
+  type: OutboxType;
+  payload: Record<string, unknown>;
+  lastError: string | null;
+  attempts: number;
+}
+
+/**
+ * Runs for dead-lettered messages of one type, on every worker pass, so a failure that can never
+ * be retried is surfaced to people instead of leaving the business state silently stranded. It MUST
+ * be idempotent (it sees the same dead row on every pass until its effect exists) and must not throw
+ * for expected conditions; unexpected errors are counted and retried on the next pass.
+ */
+export type DeadLetterHook = (message: DeadMessage) => Promise<void>;
+
 export class HandlerRegistry {
   private readonly handlers = new Map<OutboxType, OutboxHandler>();
+  private readonly deadHooks = new Map<OutboxType, DeadLetterHook>();
+  registerDeadLetter(type: OutboxType, hook: DeadLetterHook): this {
+    if (this.deadHooks.has(type)) throw new Error(`Dead-letter hook already registered: ${type}`);
+    this.deadHooks.set(type, hook);
+    return this;
+  }
+  deadLetterTypes(): OutboxType[] {
+    return [...this.deadHooks.keys()];
+  }
+  deadLetterHook(type: string): DeadLetterHook | undefined {
+    return this.deadHooks.get(type as OutboxType);
+  }
   register(type: OutboxType, handler: OutboxHandler): this {
     if (this.handlers.has(type)) throw new Error(`Outbox handler already registered: ${type}`);
     this.handlers.set(type, handler);
@@ -234,6 +264,9 @@ export interface RunStats {
   /** Finished after the lease was lost to the reaper; another delivery owns the message now. */
   lost: number;
   reaped: { requeued: number; dead: number };
+  /** Dead-letter hooks run this pass (idempotent; most are no-ops after the first pass). */
+  deadLetterHooks: number;
+  deadLetterHookErrors: number;
 }
 
 /** One worker pass: reap expired leases, claim a batch, run handlers, record outcomes. */
@@ -246,6 +279,8 @@ export async function runOnce(sql: Sql, deps: WorkerDeps): Promise<RunStats> {
     retried: 0,
     dead: 0,
     lost: 0,
+    deadLetterHooks: 0,
+    deadLetterHookErrors: 0,
     reaped: await reapExpiredLeases(sql, { now: now(), maxAttempts: cfg.maxAttempts }),
   };
   const batch = await claimBatch(sql, {
@@ -281,6 +316,41 @@ export async function runOnce(sql: Sql, deps: WorkerDeps): Promise<RunStats> {
       if (outcome === "retry") stats.retried += 1;
       else if (outcome === "dead") stats.dead += 1;
       else stats.lost += 1;
+    }
+  }
+  // Surface dead-lettered messages (this pass's and earlier ones, e.g. reaped) to people.
+  const hooked = deps.registry.deadLetterTypes();
+  if (hooked.length > 0) {
+    const dead = await sql.unsafe<
+      {
+        id: string;
+        idempotency_key: string;
+        type: string;
+        payload: Record<string, unknown>;
+        last_error: string | null;
+        attempts: number;
+      }[]
+    >(
+      `SELECT id, idempotency_key, type, payload, last_error, attempts FROM outbox
+       WHERE status = 'dead' AND type = ANY($1::text[]) ORDER BY id DESC LIMIT 200`,
+      [hooked as string[]],
+    );
+    for (const d of dead) {
+      const hook = deps.registry.deadLetterHook(d.type);
+      if (!hook) continue;
+      try {
+        await hook({
+          id: BigInt(d.id),
+          idempotencyKey: d.idempotency_key,
+          type: d.type as OutboxType,
+          payload: d.payload,
+          lastError: d.last_error,
+          attempts: d.attempts,
+        });
+        stats.deadLetterHooks += 1;
+      } catch {
+        stats.deadLetterHookErrors += 1;
+      }
     }
   }
   return stats;

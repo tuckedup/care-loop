@@ -92,6 +92,13 @@
       "when": 1793997462090,
       "tag": "0012_pharmacy_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794000719637,
+      "tag": "0013_pharmacy_alerts_composite_key",
+      "breakpoints": true
     }
   ]
 }
