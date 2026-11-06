@@ -99,3 +99,21 @@ Accepted / follow-up (from review 3, not blockers):
 - refillLimit has no cap (TODO: source needed; documented in ADR-003). Name length is capped by Zod
   at 200 chars upstream; rules are quadratic on unbounded input.
 - Mirtazapine monitoring input shape is provisional (tie to event schema).
+
+## 2026-11-06 — Wave 2: seed + patient UI (v0.1 complete)
+
+F013, F015-F019 verified PASS by an independent verifier (19/19 e2e, 836 unit at that point).
+v0.1 is functionally complete: CHANGELOG [Unreleased] updated, TAG v0.1.0 when ready (not tagged
+by agents).
+
+Follow-ups from the verifier's security review (none blocking):
+
+- No throttle/lockout on identity verification (DOB + last name brute-forceable). TODO.
+- Failed identity attempts append no event/audit entry (IDENTITY_MISMATCH thrown before append).
+  Consider an IdentityVerificationFailed event + audit so attempts are visible and countable.
+- Ownership is enforced in the service layer; handlers take only renewalId. Pass patientId into
+  the handler and compare with RenewalRequested to make it impossible to bypass.
+- syncProjections runs inside page renders (read path writes checkpoints). Move to a worker/cron.
+- Approved / follow-up-needed result states only have unit coverage until the decision pipeline
+  emits those events (F036+).
+- e2e uses its own DB (careloop_e2e) and PORT; only one e2e process at a time.

@@ -189,7 +189,7 @@
       "pnpm test src/domain/formulary.test.ts",
       "pnpm db:seed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F014",
@@ -219,7 +219,7 @@
       "pnpm test scripts/db-seed.test.ts",
       "pnpm db:seed"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F016",
@@ -233,7 +233,7 @@
     "verification": [
       "pnpm e2e e2e/patient-renew-verify.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F017",
@@ -247,7 +247,7 @@
     "verification": [
       "pnpm e2e e2e/patient-checkin.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F018",
@@ -261,7 +261,7 @@
     "verification": [
       "pnpm e2e e2e/patient-status.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F019",
@@ -277,7 +277,7 @@
       "pnpm lint",
       "pnpm test"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F020",
