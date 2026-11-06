@@ -145,3 +145,50 @@ export const pharmacies = pgTable(
   },
   (t) => [check("pharmacies_id_seven_digits", sql`${t.id} ~ '^[0-9]{7}$'`)],
 );
+
+// Projection: clinician work queue, one row per renewal, FHIR-Task-style status
+// (requested / in-progress / completed). Rebuildable from the event log.
+export const renewalQueue = pgTable(
+  "renewal_queue",
+  {
+    renewalId: text("renewal_id").primaryKey(),
+    patientId: text("patient_id").notNull(),
+    prescriptionId: text("prescription_id").notNull(),
+    status: text("status").notNull(),
+    // Latest eligibility outcome from the rules (null until evaluated).
+    outcome: text("outcome"),
+    escalated: boolean("escalated").notNull().default(false),
+    reasonCodes: jsonb("reason_codes").notNull().default([]),
+    riskSignalCount: integer("risk_signal_count").notNull().default(0),
+    clinicianId: text("clinician_id"),
+    // approved / denied / follow_up_required once status = completed.
+    decision: text("decision"),
+    decidedBy: text("decided_by"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    lastPosition: bigint("last_position", { mode: "bigint" }).notNull(),
+  },
+  (t) => [
+    index("renewal_queue_status_idx").on(t.status, t.requestedAt),
+    index("renewal_queue_patient_idx").on(t.patientId),
+    check(
+      "renewal_queue_status_check",
+      sql`${t.status} in ('requested', 'in-progress', 'completed')`,
+    ),
+  ],
+);
+
+// Projection: PHQ-9 / GAD-7 series per patient (one point per submitted check-in) for sparklines.
+export const phq9Trend = pgTable(
+  "phq9_trend",
+  {
+    renewalId: text("renewal_id").primaryKey(),
+    patientId: text("patient_id").notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    phq9Total: integer("phq9_total"),
+    gad7Total: integer("gad7_total"),
+    item9: integer("item9"),
+    position: bigint("position", { mode: "bigint" }).notNull(),
+  },
+  (t) => [index("phq9_trend_patient_idx").on(t.patientId, t.position)],
+);
