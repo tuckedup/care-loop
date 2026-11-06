@@ -13,48 +13,79 @@ export interface FormularyEntry {
   readonly allowlisted: boolean;
   /** Federal schedule for controlled meds, otherwise null. */
   readonly controlledSchedule: ControlledSchedule | null;
+  /** Normalised (lowercase, alphanumeric words) names that identify this drug in free text. */
+  readonly aliases: readonly string[];
+  /**
+   * Dose-form words that match this allowlist entry (e.g. "sr"). Empty = the entry is not
+   * form-specific, so no modified-release/immediate-release wording is accepted for it.
+   */
+  readonly formTokens: readonly string[];
 }
 
-const ALLOWLIST: ReadonlyArray<readonly [string, string]> = [
-  ["fluoxetine", "fluoxetine"],
-  ["sertraline", "sertraline"],
-  ["escitalopram", "escitalopram"],
-  ["citalopram", "citalopram"],
-  ["paroxetine", "paroxetine"],
-  ["venlafaxine_er", "venlafaxine ER"],
-  ["desvenlafaxine", "desvenlafaxine"],
-  ["duloxetine", "duloxetine"],
-  ["bupropion_sr", "bupropion SR"],
-  ["bupropion_xl", "bupropion XL"],
-  ["trazodone", "trazodone"],
-  ["mirtazapine", "mirtazapine"],
-  ["buspirone", "buspirone"],
-  ["hydroxyzine_hcl", "hydroxyzine HCl"],
-  ["hydroxyzine_pamoate", "hydroxyzine pamoate"],
+// [id, display name, aliases, formTokens]
+const ALLOWLIST: ReadonlyArray<readonly [string, string, string[], string[]]> = [
+  ["fluoxetine", "fluoxetine", ["fluoxetine"], []],
+  ["sertraline", "sertraline", ["sertraline"], []],
+  ["escitalopram", "escitalopram", ["escitalopram"], []],
+  ["citalopram", "citalopram", ["citalopram"], []],
+  ["paroxetine", "paroxetine", ["paroxetine"], []],
+  ["venlafaxine_er", "venlafaxine ER", ["venlafaxine"], ["er", "extended release"]],
+  ["desvenlafaxine", "desvenlafaxine", ["desvenlafaxine"], []],
+  ["duloxetine", "duloxetine", ["duloxetine"], []],
+  ["bupropion_sr", "bupropion SR", ["bupropion"], ["sr", "sustained release"]],
+  ["bupropion_xl", "bupropion XL", ["bupropion"], ["xl", "extended release"]],
+  ["trazodone", "trazodone", ["trazodone"], []],
+  ["mirtazapine", "mirtazapine", ["mirtazapine"], []],
+  ["buspirone", "buspirone", ["buspirone"], []],
+  ["hydroxyzine_hcl", "hydroxyzine HCl", ["hydroxyzine"], []],
+  ["hydroxyzine_pamoate", "hydroxyzine pamoate", ["hydroxyzine"], []],
 ];
 
-const CONTROLLED: ReadonlyArray<readonly [string, string, ControlledSchedule]> = [
-  ["alprazolam", "alprazolam", "IV"],
-  ["lisdexamfetamine", "lisdexamfetamine", "II"],
+// [id, display name, schedule, aliases (generic + obvious brand)]
+const CONTROLLED: ReadonlyArray<readonly [string, string, ControlledSchedule, string[]]> = [
+  ["alprazolam", "alprazolam", "IV", ["alprazolam", "xanax"]],
+  ["lisdexamfetamine", "lisdexamfetamine", "II", ["lisdexamfetamine", "vyvanse"]],
+];
+
+/** Dose-form words that are recognised in medication text (normalised). */
+export const KNOWN_FORM_TOKENS: readonly string[] = [
+  "ir",
+  "immediate release",
+  "er",
+  "xr",
+  "xl",
+  "sr",
+  "cr",
+  "la",
+  "dr",
+  "extended release",
+  "sustained release",
+  "delayed release",
+  "controlled release",
+  "long acting",
 ];
 
 const rxcuiFor = (id: string): string | null =>
   (cache.entries as Record<string, { rxcui: string | null } | undefined>)[id]?.rxcui ?? null;
 
 export const FORMULARY: readonly FormularyEntry[] = [
-  ...ALLOWLIST.map(([id, name]): FormularyEntry => ({
+  ...ALLOWLIST.map(([id, name, aliases, formTokens]): FormularyEntry => ({
     id,
     name,
     rxcui: rxcuiFor(id),
     allowlisted: true,
     controlledSchedule: null,
+    aliases,
+    formTokens,
   })),
-  ...CONTROLLED.map(([id, name, controlledSchedule]): FormularyEntry => ({
+  ...CONTROLLED.map(([id, name, controlledSchedule, aliases]): FormularyEntry => ({
     id,
     name,
     rxcui: rxcuiFor(id),
     allowlisted: false,
     controlledSchedule,
+    aliases,
+    formTokens: [],
   })),
 ];
 
@@ -79,4 +110,38 @@ export function findByRxcui(rxcui: string | null | undefined): readonly Formular
 /** True when the RxCUI resolves to at least one allowlisted, non-controlled entry. */
 export function isAllowlistedRxcui(rxcui: string | null | undefined): boolean {
   return findByRxcui(rxcui).some((e) => e.allowlisted && e.controlledSchedule === null);
+}
+
+/** Lowercase, punctuation to single spaces, trimmed. "Extended-Release" -> "extended release". */
+export function normalizeMedText(text: unknown): string {
+  if (typeof text !== "string") return "";
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** True if `alias` occurs in the text, also when letters were split by spaces ("alpra zolam"). */
+export function textMentions(text: unknown, alias: string): boolean {
+  const spaced = normalizeMedText(text);
+  return spaced.includes(alias) || spaced.replace(/ /g, "").includes(alias);
+}
+
+/**
+ * Entries (any, incl. controlled) whose aliases appear in the medication text. An alias that
+ * only occurs inside a longer matched alias is ignored ("citalopram" inside "escitalopram").
+ */
+export function entriesNamedIn(text: unknown): readonly FormularyEntry[] {
+  const allAliases = [...new Set(FORMULARY.flatMap((e) => e.aliases))];
+  const mentioned = allAliases.filter((a) => textMentions(text, a));
+  const effective = new Set(
+    mentioned.filter((a) => !mentioned.some((b) => b !== a && b.includes(a))),
+  );
+  return FORMULARY.filter((e) => e.aliases.some((a) => effective.has(a)));
+}
+
+/** Recognised dose-form words present in the text, as whole words/phrases. */
+export function formTokensIn(text: unknown): readonly string[] {
+  const padded = ` ${normalizeMedText(text)} `;
+  return KNOWN_FORM_TOKENS.filter((t) => padded.includes(` ${t} `));
 }

@@ -8,7 +8,8 @@ import type { RuleInput } from "./types";
 const dir = __dirname;
 const sources = readdirSync(dir)
   .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && f !== "fixtures.ts")
-  .map((f) => [f, readFileSync(join(dir, f), "utf8")] as const);
+  .map((f) => [f, readFileSync(join(dir, f), "utf8")] as const)
+  .concat([["../formulary.ts", readFileSync(join(dir, "..", "formulary.ts"), "utf8")] as const]);
 
 // Strip comments so prose in docs cannot trigger or hide matches.
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -19,18 +20,27 @@ describe("rules purity", () => {
   });
 
   const forbidden: Array<[string, RegExp]> = [
-    ["Date.now", /Date\.now/],
+    ["Date.now", /Date\s*\.\s*now/],
+    ["Date.parse", /Date\s*\.\s*parse/],
+    ["Date.UTC", /Date\s*\.\s*UTC/],
     ["new Date", /new\s+Date\b/],
-    ["Date()", /\bDate\(/],
-    ["Math.random", /Math\.random/],
-    ["performance.now", /performance\.now/],
-    ["process.env", /process\.env/],
+    ["Date()", /\bDate\s*\(/],
+    ["Math.random", /Math\s*\.\s*random/],
+    ["performance.now", /performance\s*\.\s*now/],
+    ["process.env", /process\s*\.\s*env/],
     ["fetch", /\bfetch\s*\(/],
-    ["console", /\bconsole\./],
+    ["XMLHttpRequest/WebSocket", /\b(XMLHttpRequest|WebSocket)\b/],
+    ["console", /\bconsole\s*\./],
     ["timers", /\b(setTimeout|setInterval|setImmediate|queueMicrotask)\b/],
-    ["crypto random", /\brandomUUID|getRandomValues|randomBytes\b/],
-    ["require", /\brequire\s*\(/],
+    ["crypto.randomUUID", /randomUUID/],
+    ["crypto.getRandomValues", /getRandomValues/],
+    ["crypto.randomBytes/randomInt", /randomBytes|randomInt/],
+    ["crypto global", /\bcrypto\s*\./],
+    ["require(", /\brequire\s*\(/],
     ["dynamic import", /\bimport\s*\(/],
+    ["side-effect import", /(^|\n)\s*import\s*["']/],
+    ["node: builtin import", /["']node:/],
+    ["bare builtin import", /from\s*["'](fs|path|os|crypto|http|https|net|child_process|url)["']/],
   ];
 
   it.each(sources)("%s has no forbidden calls", (_f, src) => {
@@ -40,10 +50,35 @@ describe("rules purity", () => {
     }
   });
 
+  it("the forbidden-pattern list actually detects each hazard", () => {
+    const samples = [
+      'import "fs";',
+      "const t = Date.parse('x');",
+      "const t = Date.UTC(1);",
+      "Date.now()",
+      "performance.now()",
+      "crypto.randomUUID()",
+      "crypto.getRandomValues(a)",
+      "process.env.X",
+      "await fetch(u)",
+      "const f = require('fs')",
+      "Math.random()",
+    ];
+    for (const sample of samples) {
+      expect(
+        forbidden.some(([, re]) => re.test(sample)),
+        sample,
+      ).toBe(true);
+    }
+  });
+
   it.each(sources)("%s imports only sibling rule modules or the pure formulary", (_f, src) => {
-    const specs = [...code(src).matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]!);
+    const c = code(src);
+    const specs = [...c.matchAll(/(?:from|import)\s*["']([^"']+)["']/g)].map((m) => m[1]!);
     for (const s of specs) {
-      expect(s, `import ${s}`).toMatch(/^\.\/[\w-]+$|^\.\.\/formulary$/);
+      expect(s, `import ${s}`).toMatch(
+        /^\.\/[\w-]+$|^\.\.\/formulary$|^\.\.\/\.\.\/data\/rxnorm-cache\.json$/,
+      );
     }
   });
 });

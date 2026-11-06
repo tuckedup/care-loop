@@ -61,6 +61,8 @@ describe("evaluateEligibility", () => {
     expect(r.results.map((x) => x.ruleId)).toEqual([
       "R01",
       "R02",
+      "M01",
+      "M02",
       "R03",
       "R04",
       "R05",

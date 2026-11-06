@@ -20,10 +20,14 @@ export type RuleId =
   | "R13"
   | "D01"
   | "D02"
-  | "D03";
+  | "D03"
+  | "M01"
+  | "M02";
 
 export type ReasonCode =
   | "INVALID_INPUT"
+  | "MEDICATION_IDENTITY_MISMATCH"
+  | "DOSE_FORM_NOT_ALLOWLISTED"
   | "IDENTITY_NOT_VERIFIED"
   | "NOT_ON_FORMULARY"
   | "CONTROLLED_SUBSTANCE"
@@ -108,6 +112,8 @@ export interface CheckInInput {
   requestedHuman: boolean;
 }
 
+// NOTE: this shape is provisional. It must be tied to the event schema when the renewal
+// aggregate is built (TODO: source needed for what counts as metabolic/CV monitoring).
 export interface MirtazapineMonitoringInput {
   baselineRecorded: boolean;
   /** Whole months since the baseline; null = unknown. */

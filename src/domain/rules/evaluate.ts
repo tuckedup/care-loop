@@ -1,6 +1,7 @@
 // evaluateEligibility: runs every rule in a fixed order and aggregates deterministically.
 // Pure: no I/O, no clock, no randomness, no env. Config (refillLimit) arrives in the input.
 import { ruleD01Trazodone, ruleD02Mirtazapine, ruleD03Hydroxyzine } from "./drug-specific";
+import { ruleM01, ruleM02 } from "./medication-identity";
 import { ruleR01, ruleR02 } from "./r01-r02";
 import { isControlled, ruleR03 } from "./r03-controlled";
 import { ruleR04, ruleR05 } from "./r04-r05";
@@ -32,6 +33,8 @@ export function ruleR00(input: RuleInput): RuleEvaluation {
 export const RULE_ORDER: ReadonlyArray<readonly [RuleId, (i: RuleInput) => RuleEvaluation]> = [
   ["R01", ruleR01],
   ["R02", ruleR02],
+  ["M01", ruleM01],
+  ["M02", ruleM02],
   ["R03", ruleR03],
   ["R04", ruleR04],
   ["R05", ruleR05],
@@ -72,7 +75,7 @@ function runSafely(id: RuleId, rule: (i: RuleInput) => RuleEvaluation, input: Ru
  * refill limit is also hit; the escalate reasons then include REFILL_LIMIT_REACHED.
  * AUTO_ELIGIBLE requires every rule to pass and the medication to be non-controlled.
  */
-export function evaluateEligibility(input: RuleInput): EligibilityResult {
+function evaluateInner(input: RuleInput): EligibilityResult {
   const evals = RULE_ORDER.map(([id, rule]) => runSafely(id, rule, input));
   const failed = evals.filter((e) => !e.passed);
   const reasonCodes = [...new Set(failed.flatMap((e) => e.reasonCodes))];
@@ -101,4 +104,35 @@ export function evaluateEligibility(input: RuleInput): EligibilityResult {
     outcome = { type: "AUTO_ELIGIBLE" };
   }
   return { outcome, results, reasonCodes };
+}
+
+/** Total fallback used when the input itself is unusable: every rule fails closed. */
+function unusableInput(): EligibilityResult {
+  return {
+    outcome: { type: "ESCALATE", reasons: ["INVALID_INPUT"] },
+    results: RULE_ORDER.map(([ruleId]) => ({
+      ruleId,
+      passed: false,
+      detail: "input missing or unusable (fail closed)",
+    })),
+    reasonCodes: ["INVALID_INPUT"],
+  };
+}
+
+/**
+ * Public entry point. Total function: null, undefined, non-objects and anything that makes
+ * evaluation throw yield ESCALATE with INVALID_INPUT. It never throws and never approves.
+ */
+export function evaluateEligibility(input: RuleInput): EligibilityResult {
+  const isObj = (v: unknown) => typeof v === "object" && v !== null;
+  try {
+    if (!isObj(input) || !isObj(input.medication) || !isObj(input.checkIn)) return unusableInput();
+  } catch {
+    return unusableInput();
+  }
+  try {
+    return evaluateInner(input);
+  } catch {
+    return unusableInput();
+  }
 }

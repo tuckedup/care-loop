@@ -106,3 +106,12 @@ or override this rule.
   KP's published escalation rates. TODO: source needed for any quantitative sensitivity claim.
 - The threshold is a code constant covered by boundary tests (0, 1, 2, 3); changing it
   requires a new ADR and clinical-safety review.
+
+### Note: dose-form limitation of ingredient-level RxCUIs
+
+The cached RxCUIs are ingredient level, so bupropion SR/XL and venlafaxine ER cannot be told
+apart from immediate-release products by RxCUI alone. Rule M02 therefore checks the medication
+text: form-specific entries (bupropion SR/XL, venlafaxine ER) need an allowed form word, and any
+other recognised form word (IR, immediate release, CR, ...) escalates with
+DOSE_FORM_NOT_ALLOWLISTED. This is a text heuristic, not a coded dose form. TODO: source needed
+for dose-form-level RxCUIs, after which M02 should compare coded forms instead.
