@@ -152,3 +152,19 @@ Follow-ups from the verifier's review (not blocking):
 - renewal_queue deliberately re-opens a renewal completed by a non-clinician if a late escalation
   arrives (flagged ESCALATED_AFTER_NON_CLINICIAN_DECISION). Fail-safe direction; confirm intended.
 - Bare `pnpm outbox:work` polls forever (use `-- --once` for verification).
+
+## 2026-11-06 — F038 (renewal_queue + phq9_trend) passing after 5 safety reviews
+
+Reviews 1-4 FAILED on real holes (system approval completing escalated renewals, lost escalation on
+late/out-of-order events, FollowUpRequired completing escalated rows, risk signals not escalating,
+invalid RenewalRequested making later events vanish). Review 5 ran an exhaustive model-based fuzz
+(~59M states) and confirmed ALL safety invariants hold; it found only data-correctness defects
+(placeholder not completed, reviewer overwrite, phq9 trusting invalid request, missing request
+event), fixed in 4a6a991 and verified by the verifier (71 projection tests, rebuild x2 identical).
+No sixth full safety review was run on that last data-only delta: flag flipped on that basis.
+
+Central queue rule (renewal-queue.ts attributableToClinician/gateApproval/gateDenial): an escalated
+row completes only via a clinician decision with matching ClinicianReviewStarted. The future decision
+aggregate (F042) MUST emit ClinicianReviewStarted before approve/deny, and reject forged clinician
+ids at command time. Only the first reviewer can resolve a row (no reassignment event yet).
+Run `pnpm projections:rebuild` after migrations 0009-0011 (0011 self-heals by truncation).

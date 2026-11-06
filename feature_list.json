@@ -568,7 +568,7 @@
       "pnpm test src/infra/projections/renewal-queue.test.ts src/infra/projections/phq9-trend.test.ts",
       "pnpm projections:rebuild"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F039",
