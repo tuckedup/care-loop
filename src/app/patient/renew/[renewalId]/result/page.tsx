@@ -13,6 +13,11 @@ const COPY: Record<ResultState, { title: string; body: string; tone: string }> =
     body: "Your check-in was received. Your care team will review your renewal. You do not need to do anything else right now.",
     tone: "border-slate-300 bg-slate-50 text-slate-900",
   },
+  pharmacy_problem: {
+    title: "There was a problem sending your prescription",
+    body: "There was a problem sending your prescription to the pharmacy. Your care team has been notified and will follow up.",
+    tone: "border-amber-300 bg-amber-50 text-amber-900",
+  },
   follow_up_needed: {
     title: "Follow-up needed",
     body: "Your care team needs to see you before this medication can be renewed. We will contact you about booking a visit.",
@@ -42,7 +47,20 @@ export default async function ResultPage({ params }: { params: Promise<{ renewal
         <h2 id="result-heading" className="text-lg font-semibold">
           {copy.title}
         </h2>
-        <p className="mt-1 text-sm">{copy.body}</p>
+        <p className="mt-1 text-sm">
+          {renewal.status === "follow_up_required"
+            ? "Your care team needs to see you before this medication can be renewed. You can book a visit now; booking does not renew your medication."
+            : copy.body}
+        </p>
+        {renewal.status === "follow_up_required" ? (
+          <Link
+            href={`/patient/follow-up/${encodeURIComponent(renewalId)}`}
+            data-testid="book-follow-up-link"
+            className="mt-3 inline-block text-sm font-medium underline"
+          >
+            Book a follow-up visit
+          </Link>
+        ) : null}
       </section>
       <Link href="/patient/status" className="mt-6 inline-block text-sm underline">
         View renewal status
