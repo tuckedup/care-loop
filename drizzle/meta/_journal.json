@@ -43,6 +43,13 @@
       "when": 1793952500577,
       "tag": "0005_projections_med_list_rx_status",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793952973033,
+      "tag": "0006_formulary_pharmacies",
+      "breakpoints": true
     }
   ]
 }

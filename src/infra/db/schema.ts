@@ -105,3 +105,43 @@ export const rxStatus = pgTable(
   },
   (t) => [index("rx_status_prescription_idx").on(t.prescriptionId)],
 );
+
+// Reference data: the formulary (docs/SPEC.md section 2), seeded from src/domain/formulary.ts and
+// the cached RxNav results in data/rxnorm-cache.json. rxcui is NULL when unresolved (TODO, never
+// invented). Controlled entries exist only so tests can prove they are blocked.
+export const formulary = pgTable(
+  "formulary",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    rxcui: text("rxcui"),
+    allowlisted: boolean("allowlisted").notNull(),
+    controlledSchedule: text("controlled_schedule"),
+    aliases: jsonb("aliases").notNull(),
+    formTokens: jsonb("form_tokens").notNull(),
+  },
+  (t) => [
+    index("formulary_rxcui_idx").on(t.rxcui),
+    check(
+      "formulary_schedule_check",
+      sql`${t.controlledSchedule} is null or ${t.controlledSchedule} in ('II', 'III', 'IV', 'V')`,
+    ),
+    // A controlled entry can never be allowlisted.
+    check(
+      "formulary_controlled_not_allowlisted",
+      sql`not (${t.allowlisted} and ${t.controlledSchedule} is not null)`,
+    ),
+  ],
+);
+
+// Reference data: fake pharmacies with 7-digit IDs (SPEC section 7). Synthetic; never real.
+export const pharmacies = pgTable(
+  "pharmacies",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    address: text("address").notNull(),
+    phone: text("phone").notNull(),
+  },
+  (t) => [check("pharmacies_id_seven_digits", sql`${t.id} ~ '^[0-9]{7}$'`)],
+);
