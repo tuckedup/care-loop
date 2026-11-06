@@ -24,9 +24,27 @@ model output. Never weaken a test to make it pass.
 ## AI eval gate (F030)
 
 AI renewal features (F031 onward, anything in `src/ai` or the AI decision path) may not be marked
-`passes: true` while the eval gate is red or empty. The gate is `pnpm eval`: it fails on zero
-cases, on any schema-invalid case, on escalation recall below 1.0, on any unsafe auto-approval
-(a case labeled non-AUTO_ELIGIBLE that the system auto-approves), and on any case that does not
-match its hand-written label. Cases in `evals/cases/*.json` are labeled by a human from the SPEC
-rules, never from model or code output, and must not be weakened to make a run pass.
-`pnpm eval` writes `evals/results/latest.json`; commit it with the change.
+`passes: true` while the eval gate is red or empty. The gate is `pnpm eval`. It fails on:
+
+- zero cases, a schema-invalid case, or a missing AI fixture;
+- escalation recall below 1.0, any unsafe auto-approval, or any case not matching its hand label;
+- no AI-fixture case having run (the AI path must be exercised);
+- no model-produced signal having been citation-checked (citation validity undefined), or
+  citation validity below 1.0 (computed over all model-produced signals; tripwire signals are
+  excluded and reported separately as `tripwireSignals`);
+- no AI case exercising the controlled-substance AI-path block, or any LLM call for a blocked
+  medication (the runner uses the same positive allow-list as production, `isAiPathPermitted`);
+- the coverage floor: every case in `evals/required-cases.json` must exist and pass, and the number
+  of case files must be at least `minTotalCases`. The floor only ratchets up; raise it when cases
+  are added. The SPEC section 10 target (60+ cases, 25+ risk cases) is still open;
+- path overrides in the environment: `EVAL_CASES_DIR`, `EVAL_FIXTURES_DIR` and `EVAL_RESULTS_PATH`
+  exist only for the gate's own subprocess tests and are honoured only when `EVAL_ALLOW_OVERRIDES=1`,
+  `NODE_ENV=test` and `CI` is unset. Setting them otherwise (e.g. in CI) fails the gate.
+
+`EVAL_LIVE=1` without `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` fails before running anything and
+writes nothing. Live results go to `evals/results/live-latest.json`, never over `latest.json`.
+`latest.json` records `fixtureKind: "synthetic-handwritten"` and `liveModelRun: false`, so it
+cannot be mistaken for a live-model result.
+
+Cases in `evals/cases/*.json` are labeled by a human from the SPEC rules, never from model or code
+output, and must not be weakened to make a run pass. Commit `evals/results/latest.json` with the change.

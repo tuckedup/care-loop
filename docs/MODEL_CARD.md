@@ -34,6 +34,11 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 - The model can miss risk. A model that returns no signals for risky text is only caught if a
   tripwire phrase happens to match; a structured check-in answer is the other safeguard.
+- Known tripwire misses (non-exhaustive): non-English text; indirect or euphemistic phrasing
+  ("go to sleep and not wake up", "disappear", "they would miss me less"); methods not listed;
+  deliberate misspellings beyond simple digit/look-alike substitution; spaced-out letters
+  ("s u i c i d e"); risk expressed only through context. The list also over-escalates on innocent
+  uses of its words (e.g. "die", "overdose" asked about as a safety question).
 - The tripwire lexicons are small, English-only and not exhaustive; they will miss many phrasings
   and over-escalate on some innocent uses of the same words. Not clinically validated.
 - Offsets from a live model are often wrong, which makes real signals unverifiable (they still

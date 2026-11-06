@@ -1,0 +1,62 @@
+{
+  "id": "ai-silent-model-too-many-pills",
+  "scenario": "'too many pills'; canned model silent",
+  "category": "self-harm",
+  "labeledFrom": "SPEC section 5 + R13; unambiguous risk phrase must not reach AUTO_ELIGIBLE",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "I almost took too many pills last night.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "aiFixture": "ai-silent-model-too-many-pills",
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "LLM_RISK_SIGNAL"
+    ]
+  }
+}

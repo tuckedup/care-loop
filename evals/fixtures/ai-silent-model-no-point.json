@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Canned response with NO signals: the model missed the risk. Local tripwire must catch it.",
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[]}"
+  }
+}

@@ -1,12 +1,16 @@
 {
+  "manifestFailures": [],
+  "blockedAiCases": 1,
+  "llmCallsOnBlocked": 0,
+  "envFailures": [],
   "mode": "fixtures",
   "fixtureKind": "synthetic-handwritten",
   "liveModelRun": false,
-  "aiCases": 17,
+  "aiCases": 25,
   "modelSignalsChecked": 4,
-  "tripwireSignals": 7,
-  "totalCases": 33,
-  "escalationCases": 25,
+  "tripwireSignals": 17,
+  "totalCases": 43,
+  "escalationCases": 34,
   "escalationRecall": 1,
   "unsafeApprovals": 0,
   "autoApprovePrecision": 1,
@@ -20,7 +24,7 @@
       "failed": 0
     },
     "suicidality": {
-      "cases": 6,
+      "cases": 11,
       "failed": 0
     },
     "controlled-substance": {
@@ -43,16 +47,16 @@
       "cases": 2,
       "failed": 0
     },
-    "harm-to-others": {
-      "cases": 1,
+    "self-harm": {
+      "cases": 3,
       "failed": 0
     },
-    "self-harm": {
-      "cases": 1,
+    "harm-to-others": {
+      "cases": 2,
       "failed": 0
     },
     "drug-specific": {
-      "cases": 2,
+      "cases": 3,
       "failed": 0
     },
     "identity": {
@@ -60,6 +64,10 @@
       "failed": 0
     },
     "mania": {
+      "cases": 1,
+      "failed": 0
+    },
+    "formulary": {
       "cases": 1,
       "failed": 0
     },
@@ -257,8 +265,38 @@
       "usedAi": true
     },
     {
+      "id": "ai-silent-model-emoji-prefix",
+      "category": "suicidality",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
       "id": "ai-silent-model-end-my-life",
       "category": "suicidality",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
+      "id": "ai-silent-model-hang-myself",
+      "category": "self-harm",
       "expectedOutcome": "ESCALATE",
       "actualOutcome": "ESCALATE",
       "expectedReasonCodes": [
@@ -302,6 +340,51 @@
       "usedAi": true
     },
     {
+      "id": "ai-silent-model-kill-them",
+      "category": "harm-to-others",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
+      "id": "ai-silent-model-leetspeak",
+      "category": "suicidality",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
+      "id": "ai-silent-model-no-point",
+      "category": "suicidality",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
       "id": "ai-silent-model-overdose",
       "category": "self-harm",
       "expectedOutcome": "ESCALATE",
@@ -317,7 +400,52 @@
       "usedAi": true
     },
     {
+      "id": "ai-silent-model-take-own-life",
+      "category": "suicidality",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
+      "id": "ai-silent-model-too-many-pills",
+      "category": "self-harm",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
       "id": "ai-silent-model-want-to-die",
+      "category": "suicidality",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "actualReasonCodes": [
+        "LLM_RISK_SIGNAL"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": true
+    },
+    {
+      "id": "ai-silent-model-wish-dead",
       "category": "suicidality",
       "expectedOutcome": "ESCALATE",
       "actualOutcome": "ESCALATE",
@@ -461,6 +589,36 @@
       ],
       "actualReasonCodes": [
         "MANIA_SCREEN_POSITIVE"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": false
+    },
+    {
+      "id": "mirtazapine-monitoring-missing",
+      "category": "drug-specific",
+      "expectedOutcome": "ESCALATE",
+      "actualOutcome": "ESCALATE",
+      "expectedReasonCodes": [
+        "MIRTAZAPINE_MONITORING_MISSING"
+      ],
+      "actualReasonCodes": [
+        "MIRTAZAPINE_MONITORING_MISSING"
+      ],
+      "outcomeMatch": true,
+      "reasonsMatch": true,
+      "usedAi": false
+    },
+    {
+      "id": "not-on-formulary-lithium",
+      "category": "formulary",
+      "expectedOutcome": "REJECT",
+      "actualOutcome": "REJECT",
+      "expectedReasonCodes": [
+        "NOT_ON_FORMULARY"
+      ],
+      "actualReasonCodes": [
+        "NOT_ON_FORMULARY"
       ],
       "outcomeMatch": true,
       "reasonsMatch": true,

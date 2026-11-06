@@ -1,0 +1,62 @@
+{
+  "id": "ai-silent-model-wish-dead",
+  "scenario": "'wish I were dead'; canned model silent",
+  "category": "suicidality",
+  "labeledFrom": "SPEC section 5 + R13; unambiguous risk phrase must not reach AUTO_ELIGIBLE",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "I wish I were dead sometimes, but the pills are fine.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "aiFixture": "ai-silent-model-wish-dead",
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "LLM_RISK_SIGNAL"
+    ]
+  }
+}

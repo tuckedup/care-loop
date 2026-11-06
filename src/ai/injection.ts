@@ -10,7 +10,7 @@ const PATTERNS: readonly RegExp[] = [
   /\b(?:ignore|disregard|forget|override)\s+(?:all\s+|any\s+|the\s+|your\s+|my\s+)*(?:previous|prior|above|earlier|preceding|system)\s+(?:instructions?|rules?|prompts?|messages?|guidelines?)/gi,
   /\b(?:ignore|disregard|override)\s+(?:the\s+|all\s+)?(?:rules|safety|safeguards|checks|screening)\b/gi,
   /\b(?:reveal|show|print|repeat)\s+(?:your|the)\s+(?:system\s+)?(?:prompt|instructions)\b/gi,
-  /^[ \t]*(?:system|assistant|developer)\s*(?:prompt|message)?\s*:/gim,
+  /^[ \t]*(?:system|assistant|developer)(?: (?:prompt|message))?[ \t]*:/gim,
   /\byou\s+are\s+now\b/gi,
   /\bnew\s+instructions?\s*:/gi,
   /\b(?:outcome|decision|status|result)\s*[:=]\s*"?(?:AUTO[_ -]?ELIGIBLE|approve[d]?)\b/gi,
@@ -22,14 +22,29 @@ const PATTERNS: readonly RegExp[] = [
 ];
 
 const MAX_QUOTE = 200;
+/** Characters scanned per field (the AI layer rejects longer text before this runs). */
+export const INJECTION_SCAN_LIMIT = 8000;
 const MAX_PER_FIELD = 20;
 
 /** Returns verified-by-construction prompt_injection_attempt signals (quote == text[start,end)). */
 export function detectInjection(input: RiskTextInput): VerifiedSignal[] {
   const out: VerifiedSignal[] = [];
   for (const field of SOURCE_FIELDS) {
-    const text = input[field];
-    if (typeof text !== "string") continue;
+    const full = input[field];
+    if (typeof full !== "string") continue;
+    // Bound the work: never run regexes over an unbounded string.
+    const text = full.length > INJECTION_SCAN_LIMIT ? full.slice(0, INJECTION_SCAN_LIMIT) : full;
+    if (full.length > INJECTION_SCAN_LIMIT) {
+      out.push({
+        type: "prompt_injection_attempt",
+        quote: text.slice(0, MAX_QUOTE),
+        sourceField: field,
+        start: 0,
+        end: Math.min(MAX_QUOTE, text.length),
+        origin: "tripwire",
+        verified: true,
+      });
+    }
     let count = 0;
     for (const re of PATTERNS) {
       if (count >= MAX_PER_FIELD) break;

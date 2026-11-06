@@ -4,7 +4,7 @@
 import { createAnthropicClient, createRecordedClient, type RiskLlmClient } from "../src/ai/client";
 import { loadAiConfig } from "../src/ai/config";
 import { runRiskExtraction, toRulesAiResult } from "../src/ai/fail-closed";
-import { isAiPathAllowed } from "../src/domain/rules";
+import { isAiPathPermitted } from "../src/ai/ai-path-gate";
 import { loadFixture } from "./fixtures";
 import { toRuleInput, type AiForRules } from "./lib";
 import type { EvalCase } from "./schema";
@@ -18,6 +18,8 @@ export interface AiStageResult {
   modelSignalsVerified: number;
   /** Locally produced tripwire / injection signals, reported separately. */
   tripwireSignals: number;
+  /** The medication was blocked from the AI path (positive allow-list). */
+  blocked: boolean;
   /** Excluded from this run (fixture-only case during a live run). */
   skipped: boolean;
 }
@@ -36,6 +38,7 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
       modelSignals: 0,
       modelSignalsVerified: 0,
       tripwireSignals: 0,
+      blocked: false,
       skipped: true,
     };
   }
@@ -79,7 +82,8 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
     },
   );
   const calls = counted.calls.length;
-  if (!isAiPathAllowed(ruleInput) && calls > 0) {
+  const blocked = !isAiPathPermitted(ruleInput);
+  if (blocked && calls > 0) {
     throw new Error(`case ${c.id}: controlled medication reached the LLM (${calls} call(s))`);
   }
   const signals = result.status === "ok" ? result.signals : [];
@@ -92,6 +96,7 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
     modelSignals: modelSigs.length,
     modelSignalsVerified: modelSigs.filter((s) => s.verified).length,
     tripwireSignals: signals.length - modelSigs.length,
+    blocked,
     skipped: false,
   };
 }

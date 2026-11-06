@@ -1,0 +1,61 @@
+{
+  "id": "not-on-formulary-lithium",
+  "scenario": "Non-controlled medication that is not on the 15-drug allowlist (placeholder RxCUI)",
+  "category": "formulary",
+  "labeledFrom": "R02 (medication not on formulary allowlist rejects)",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "999999999",
+    "name": "lithium",
+    "doseMg": 300,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": null
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "999999999"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "REJECT",
+    "reasonCodes": [
+      "NOT_ON_FORMULARY"
+    ]
+  }
+}

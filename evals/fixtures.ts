@@ -5,9 +5,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { overridesAllowed } from "./lib";
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const fixturesDir = () => process.env.EVAL_FIXTURES_DIR ?? join(here, "fixtures");
+export const fixturesDir = () =>
+  (overridesAllowed() ? process.env.EVAL_FIXTURES_DIR : undefined) ?? join(here, "fixtures");
 
 export const AiFixtureSchema = z
   .object({

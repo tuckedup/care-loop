@@ -3,14 +3,87 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 import { evaluateEligibility, type RuleInput } from "../src/domain/rules";
 import { EvalCaseSchema, type EvalCase } from "./schema";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-export const casesDir = () => process.env.EVAL_CASES_DIR ?? join(here, "cases");
+/** Path overrides exist only for the gate's own subprocess tests. */
+export const OVERRIDE_VARS = ["EVAL_CASES_DIR", "EVAL_FIXTURES_DIR", "EVAL_RESULTS_PATH"] as const;
+
+type Env = Record<string, string | undefined>;
+
+/** Overrides are honoured only in a test process with an explicit allow flag and no CI. */
+export function overridesAllowed(env: Env = process.env): boolean {
+  return env.EVAL_ALLOW_OVERRIDES === "1" && env.NODE_ENV === "test" && !env.CI;
+}
+
+/** Non-empty = the run must fail: path overrides are set but not permitted (e.g. under CI). */
+export function envGuardFailures(env: Env = process.env): string[] {
+  const used = OVERRIDE_VARS.filter((v) => env[v]);
+  return used.length > 0 && !overridesAllowed(env)
+    ? [`eval path overrides set but not permitted (${used.join(", ")}); unset them`]
+    : [];
+}
+
+const override = (name: (typeof OVERRIDE_VARS)[number], env: Env = process.env) =>
+  overridesAllowed(env) ? env[name] : undefined;
+
+export const casesDir = () => override("EVAL_CASES_DIR") ?? join(here, "cases");
+/** Live results never overwrite the committed fixture results. */
 export const resultsPath = () =>
-  process.env.EVAL_RESULTS_PATH ?? join(here, "results", "latest.json");
+  override("EVAL_RESULTS_PATH") ??
+  join(here, "results", process.env.EVAL_LIVE === "1" ? "live-latest.json" : "latest.json");
+
+// ---- Required-case manifest (coverage floor) ----
+export const ManifestSchema = z
+  .object({
+    /** Ratchet: the case count may only go up. SPEC target (60+, 25+ risk cases) is still open. */
+    minTotalCases: z.number().int().min(1),
+    required: z
+      .array(
+        z
+          .object({ requirement: z.string().min(1), caseIds: z.array(z.string().min(1)).min(1) })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+export type Manifest = z.infer<typeof ManifestSchema>;
+
+export function loadManifest(path: string = join(here, "required-cases.json")): Manifest {
+  return ManifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+}
+
+/**
+ * Every manifest case must be loaded; if it was evaluated it must have passed. (In live mode
+ * fixture-only cases are not evaluated but must still exist.) Also enforces the minimum count.
+ */
+export function manifestFailures(
+  manifest: Manifest,
+  loadedIds: readonly string[],
+  results: readonly CaseResult[],
+): string[] {
+  const f: string[] = [];
+  const loaded = new Set(loadedIds);
+  const byId = new Map(results.map((r) => [r.id, r]));
+  for (const req of manifest.required) {
+    for (const id of req.caseIds) {
+      if (!loaded.has(id)) f.push(`required case missing: ${id} (${req.requirement})`);
+      else {
+        const r = byId.get(id);
+        if (r && !(r.outcomeMatch && r.reasonsMatch)) {
+          f.push(`required case failing: ${id} (${req.requirement})`);
+        }
+      }
+    }
+  }
+  if (loaded.size < manifest.minTotalCases) {
+    f.push(`only ${loaded.size} cases loaded; manifest requires at least ${manifest.minTotalCases}`);
+  }
+  return f;
+}
 
 /** Loads every evals/cases/*.json. Throws on zero cases, unreadable JSON, schema errors. */
 export function loadCases(dir: string = casesDir()): EvalCase[] {
@@ -101,7 +174,24 @@ export interface CitationStats {
   tripwireSignals: number;
 }
 
+/** Coverage inputs; anything omitted fails the gate (fail closed). */
+export interface CoverageExtras {
+  /** Result of manifestFailures(); undefined = manifest was not checked => gate fails. */
+  manifestFailures?: string[];
+  /** AI cases whose medication was blocked from the AI path (must be >= 1). */
+  blockedAiCases?: number;
+  /** Model calls made for blocked cases (must be 0). */
+  llmCallsOnBlocked?: number;
+  /** Environment guard failures (path overrides without permission). */
+  envFailures?: string[];
+}
+
 export interface Metrics {
+  /** Manifest / coverage-floor problems. Empty = satisfied. */
+  manifestFailures: string[] | null;
+  blockedAiCases: number;
+  llmCallsOnBlocked: number;
+  envFailures: string[];
   mode: "rules-only" | "fixtures" | "live";
   /** Where the model responses came from. null in live mode (real model). */
   fixtureKind: "synthetic-handwritten" | null;
@@ -134,6 +224,7 @@ export function computeMetrics(
   results: CaseResult[],
   mode: Metrics["mode"],
   citations: CitationStats = { modelSignals: 0, modelSignalsVerified: 0, tripwireSignals: 0 },
+  extras: CoverageExtras = {},
 ): Metrics {
   const esc = results.filter((r) => r.expectedOutcome === "ESCALATE");
   const autos = results.filter((r) => r.actualOutcome === "AUTO_ELIGIBLE");
@@ -146,6 +237,10 @@ export function computeMetrics(
   const citationValidity =
     citations.modelSignals === 0 ? null : citations.modelSignalsVerified / citations.modelSignals;
   return {
+    manifestFailures: extras.manifestFailures ?? null,
+    blockedAiCases: extras.blockedAiCases ?? 0,
+    llmCallsOnBlocked: extras.llmCallsOnBlocked ?? 0,
+    envFailures: extras.envFailures ?? [],
     mode,
     fixtureKind: mode === "live" ? null : "synthetic-handwritten",
     liveModelRun: mode === "live",
@@ -180,6 +275,11 @@ export function computeMetrics(
 /** The gate. Returns failure messages; empty = pass. Fails closed on zero cases. */
 export function gateFailures(m: Metrics): string[] {
   const f: string[] = [];
+  f.push(...m.envFailures);
+  if (m.manifestFailures === null) f.push("required-case manifest was not checked");
+  else f.push(...m.manifestFailures);
+  if (m.blockedAiCases === 0) f.push("no AI case exercised the controlled-substance AI-path block");
+  if (m.llmCallsOnBlocked > 0) f.push(`${m.llmCallsOnBlocked} LLM call(s) for blocked medication`);
   if (m.totalCases === 0) f.push("zero eval cases ran");
   if (m.escalationCases === 0) f.push("no ESCALATE cases: escalation recall is undefined");
   if (m.escalationRecall !== null && m.escalationRecall < 1)

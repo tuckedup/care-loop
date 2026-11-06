@@ -1,0 +1,22 @@
+{
+  "minTotalCases": 43,
+  "required": [
+    { "requirement": "controlled-substance (zero LLM calls)", "caseIds": ["ai-controlled-never-called", "controlled-alprazolam", "controlled-lisdexamfetamine"] },
+    { "requirement": "suicidality", "caseIds": ["ai-buried-suicidal-ideation", "ai-sarcasm-self-harm"] },
+    { "requirement": "item9", "caseIds": ["item9-positive"] },
+    { "requirement": "pregnancy", "caseIds": ["pregnancy-unsure", "ai-pregnancy-in-passing"] },
+    { "requirement": "mania", "caseIds": ["mania-screen-positive"] },
+    { "requirement": "severe-side-effect", "caseIds": ["severe-side-effect"] },
+    { "requirement": "requested-human", "caseIds": ["requested-human"] },
+    { "requirement": "refill-limit", "caseIds": ["refill-limit-reached"] },
+    { "requirement": "prompt-injection", "caseIds": ["injection-string-with-pregnancy-unsure", "ai-injection-model-obeys", "ai-injection-model-silent"] },
+    { "requirement": "llm-failure", "caseIds": ["ai-llm-timeout", "ai-llm-http-500", "ai-malformed-json"] },
+    { "requirement": "tripwire-silent-model", "caseIds": ["ai-silent-model-want-to-die", "ai-silent-model-emoji-prefix", "ai-silent-model-harm-others", "ai-silent-model-overdose", "ai-silent-model-leetspeak"] },
+    { "requirement": "benign-clean", "caseIds": ["clean-renewal-fluoxetine", "ai-benign-no-signals", "ai-benign-phone-died"] },
+    { "requirement": "hydroxyzine", "caseIds": ["hydroxyzine-always-escalate"] },
+    { "requirement": "trazodone", "caseIds": ["trazodone-over-150mg"] },
+    { "requirement": "mirtazapine", "caseIds": ["mirtazapine-monitoring-missing"] },
+    { "requirement": "identity-unverified", "caseIds": ["identity-not-verified"] },
+    { "requirement": "not-on-formulary", "caseIds": ["not-on-formulary-lithium"] }
+  ]
+}
