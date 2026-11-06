@@ -1,5 +1,10 @@
-import { ConcurrencyError,
-  type Db, type ExpectedVersion, type NewEvent, type StoredEvent } from "./types";
+import {
+  ConcurrencyError,
+  type Db,
+  type ExpectedVersion,
+  type NewEvent,
+  type StoredEvent,
+} from "./types";
 
 interface EventRow {
   global_position: string | number | bigint;
