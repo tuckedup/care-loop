@@ -153,8 +153,9 @@ export const renewalQueue = pgTable(
   "renewal_queue",
   {
     renewalId: text("renewal_id").primaryKey(),
-    patientId: text("patient_id").notNull(),
-    prescriptionId: text("prescription_id").notNull(),
+    // NULL only on a placeholder row created for a schema-invalid RenewalRequested.
+    patientId: text("patient_id"),
+    prescriptionId: text("prescription_id"),
     status: text("status").notNull(),
     // Latest eligibility outcome from the rules (null until evaluated).
     outcome: text("outcome"),

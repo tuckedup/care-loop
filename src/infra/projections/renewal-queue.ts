@@ -4,14 +4,25 @@ import type { Db, StoredEvent } from "@/infra/event-store/types";
 import { recordAnomaly } from "./anomalies";
 import type { Projection } from "./runner";
 
+// Assumptions for the future decision aggregate (F042), documented rather than enforced here:
+//  - Only the FIRST ClinicianReviewStarted resolves a row (there is no reassignment event yet);
+//    a second review start by someone else is ignored and that clinician's decision is refused
+//    with CLINICIAN_ID_MISMATCH.
+//  - A decision made before ClinicianReviewStarted is not replayed once a review starts: the
+//    aggregate must require review-start before accepting an approval/denial of an escalated
+//    renewal.
+//  - Ids come from application-appended events; rejecting a forged clinicianId at command time is
+//    the aggregate's job.
+
 /** FHIR Task.status vocabulary, restricted to the three states the clinician queue shows. */
 export type QueueStatus = "requested" | "in-progress" | "completed";
 export type QueueDecision = "approved" | "denied" | "follow_up_required";
 
 export interface RenewalQueueRow {
   renewalId: string;
-  patientId: string;
-  prescriptionId: string;
+  /** null only on a placeholder created for a schema-invalid RenewalRequested. */
+  patientId: string | null;
+  prescriptionId: string | null;
   status: QueueStatus;
   outcome: string | null;
   escalated: boolean;
@@ -40,7 +51,15 @@ export const QUEUE_ANOMALY = {
   FOLLOW_UP_ON_ESCALATED_WITHOUT_CLINICIAN: "FOLLOW_UP_ON_ESCALATED_WITHOUT_CLINICIAN",
   ESCALATED_AFTER_NON_CLINICIAN_DECISION: "ESCALATED_AFTER_NON_CLINICIAN_DECISION",
   INVALID_EVENT_FOR_RENEWAL: "INVALID_EVENT_FOR_RENEWAL",
+  INVALID_REQUEST_EVENT: "INVALID_REQUEST_EVENT",
 } as const;
+
+/** Reason code the rules use (R13) for any LLM risk signal. */
+export const LLM_RISK_SIGNAL = "LLM_RISK_SIGNAL";
+/** Reason code the rules use (R13) for an LLM failure / invalid output. */
+export const LLM_FAILURE = "LLM_FAILURE";
+/** Added when an escalation carries no reason code, so reasonCodes is never empty when escalated. */
+export const ESCALATED_NO_REASON_CODES = "ESCALATED_NO_REASON_CODES";
 
 /** An outcome of ESCALATE counts as escalated even if RenewalEscalated has not arrived (yet). */
 export const isEscalated = (r: Pick<RenewalQueueRow, "escalated" | "outcome">) =>
@@ -80,8 +99,10 @@ function gateApproval(
       ? refuse(QUEUE_ANOMALY.SYSTEM_APPROVAL_ON_ESCALATED)
       : { ok: true, decidedBy: "system", decisionClinicianId: null };
   }
-  // A clinician approval with no identifiable clinician never completes ANY row.
-  const id = data.clinicianId ?? current.clinicianId;
+  // A clinician approval with no named clinician never completes ANY row.
+  // No inference: a clinician approval must name the clinician itself (a review start is not
+  // evidence of who approved).
+  const id = data.clinicianId;
   if (!id) return refuse(QUEUE_ANOMALY.APPROVAL_WITHOUT_CLINICIAN_ID);
   if (current.clinicianId && id !== current.clinicianId) {
     return refuse(QUEUE_ANOMALY.CLINICIAN_ID_MISMATCH);
@@ -120,7 +141,19 @@ export function reduceRenewalQueue(
   meta: { position: bigint; at: string },
 ): RenewalQueueRow | null {
   if (event.type === "RenewalRequested") {
-    if (current !== null) return current; // duplicate request: first one wins
+    if (current !== null) {
+      // First valid request wins; it only fills in a placeholder created for an invalid one
+      // (the placeholder keeps its escalated flag and anomaly).
+      return current.patientId === null
+        ? {
+            ...current,
+            patientId: event.data.patientId,
+            prescriptionId: event.data.prescriptionId,
+            updatedAt: meta.at,
+            lastPosition: meta.position,
+          }
+        : current;
+    }
     return {
       renewalId: event.data.renewalId,
       patientId: event.data.patientId,
@@ -154,17 +187,19 @@ export function reduceRenewalQueue(
 
   /** Mark escalated; re-open a completed renewal that is not attributable to a clinician. */
   const escalate = (codes: readonly string[]): RenewalQueueRow =>
-    holdIfUnattributed(
-      next({ escalated: true, reasonCodes: union(current.reasonCodes, codes) }),
-      current,
-    );
+    escalateRow(next({}), codes, current);
 
   switch (event.type) {
     case "IdentityVerified":
     case "CheckInSubmitted":
       return done ? current : next({});
-    case "RiskSignalsExtracted":
-      return next({ riskSignalCount: event.data.signals.length });
+    case "RiskSignalsExtracted": {
+      // R13: any LLM risk signal escalates, through the same path as every other escalation.
+      const count = event.data.signals.length;
+      return count > 0
+        ? { ...escalate([LLM_RISK_SIGNAL]), riskSignalCount: count }
+        : next({ riskSignalCount: count });
+    }
     case "EligibilityEvaluated": {
       const failed = event.data.results.filter((r) => !r.passed).map((r) => r.ruleId);
       if (event.data.outcome === "ESCALATE") {
@@ -241,7 +276,32 @@ function holdIfUnattributed(row: RenewalQueueRow, before: RenewalQueueRow): Rene
   };
 }
 
-const ESCALATION_TYPES = new Set(["RenewalEscalated", "EligibilityEvaluated"]);
+/** Reason codes merged: de-duplicated union; never empty once escalated. */
+function mergeCodes(a: readonly string[], b: readonly string[]): string[] {
+  const u = union(a, b);
+  const specific = u.filter((c) => c !== ESCALATED_NO_REASON_CODES);
+  if (specific.length > 0) return specific;
+  return [ESCALATED_NO_REASON_CODES];
+}
+
+/** Mark escalated with merged reason codes; re-open a completion `before` that has no clinician. */
+function escalateRow(
+  row: RenewalQueueRow,
+  codes: readonly string[],
+  before: RenewalQueueRow,
+): RenewalQueueRow {
+  return holdIfUnattributed(
+    { ...row, escalated: true, reasonCodes: mergeCodes(row.reasonCodes, codes) },
+    before,
+  );
+}
+
+/** Invalid event types whose lost content may have been an escalation (R13 included). */
+const ESCALATION_CODES: Record<string, readonly string[]> = {
+  RenewalEscalated: [],
+  EligibilityEvaluated: [],
+  RiskSignalsExtracted: [LLM_FAILURE],
+};
 
 /**
  * A schema-invalid event for an existing renewal. Fail closed: flag the row, hold it open (a
@@ -256,18 +316,51 @@ export function reduceInvalidEvent(
   if (current === null) return null;
   const flagged: RenewalQueueRow = {
     ...current,
-    ...(ESCALATION_TYPES.has(eventType) ? { escalated: true } : {}),
     anomalies: union(current.anomalies, [QUEUE_ANOMALY.INVALID_EVENT_FOR_RENEWAL]),
     updatedAt: meta.at,
     lastPosition: meta.position,
   };
-  return holdIfUnattributed(flagged, current);
+  return Object.hasOwn(ESCALATION_CODES, eventType)
+    ? escalateRow(flagged, ESCALATION_CODES[eventType]!, current)
+    : holdIfUnattributed(flagged, current);
+}
+
+/**
+ * A schema-invalid RenewalRequested: the renewal must not vanish. Creates a placeholder row keyed
+ * by the stream-derived renewal id (patient/prescription unknown, escalated, anomaly set) so it is
+ * visible and open, and later valid events apply to it. If a row already exists it is flagged.
+ */
+export function reduceInvalidRequest(
+  renewalId: string,
+  current: RenewalQueueRow | null,
+  meta: { position: bigint; at: string },
+): RenewalQueueRow {
+  if (current !== null) return reduceInvalidEvent(current, "RenewalRequested", meta)!;
+  return {
+    renewalId,
+    patientId: null,
+    prescriptionId: null,
+    status: "requested",
+    outcome: null,
+    escalated: true,
+    reasonCodes: [QUEUE_ANOMALY.INVALID_REQUEST_EVENT],
+    riskSignalCount: 0,
+    clinicianId: null,
+    decision: null,
+    decidedBy: null,
+    decisionClinicianId: null,
+    anomalies: [QUEUE_ANOMALY.INVALID_REQUEST_EVENT],
+    requestedAt: meta.at,
+    updatedAt: meta.at,
+    lastPosition: meta.position,
+    requestPosition: meta.position,
+  };
 }
 
 interface Row {
   renewal_id: string;
-  patient_id: string;
-  prescription_id: string;
+  patient_id: string | null;
+  prescription_id: string | null;
   status: QueueStatus;
   outcome: string | null;
   escalated: boolean;
@@ -380,12 +473,16 @@ export const renewalQueueProjection: Projection = {
       // Skip and record; the runner checkpoint advances so one bad event cannot halt the queue.
       // Fail closed for the renewal it belongs to (identified by its stream), if we have a row.
       await recordAnomaly(tx, "renewal_queue", stored, "INVALID_EVENT", String(e));
-      if (stored.streamId.startsWith(STREAM_PREFIX) && stored.type !== "RenewalRequested") {
-        const id = stored.streamId.slice(STREAM_PREFIX.length);
-        const marked = reduceInvalidEvent(await loadRow(tx, id), stored.type, {
-          position: stored.globalPosition,
-          at: stored.createdAt.toISOString(),
-        });
+      const id = stored.streamId.startsWith(STREAM_PREFIX)
+        ? stored.streamId.slice(STREAM_PREFIX.length)
+        : "";
+      if (id !== "") {
+        const m = { position: stored.globalPosition, at: stored.createdAt.toISOString() };
+        const row = await loadRow(tx, id);
+        const marked =
+          stored.type === "RenewalRequested"
+            ? reduceInvalidRequest(id, row, m)
+            : reduceInvalidEvent(row, stored.type, m);
         if (marked) await writeRow(tx, marked);
       }
       return;

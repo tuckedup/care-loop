@@ -11,6 +11,8 @@ import {
   listRenewalQueue,
   QUEUE_ANOMALY,
   reduceInvalidEvent,
+  reduceInvalidRequest,
+  ESCALATED_NO_REASON_CODES,
   reduceRenewalQueue,
   renewalQueueProjection,
   type RenewalQueueRow,
@@ -89,7 +91,13 @@ describe("renewal_queue safety rules (pure)", () => {
       requested,
       escalated(["R08"]),
       started("c1"),
-      ev("RenewalApproved", { v: 1, renewalId: "r1", by: "clinician", autonomyMode: "SHADOW" }),
+      ev("RenewalApproved", {
+        v: 1,
+        renewalId: "r1",
+        by: "clinician",
+        autonomyMode: "SHADOW",
+        clinicianId: "c1",
+      }),
     ]);
     expect(fromReview).toMatchObject({
       status: "completed",
@@ -223,12 +231,102 @@ describe("renewal_queue safety rules (pure)", () => {
       escalated: true,
       anomalies: [QUEUE_ANOMALY.INVALID_EVENT_FOR_RENEWAL],
     });
-    expect(reduceInvalidEvent(base, "RiskSignalsExtracted", m)!.escalated).toBe(false);
+    expect(reduceInvalidEvent(base, "IdentityVerified", m)!.escalated).toBe(false);
+    expect(reduceInvalidEvent(base, "RiskSignalsExtracted", m)).toMatchObject({
+      escalated: true,
+      reasonCodes: ["LLM_FAILURE"],
+    });
     const approved = fold([requested, approvedBySystem]);
     expect(reduceInvalidEvent(approved, "RiskSignalsExtracted", m)).toMatchObject({
       status: "requested",
       decision: null,
     });
+  });
+
+  it("any LLM risk signal escalates (R13) and a later system approval stays open", () => {
+    const sig = ev("RiskSignalsExtracted", {
+      v: 1,
+      renewalId: "r1",
+      signals: [{ type: "x", quote: "q", sourceField: "freeText", start: 0, end: 1 }],
+      model: "m",
+      latencyMs: 1,
+    });
+    const row = fold([requested, sig, approvedBySystem]);
+    expect(row).toMatchObject({
+      status: "requested",
+      decision: null,
+      escalated: true,
+      reasonCodes: ["LLM_RISK_SIGNAL"],
+      riskSignalCount: 1,
+    });
+    expect(row.anomalies).toEqual([QUEUE_ANOMALY.SYSTEM_APPROVAL_ON_ESCALATED]);
+    const zero = fold([
+      requested,
+      ev("RiskSignalsExtracted", { v: 1, renewalId: "r1", signals: [], model: "m", latencyMs: 1 }),
+    ]);
+    expect(zero.escalated).toBe(false);
+  });
+
+  it("a risk signal arriving after a system approval re-opens it with an anomaly", () => {
+    const sig = ev("RiskSignalsExtracted", {
+      v: 1,
+      renewalId: "r1",
+      signals: [{ type: "x", quote: "q", sourceField: "freeText", start: 0, end: 1 }],
+      model: "m",
+      latencyMs: 1,
+    });
+    const row = fold([requested, approvedBySystem, sig]);
+    expect(row).toMatchObject({
+      status: "requested",
+      decision: null,
+      escalated: true,
+      reasonCodes: ["LLM_RISK_SIGNAL"],
+    });
+    expect(row.anomalies).toEqual([QUEUE_ANOMALY.ESCALATED_AFTER_NON_CLINICIAN_DECISION]);
+  });
+
+  it("a clinician approval never inherits the reviewer id (no inference)", () => {
+    const row = fold([
+      requested,
+      escalated(["R08"]),
+      started("c1"),
+      ev("RenewalApproved", { v: 1, renewalId: "r1", by: "clinician", autonomyMode: "SHADOW" }),
+    ]);
+    expect(row.status).toBe("in-progress");
+    expect(row.anomalies).toEqual([QUEUE_ANOMALY.APPROVAL_WITHOUT_CLINICIAN_ID]);
+  });
+
+  it("an ESCALATE evaluation with no failed rules still gets a generic reason code", () => {
+    const row = fold([
+      requested,
+      ev("EligibilityEvaluated", { v: 1, renewalId: "r1", results: [], outcome: "ESCALATE" }),
+    ]);
+    expect(row.reasonCodes).toEqual([ESCALATED_NO_REASON_CODES]);
+    // a specific code arriving later replaces the generic one
+    const later = fold([
+      requested,
+      ev("EligibilityEvaluated", { v: 1, renewalId: "r1", results: [], outcome: "ESCALATE" }),
+      escalated(["R08"]),
+    ]);
+    expect(later.reasonCodes).toEqual(["R08"]);
+    expect(fold([requested, escalated([])]).reasonCodes).toEqual([ESCALATED_NO_REASON_CODES]);
+  });
+
+  it("an invalid RenewalRequested creates an open, escalated placeholder that later events apply to", () => {
+    const m = meta(1);
+    const ph = reduceInvalidRequest("r1", null, m);
+    expect(ph).toMatchObject({
+      renewalId: "r1",
+      patientId: null,
+      status: "requested",
+      escalated: true,
+      requestPosition: 1n,
+      anomalies: [QUEUE_ANOMALY.INVALID_REQUEST_EVENT],
+    });
+    const after = reduceRenewalQueue(ph, approvedBySystem, meta(2))!;
+    expect(after.status).toBe("requested");
+    const filled = reduceRenewalQueue(ph, requested, meta(3))!;
+    expect(filled).toMatchObject({ patientId: "p1", escalated: true, requestPosition: 1n });
   });
 
   it("late escalation after a system approval re-opens the renewal and flags it", () => {
@@ -246,7 +344,13 @@ describe("renewal_queue safety rules (pure)", () => {
     const row = fold([
       requested,
       started("c1"),
-      ev("RenewalApproved", { v: 1, renewalId: "r1", by: "clinician", autonomyMode: "SHADOW" }),
+      ev("RenewalApproved", {
+        v: 1,
+        renewalId: "r1",
+        by: "clinician",
+        autonomyMode: "SHADOW",
+        clinicianId: "c1",
+      }),
       escalated(["R08"]),
     ]);
     expect(row).toMatchObject({
@@ -556,6 +660,87 @@ describe("projection safety (database)", () => {
       "SELECT patient_id, orphan FROM phq9_trend WHERE renewal_id = 'w1'",
     );
     expect(o).toMatchObject({ patient_id: null, orphan: true });
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("a risk signal escalates and holds against system approval; rebuild equals incremental", async () => {
+    await append("renewal-k1", [
+      req("k1"),
+      makeEvent("RiskSignalsExtracted", {
+        v: 1,
+        renewalId: "k1",
+        signals: [{ type: "x", quote: "q", sourceField: "freeText", start: 0, end: 1 }],
+        model: "m",
+        latencyMs: 1,
+      }),
+      makeEvent("RenewalApproved", { v: 1, renewalId: "k1", by: "system", autonomyMode: "RETRO" }),
+    ]);
+    expect(await row("k1")).toMatchObject({ status: "requested", escalated: true, decision: null });
+    expect((await row("k1")).reasonCodes).toEqual(["LLM_RISK_SIGNAL"]);
+
+    await append("renewal-k2", [
+      req("k2"),
+      makeEvent("RenewalApproved", { v: 1, renewalId: "k2", by: "system", autonomyMode: "RETRO" }),
+    ]);
+    await append("renewal-k2", [
+      makeEvent("RiskSignalsExtracted", {
+        v: 1,
+        renewalId: "k2",
+        signals: [{ type: "x", quote: "q", sourceField: "freeText", start: 0, end: 1 }],
+        model: "m",
+        latencyMs: 1,
+      }),
+    ]);
+    expect(await row("k2")).toMatchObject({ status: "requested", escalated: true, decision: null });
+    expect((await row("k2")).anomalies).toEqual(["ESCALATED_AFTER_NON_CLINICIAN_DECISION"]);
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("an invalid RiskSignalsExtracted escalates and holds against system approval", async () => {
+    await append("renewal-k3", [req("k3")]);
+    await append("renewal-k3", [
+      { type: "RiskSignalsExtracted", data: { v: 1, renewalId: "k3", signals: "garbage" } },
+    ]);
+    await append("renewal-k3", [
+      makeEvent("RenewalApproved", { v: 1, renewalId: "k3", by: "system", autonomyMode: "RETRO" }),
+    ]);
+    const r = await row("k3");
+    expect(r).toMatchObject({ status: "requested", escalated: true, decision: null });
+    expect(r.reasonCodes).toEqual(["LLM_FAILURE"]);
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("an invalid RenewalRequested leaves a visible open placeholder; later events apply", async () => {
+    await append("renewal-x1", [{ type: "RenewalRequested", data: { v: 1, renewalId: "x1" } }]);
+    let r = await row("x1");
+    expect(r).toMatchObject({
+      patientId: null,
+      status: "requested",
+      escalated: true,
+      anomalies: ["INVALID_REQUEST_EVENT"],
+    });
+    expect(r.requestPosition > 0n).toBe(true);
+    await append("renewal-x1", [
+      makeEvent("RenewalApproved", { v: 1, renewalId: "x1", by: "system", autonomyMode: "RETRO" }),
+      makeEvent("ClinicianReviewStarted", { v: 1, renewalId: "x1", clinicianId: "c1" }),
+    ]);
+    r = await row("x1");
+    expect(r).toMatchObject({ status: "in-progress", decision: null, clinicianId: "c1" });
+    expect(r.anomalies).toContain("SYSTEM_APPROVAL_ON_ESCALATED");
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("an ESCALATE evaluation with empty results gets the generic reason code", async () => {
+    await append("renewal-g1", [
+      req("g1"),
+      makeEvent("EligibilityEvaluated", {
+        v: 1,
+        renewalId: "g1",
+        results: [],
+        outcome: "ESCALATE",
+      }),
+    ]);
+    expect((await row("g1")).reasonCodes).toEqual(["ESCALATED_NO_REASON_CODES"]);
     await expectRebuildEqualsIncremental();
   });
 

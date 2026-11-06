@@ -78,6 +78,13 @@
       "when": 1793961134349,
       "tag": "0010_queue_decision_clinician",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793961629578,
+      "tag": "0011_queue_placeholder_selfheal",
+      "breakpoints": true
     }
   ]
 }
