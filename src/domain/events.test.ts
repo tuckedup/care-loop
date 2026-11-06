@@ -262,4 +262,37 @@ describe("event schemas v1 (F005)", () => {
       ).toThrow();
     });
   });
+
+  describe("additive clinician attribution fields (F042)", () => {
+    it("old RenewalDenied / VisitBooked payloads still parse", () => {
+      expect(
+        parseEvent({ type: "RenewalDenied", data: { v: 1, renewalId: "r1", reason: "no" } }).type,
+      ).toBe("RenewalDenied");
+      expect(
+        parseEvent({
+          type: "VisitBooked",
+          data: { v: 1, visitId: "v1", patientId: "p1", start: T, end: "2026-01-02T03:34:05Z" },
+        }).type,
+      ).toBe("VisitBooked");
+    });
+    it("accepts and validates by / clinicianId / renewalId", () => {
+      const denied = parseEvent({
+        type: "RenewalDenied",
+        data: { v: 1, renewalId: "r1", reason: "no", by: "clinician", clinicianId: "c1" },
+      });
+      expect(denied.data).toMatchObject({ by: "clinician", clinicianId: "c1" });
+      expect(() =>
+        parseEvent({
+          type: "RenewalDenied",
+          data: { v: 1, renewalId: "r1", reason: "no", by: "ai" },
+        }),
+      ).toThrow();
+      expect(() =>
+        parseEvent({
+          type: "VisitBooked",
+          data: { v: 1, visitId: "v1", patientId: "p1", start: T, end: T, clinicianId: "" },
+        }),
+      ).toThrow();
+    });
+  });
 });

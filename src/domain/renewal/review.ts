@@ -170,20 +170,26 @@ export function evolveReview(state: ReviewState, event: DomainEvent): ReviewStat
       return state.reviewerId === null && state.decision === null
         ? { ...state, reviewerId: event.data.clinicianId }
         : state;
-    case "RenewalApproved":
-      return state.decision === null
-        ? { ...state, decision: "approved", decidedBy: event.data.by }
-        : state;
+    // Mirrors the renewal_queue gates: an approval/denial only counts as a decision if the queue
+    // would complete the row. A forged event (system approval of an escalated renewal, another
+    // clinician's id, a decision before review start) is ignored, so it can never block the
+    // legitimate reviewer from deciding.
+    case "RenewalApproved": {
+      if (state.decision !== null) return state;
+      const d = event.data;
+      if (d.by === "system") {
+        return state.escalated ? state : { ...state, decision: "approved", decidedBy: "system" };
+      }
+      if (!d.clinicianId) return state;
+      if (state.reviewerId !== null && state.reviewerId !== d.clinicianId) return state;
+      if (state.escalated && state.reviewerId === null) return state;
+      return { ...state, decision: "approved", decidedBy: "clinician" };
+    }
     case "RenewalDenied":
-      return state.decision === null
-        ? {
-            ...state,
-            decision: "denied",
-            decidedBy:
-              event.data.by ??
-              (state.reviewerId !== null || state.escalated ? "clinician" : "system"),
-          }
-        : state;
+      if (state.decision !== null) return state;
+      if (state.reviewerId !== null)
+        return { ...state, decision: "denied", decidedBy: "clinician" };
+      return state.escalated ? state : { ...state, decision: "denied", decidedBy: "system" };
     case "FollowUpRequired":
       return state.decision === null && !state.escalated
         ? { ...state, decision: "follow_up_required", decidedBy: "system" }

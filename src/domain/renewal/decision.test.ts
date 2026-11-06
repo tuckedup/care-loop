@@ -5,7 +5,11 @@ import { readStream } from "@/infra/event-store";
 import { createTestDb, type TestDb } from "@/test/db";
 import { given } from "../aggregate-testing";
 import { makeEvent, type DomainEvent } from "../events";
-import { evaluateRenewal } from "../pipeline/process-manager";
+import {
+  evaluateRenewal,
+  findPendingRenewals,
+  runPendingEvaluations,
+} from "../pipeline/process-manager";
 import { aiDepsFor, seedRenewal, spyClient } from "../pipeline/testing";
 import {
   checkOrderIntegrity,
@@ -601,6 +605,20 @@ describe("process manager against Postgres (F036)", () => {
     expect(results.some((r) => r.status === "fulfilled")).toBe(true);
     const t = await types(s.renewalId);
     expect(t.filter((x) => x === "EligibilityEvaluated")).toHaveLength(1);
+  });
+
+  it("catch-up runner evaluates pending renewals once", async () => {
+    const a = await seedRenewal(db.sql);
+    const b = await seedRenewal(db.sql);
+    const deps = { ai: aiDepsFor(spyClient()), now: () => NOW };
+    expect(await findPendingRenewals(db.sql, 500)).toEqual(
+      expect.arrayContaining([a.renewalId, b.renewalId]),
+    );
+    await runPendingEvaluations(db.sql, deps, 500);
+    const pending = await findPendingRenewals(db.sql, 500);
+    expect(pending).not.toContain(a.renewalId);
+    expect(pending).not.toContain(b.renewalId);
+    expect(await runPendingEvaluations(db.sql, deps, 500)).toEqual({ processed: 0, failed: 0 });
   });
 
   it("never appends RenewalApproved and keeps the audit chain valid", async () => {

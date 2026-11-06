@@ -150,3 +150,49 @@ outcome types with the product owner; if they change, relabel those cases delibe
 the pins in `evals/required-cases.json`. Likewise, ESCALATE as the outcome for missing mirtazapine
 monitoring (baseline and six-month) is an implementer's choice; SPEC section 2 only requires the
 monitoring.
+
+## ADR-0xx: Renewal decision pipeline and clinician actions (F036, F037, F042)
+
+- Status: accepted
+- Date: 2026-11-06
+
+### Decision
+
+- The process manager (`src/domain/pipeline/process-manager.ts`) turns a submitted check-in into
+  `RiskSignalsExtracted`, `EligibilityEvaluated` and one of `RenewalEscalated`, `RenewalDenied{by:system}`,
+  `FollowUpRequired` or nothing (AUTO_ELIGIBLE awaits a clinician; autonomy modes are F059). All of it is
+  recorded by ONE `RecordEvaluation` command on the renewal stream, so the events are atomic and a second
+  evaluation decides nothing (idempotent). It never emits `RenewalApproved`.
+- The AI gate (`isAiPathAllowed` and `isAiPathPermitted`) is consulted before `runRiskExtraction`; a
+  blocked path records no `RiskSignalsExtracted` and calls no client. An AI failure or any signal adds an
+  escalation; it can never approve.
+- Medication name and dose both come from the prescribed order (`MedicationPrescribed`). A number in the
+  order's name text that differs from `dose.amountMg`, a missing order, or an order owned by another
+  patient fails a pipeline check `P01` (persisted next to the rule results) and forces ESCALATE
+  (`MEDICATION_IDENTITY_MISMATCH` / `ORDER_NOT_FOUND`), even over a REJECT. This closes the rules-review
+  follow-up (dose in the name was not compared with doseMg).
+- A REJECT whose failed rules include R03 (controlled substance) is escalated to a person instead of
+  being auto-denied. Reviewers can then only deny (approval of REJECT or controlled is refused).
+- Clinician actions (`src/domain/renewal/review.ts`): the clinician id on every event is the session
+  subject. Approve requires the same clinician's `ClinicianReviewStarted` on escalated renewals; Deny and
+  BookVisit always require it (the renewal_queue attributes a denial only through the review start).
+  `BookVisit` emits `VisitBooked` and a clinician `RenewalDenied` on the renewal stream (the queue only
+  completes an escalated row through a clinician decision); after a system follow-up it emits only
+  `VisitBooked`. `evolve` ignores events the queue would refuse (forged system approval, other
+  clinician's id) so a forged event cannot lock out the legitimate reviewer.
+- `RenewalDenied` gained optional `by` / `clinicianId`; `VisitBooked` gained optional `clinicianId` /
+  `renewalId` (additive, v1).
+- Renewals since the last visit are counted from events (approvals of the same patient and prescription
+  after the patient's last `VisitNoteSigned`, matched through `VisitBooked.patientId`), not from a
+  projection, because projections are read-only for this feature.
+
+### Known gaps
+
+- The seed's prior renewals have no `RenewalApproved`, so the seeded "refill-limit" patient counts 0 until
+  the seed emits approvals (TODO).
+- The LLM request has no idempotency-key parameter in `RiskLlmRequest`; replay safety comes from the
+  aggregate (one evaluation per renewal), not from the provider. TODO in src/ai.
+- Nothing calls `evaluateRenewal` after check-in yet except the cron catch-up route
+  (`/api/cron/decisions`); the patient check-in action should call it (outside this feature's files).
+- Verified/unverified quote flags and signal origin are not persisted (`RiskSignalsExtracted` has no
+  field for them).
