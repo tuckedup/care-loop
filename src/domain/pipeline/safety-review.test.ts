@@ -17,9 +17,15 @@ import {
   parseAmbiguousNumber,
   type HistoryFacts,
 } from "../renewal/decision";
+import { requestRenewal } from "../renewal/handlers";
 import { renewalStreamId } from "../renewal/renewal";
-import { evaluateRenewal, markPipelineError, runPendingEvaluations } from "./process-manager";
-import { aiDepsFor, seedRenewal, spyClient } from "./testing";
+import {
+  evaluateRenewal,
+  findPendingRenewals,
+  markPipelineError,
+  runPendingEvaluations,
+} from "./process-manager";
+import { aiDepsFor, CALM_CHECK_IN, seedRenewal, spyClient } from "./testing";
 
 const NOW = new Date("2026-11-06T12:00:00Z");
 const sys = { actor: "test", role: "system", action: "test:raw" } as const;
@@ -533,5 +539,78 @@ describe("10. a PIPELINE_ERROR-only escalation can be resolved by a clinician", 
     expect(await code(startReview(db.sql, c1, { renewalId: plain.renewalId }))).toBe(
       "NOT_EVALUATED",
     );
+  });
+});
+// ---------------------------------------------------------------------------------------------
+// Third review
+describe("11. the cron skips renewals that already have a decision", () => {
+  it("a clinician-decided, unevaluated renewal is not picked up again", async () => {
+    const s = await seedRenewal(db.sql);
+    await markPipelineError(db.sql, s.renewalId);
+    await startReview(db.sql, c1, { renewalId: s.renewalId });
+    await denyRenewal(db.sql, c1, { renewalId: s.renewalId, reason: "Manual" });
+    expect(await findPendingRenewals(db.sql, 500)).not.toContain(s.renewalId);
+    await runPendingEvaluations(db.sql, { ai: aiDepsFor(spyClient()), now: () => NOW }, 500);
+    expect(await types(s.renewalId)).not.toContain("EligibilityEvaluated");
+  });
+});
+
+describe("12. AI gate also needs a verified identity and a knowable refill counter", () => {
+  it("unverified identity: zero client calls, still escalated/handled by rules", async () => {
+    const base = await seedRenewal(db.sql);
+    const renewalId = `r-unverified-${base.renewalId}`;
+    await requestRenewal(
+      db.sql,
+      {
+        type: "RequestRenewal",
+        renewalId,
+        patientId: base.patientId,
+        prescriptionId: base.prescriptionId,
+      },
+      { actor: base.patientId, role: "patient", action: "test" },
+    );
+    const stream = renewalStreamId(renewalId);
+    const v = (await readStream(db.sql, stream)).length;
+    await appendToStream(
+      db.sql,
+      stream,
+      v,
+      [makeEvent("CheckInSubmitted", { v: 1, renewalId, ...CALM_CHECK_IN })],
+      sys,
+    );
+    const client = spyClient();
+    await run(renewalId, client);
+    expect(client.calls).toHaveLength(0);
+    expect(await types(renewalId)).toContain("EligibilityEvaluated");
+    expect((await lastData(renewalId, "EligibilityEvaluated")).outcome).not.toBe("AUTO_ELIGIBLE");
+  });
+
+  it("unknown refill counter (P02): zero client calls, outcome escalated, local scans still run", async () => {
+    const first = await seedRenewal(db.sql);
+    const v = (await events(first.renewalId)).length;
+    await appendToStream(
+      db.sql,
+      renewalStreamId(first.renewalId),
+      v,
+      [
+        {
+          type: "RenewalApproved",
+          data: { v: 1, renewalId: first.renewalId, by: "clinician" },
+        },
+      ],
+      sys,
+    );
+    const next = await seedRenewal(db.sql, {
+      patientId: first.patientId,
+      prescriptionId: first.prescriptionId,
+      checkIn: { freeText: "I want to die" },
+    });
+    const client = spyClient();
+    expect(await run(next.renewalId, client)).toMatchObject({
+      outcome: "ESCALATE",
+    });
+    expect(client.calls).toHaveLength(0);
+    const codes = (await lastData(next.renewalId, "RenewalEscalated")).reasonCodes;
+    expect(codes).toEqual(expect.arrayContaining(["REFILL_COUNT_UNKNOWN", "LLM_RISK_SIGNAL"]));
   });
 });

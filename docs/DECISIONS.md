@@ -208,6 +208,11 @@ monitoring.
 - The catch-up runner isolates each renewal, pages past failures with a cursor, and escalates a failing
   renewal with `RenewalEscalated{PIPELINE_ERROR}` (best effort); failure counts and opaque renewal ids
   are returned by the cron route and unmarkable failures are logged with a non-PHI code.
+- `rx_status` status precedence: once a row is approved, denied, follow_up_required or later in the
+  pharmacy flow, evaluation and review-progress events (`IdentityVerified`, `CheckInSubmitted`,
+  `EligibilityEvaluated`, `ClinicianReviewStarted`) never downgrade it. The cron catch-up skips renewals
+  that already have a decision event. The AI gate additionally requires a verified identity and a
+  knowable refill counter (P02); local scans still run.
 - Defence in depth in projections: `renewal_queue` refuses to complete a row whose recorded outcome is
   REJECT on an approval (anomaly `APPROVAL_OF_REJECTED_RENEWAL`), and `rx_status` ignores a denial or
   approval on an escalated renewal that has no earlier `ClinicianReviewStarted`, so the patient is never
@@ -227,6 +232,7 @@ monitoring.
 - Verified/unverified quote flags and signal origin are not persisted (`RiskSignalsExtracted` has no
   field for them).
 - The `patient_med_list` projection throws on a schema-invalid `MedicationPrescribed` event, which halts
-  that projection run (outside this feature's files).
+  that projection run (outside this feature's files). `rx_status` and `renewal_queue` skip and record
+  such events in `projection_anomalies` instead.
 - A schema-invalid `RenewalRequested` with no readable `patientId` cannot be attributed to a patient, so
   P02 cannot detect it.

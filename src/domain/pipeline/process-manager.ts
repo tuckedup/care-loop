@@ -215,11 +215,25 @@ export async function evaluateRenewal(
 
   let ai: AiRecord;
   let rulesAi: AiResult;
-  const gateOpen = integrity.ok && isAiPathAllowed(baseInput) && isAiPathPermitted(baseInput);
+  const counter = counterResult(history);
+  // The LLM is reached only for a verified identity, an intact order, a knowable refill counter and
+  // a positively identified non-controlled medication. Local scans above still run regardless.
+  const gateOpen =
+    identityVerified &&
+    integrity.ok &&
+    counter.passed &&
+    isAiPathAllowed(baseInput) &&
+    isAiPathPermitted(baseInput);
   if (!gateOpen) {
     ai = {
       status: "not_attempted",
-      reason: integrity.ok ? "ai_path_blocked" : "order_integrity",
+      reason: !identityVerified
+        ? "identity_not_verified"
+        : !integrity.ok
+          ? "order_integrity"
+          : !counter.passed
+            ? "refill_count_unknown"
+            : "ai_path_blocked",
       signals: localSignals,
     };
     rulesAi = { status: "failed" };
@@ -243,7 +257,6 @@ export async function evaluateRenewal(
   }
 
   const rules = evaluateEligibility({ ...baseInput, ai: rulesAi });
-  const counter = counterResult(history);
   const results = [...rules.results, integrityResult(integrity), counter];
   // A blocked AI path is not an "LLM failure": say what actually happened.
   const reasonCodes: string[] = rules.reasonCodes.flatMap((c) =>
@@ -314,7 +327,9 @@ export async function findPendingAfter(
         AND c.stream_id LIKE 'renewal-%'
         AND NOT EXISTS (
           SELECT 1 FROM events e
-           WHERE e.stream_id = c.stream_id AND e.type = 'EligibilityEvaluated')
+           WHERE e.stream_id = c.stream_id
+             AND e.type IN ('EligibilityEvaluated', 'RenewalApproved', 'RenewalDenied',
+                            'FollowUpRequired'))
       GROUP BY c.stream_id
      HAVING min(c.global_position) > $2::bigint
       ORDER BY min(c.global_position) ASC

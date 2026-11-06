@@ -1,5 +1,6 @@
 import type { Db, StoredEvent } from "@/infra/event-store/types";
 import { EVENT_TYPES, parseEvent, type DomainEvent } from "@/domain/events";
+import { recordAnomaly } from "./anomalies";
 import type { Projection } from "./runner";
 
 export type RxStatusValue =
@@ -30,6 +31,18 @@ export interface RxStatusRow {
   updatedAt: string; // ISO-8601, taken from the event, never from a clock
 }
 
+/** Statuses that a decision or later pipeline step produced; progress events cannot undo them. */
+const STICKY: ReadonlySet<RxStatusValue> = new Set([
+  "approved",
+  "denied",
+  "follow_up_required",
+  "queued",
+  "transmitted",
+  "pharmacy_status",
+  "pharmacy_error",
+  "filled",
+]);
+
 /**
  * Pure reducer: next row for a renewal given its current row and one event.
  * Latest event in global order wins. Events that do not describe renewal progress return the
@@ -52,6 +65,18 @@ export function reduceRxStatus(
           ...over,
         };
 
+  // Status precedence: once a decision (or anything after it) is on the row, evaluation and
+  // review-progress events never downgrade it. Escalation may still move it back (fail safe).
+  if (current !== null && STICKY.has(current.status)) {
+    switch (event.type) {
+      case "IdentityVerified":
+      case "CheckInSubmitted":
+      case "EligibilityEvaluated":
+      case "ClinicianReviewStarted":
+        return current;
+      default:
+    }
+  }
   switch (event.type) {
     case "RenewalRequested":
       return {
@@ -137,7 +162,14 @@ export const rxStatusProjection: Projection = {
 
   async handle(tx: Db, stored: StoredEvent): Promise<void> {
     if (!KNOWN.has(stored.type)) return;
-    const event = parseEvent({ type: stored.type, data: stored.data });
+    let event: DomainEvent;
+    try {
+      event = parseEvent({ type: stored.type, data: stored.data });
+    } catch (e) {
+      // A schema-invalid event is skipped and surfaced, never allowed to halt the projection.
+      await recordAnomaly(tx, "rx_status", stored, "INVALID_EVENT", String(e));
+      return;
+    }
     const renewalId = renewalIdOf(event);
     if (renewalId === null) return;
     const [existing] = await tx.unsafe<RxDbRow[]>(
