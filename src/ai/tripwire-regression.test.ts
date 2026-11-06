@@ -75,6 +75,15 @@ const ALPHABET = [
   "а",
   "中",
   "x",
+  "ㅤ",
+  "⠀",
+  "ᅟ",
+  "ᅠ",
+  "ﾠ",
+  "ı",
+  "ᴅ",
+  "឴",
+  "️",
 ];
 
 // Deterministic PRNG (mulberry32) so failures reproduce.
@@ -133,6 +142,9 @@ describe("tripwire offset regression", () => {
     "\r\n\r\n",
     "\u{1F9D1}‍\u{1F4BB}",
     "  ",
+    "ㅤㅤ",
+    "⠀",
+    "ᅟᅠﾠ",
   ];
 
   it.each(Object.entries(PHRASES_BY_FAMILY))(

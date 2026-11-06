@@ -1,8 +1,8 @@
 {
-  "id": "not-on-formulary-lithium",
-  "scenario": "Non-controlled medication that is not on the 15-drug allowlist (placeholder RxCUI)",
+  "id": "not-on-formulary-synthetic-drug",
+  "scenario": "Non-controlled medication that is not on the 15-drug allowlist (fictional drug, synthetic identifier)",
   "category": "formulary",
-  "labeledFrom": "R02 (medication not on formulary allowlist rejects)",
+  "labeledFrom": "SPEC text: R02 (medication must be on the formulary allowlist, else reject; the fictional drug 'examplemed' is not on it). The identifier 'SYNTHETIC-UNLISTED-1' is deliberately not a real RxCUI. The REJECT outcome for R02 is this implementation's choice (SPEC section 4 names REJECT only for R01). TODO: confirm in docs/DECISIONS.md.",
   "input": {
     "phq9": [
       0,
@@ -33,9 +33,9 @@
     "requestedChange": "none"
   },
   "med": {
-    "rxcui": "999999999",
-    "name": "lithium",
-    "doseMg": 300,
+    "rxcui": "SYNTHETIC-UNLISTED-1",
+    "name": "examplemed",
+    "doseMg": 10,
     "frequency": "daily",
     "controlledSchedule": null,
     "formularyId": null
@@ -45,7 +45,7 @@
     "activeOrder": {
       "status": "active",
       "intent": "order",
-      "rxcui": "999999999"
+      "rxcui": "SYNTHETIC-UNLISTED-1"
     },
     "renewalsSinceLastVisit": 0,
     "refillLimit": 2,

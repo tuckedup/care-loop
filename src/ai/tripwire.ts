@@ -13,7 +13,7 @@
 // original text, a signal covering the whole (capped) field is emitted instead. Text beyond
 // SCAN_LIMIT is not scanned; a fallback signal over the field start is emitted for it.
 import { FREE_TEXT_MAX } from "@/domain/events";
-import { normalizeWithMap } from "./normalize";
+import { collapseSpacedLetters, normalizeWithMap, type NormalizedText } from "./normalize";
 import { MAX_QUOTE_LENGTH, SOURCE_FIELDS, type RiskTextInput, type SignalType } from "./types";
 import type { VerifiedSignal } from "./verify-quotes";
 
@@ -48,7 +48,17 @@ export const TRIPWIRE_LEXICON: readonly LexiconEntry[] = [
     type: "suicidal_ideation",
     re: new RegExp(`\\b${NOT} (?:want to|wanna) be here (?:any ?more|anymore)\\b`, "g"),
   },
+  { type: "suicidal_ideation", re: /\bun-?aliv(?:e|ed|ing)\b/g },
+  { type: "suicidal_ideation", re: /\bkms\b/g },
+  {
+    type: "suicidal_ideation",
+    re: /\b(?:want|wanna|going|planning|plan|ready|trying) to end it\b/g,
+  },
+  { type: "suicidal_ideation", re: /\bbetter off (?:not here|without me|gone)\b/g },
+  { type: "suicidal_ideation", re: /\bdisappear(?:ing)? forever\b/g },
   // self-harm
+  { type: "self_harm", re: /\bjump(?:ing)? off (?:a|the|my|this)\b/g },
+  { type: "self_harm", re: /\bsl(?:it|itting) (?:my )?(?:wrists?|throat)\b/g },
   { type: "self_harm", re: /\bself[ -]?harm(?:ing)?\b/g },
   {
     type: "self_harm",
@@ -71,6 +81,18 @@ export const TRIPWIRE_LEXICON: readonly LexiconEntry[] = [
   },
 ];
 
+/**
+ * Space-less variants, matched on text where letter-spaced words were collapsed
+ * ("k i l l  m y s e l f" -> "killmyself"). Derived mechanically from the lexicon.
+ */
+const SPACELESS_LEXICON: readonly LexiconEntry[] = TRIPWIRE_LEXICON.map(({ type, re }) => ({
+  type,
+  re: new RegExp(re.source.replace(/ \?/g, "").replace(/ /g, ""), re.flags),
+}));
+
+/** On collapsed text both the spaced and space-less pattern forms are tried. */
+const COLLAPSED_LEXICON: readonly LexiconEntry[] = [...TRIPWIRE_LEXICON, ...SPACELESS_LEXICON];
+
 const MAX_PER_FIELD = 20;
 /** Characters scanned per field. The AI layer rejects longer text before calling this. */
 export const SCAN_LIMIT = FREE_TEXT_MAX * 4;
@@ -91,10 +113,10 @@ export function detectTripwire(input: RiskTextInput): VerifiedSignal[] {
     const full = input[field];
     if (typeof full !== "string" || full.length === 0) continue;
     const original = full.length > SCAN_LIMIT ? full.slice(0, SCAN_LIMIT) : full;
-    const push = (type: SignalType, s: number, e: number) => {
+    const push = (type: SignalType, s: number, e: number): boolean => {
       const end = boundedEnd(original, s, e);
-      if (end <= s) return;
-      if (out.some((o) => o.sourceField === field && o.start === s && o.end === end)) return;
+      if (end <= s) return false;
+      if (out.some((o) => o.sourceField === field && o.start === s && o.end === end)) return false;
       out.push({
         type,
         quote: original.slice(s, end),
@@ -104,30 +126,43 @@ export function detectTripwire(input: RiskTextInput): VerifiedSignal[] {
         origin: "tripwire",
         verified: true,
       });
+      return true;
     };
     if (full.length > SCAN_LIMIT) {
       // Unscanned remainder: stay conservative rather than silently ignoring it.
       push("other_safety_concern", 0, Math.min(original.length, MAX_QUOTE_LENGTH));
     }
-    const norm = normalizeWithMap(original, { leet: true });
+    const A = normalizeWithMap(original, { leet: true });
+    const B = normalizeWithMap(original, { leet: true, blanksAsSpace: true });
+    const variants: { n: NormalizedText; lex: readonly LexiconEntry[] }[] = [
+      { n: A, lex: TRIPWIRE_LEXICON },
+      { n: collapseSpacedLetters(A), lex: COLLAPSED_LEXICON },
+    ];
+    if (B.text !== A.text) {
+      variants.push(
+        { n: B, lex: TRIPWIRE_LEXICON },
+        { n: collapseSpacedLetters(B), lex: COLLAPSED_LEXICON },
+      );
+    }
     let count = 0;
-    for (const { type, re } of TRIPWIRE_LEXICON) {
-      re.lastIndex = 0;
-      for (const m of norm.text.matchAll(re)) {
-        const a = m.index ?? 0;
-        const b = a + m[0].length;
-        const s = norm.start[a];
-        const e = norm.end[b - 1];
-        if (count >= MAX_PER_FIELD) {
-          // Cap reached: still never drop silently; one whole-prefix fallback is enough.
-          push("other_safety_concern", 0, Math.min(original.length, MAX_QUOTE_LENGTH));
-          break;
-        }
-        count++;
-        if (s === undefined || e === undefined || e <= s) {
-          push(type, 0, Math.min(original.length, MAX_QUOTE_LENGTH));
-        } else {
-          push(type, s, e);
+    for (const { n: norm, lex } of variants) {
+      for (const { type, re } of lex) {
+        re.lastIndex = 0;
+        for (const m of norm.text.matchAll(re)) {
+          const a = m.index ?? 0;
+          const b = a + m[0].length;
+          const s = norm.start[a];
+          const e = norm.end[b - 1];
+          if (count >= MAX_PER_FIELD) {
+            // Cap reached: still never drop silently; one whole-prefix fallback is enough.
+            push("other_safety_concern", 0, Math.min(original.length, MAX_QUOTE_LENGTH));
+            break;
+          }
+          const added =
+            s === undefined || e === undefined || e <= s
+              ? push(type, 0, Math.min(original.length, MAX_QUOTE_LENGTH))
+              : push(type, s, e);
+          if (added) count++;
         }
       }
     }

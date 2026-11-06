@@ -137,3 +137,16 @@ non-finite values. A test documents this behaviour.
 evaluateEligibility copies the input once as plain data, reading each property a single time and
 never invoking getters, and evaluates only that copy. Getters, functions, symbols, class
 instances, cyclic or very deep structures fail closed with ESCALATE / INVALID_INPUT.
+
+### TODO: confirm outcome precedence (REJECT vs ESCALATE) and R02/R03 outcomes
+
+SPEC section 4 names REJECT only for R01 (identity) and says R02 is "medication on formulary
+allowlist" and R03 is a "hard block from the AI path" without stating the outcome type. The rule
+engine currently REJECTs on R02 and gives REJECT precedence over ESCALATE (REJECT > ESCALATE >
+FOLLOW_UP_REQUIRED > AUTO_ELIGIBLE). The eval cases controlled-alprazolam,
+controlled-lisdexamfetamine, not-on-formulary-synthetic-drug and the ai-blocked-* cases encode that
+choice in their labels and say so in `labeledFrom`. TODO: confirm the precedence and the R02/R03
+outcome types with the product owner; if they change, relabel those cases deliberately and update
+the pins in `evals/required-cases.json`. Likewise, ESCALATE as the outcome for missing mirtazapine
+monitoring (baseline and six-month) is an implementer's choice; SPEC section 2 only requires the
+monitoring.

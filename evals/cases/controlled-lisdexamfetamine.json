@@ -2,7 +2,7 @@
   "id": "controlled-lisdexamfetamine",
   "scenario": "Controlled medication (lisdexamfetamine, schedule II), clean check-in",
   "category": "controlled-substance",
-  "labeledFrom": "R02 + R03",
+  "labeledFrom": "SPEC text: R02 (not on the formulary allowlist) and R03 (controlled substance is a hard block from the AI path). Implementation precedence choice, NOT SPEC text: REJECT outranks ESCALATE (SPEC section 4 names REJECT only for R01). TODO: confirm precedence (docs/DECISIONS.md).",
   "input": {
     "phq9": [
       0,

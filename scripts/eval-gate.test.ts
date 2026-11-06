@@ -1,6 +1,7 @@
 // Proves the eval gate fails closed: zero cases, invalid cases, recall < 1, no AI cases, and
 // unchecked or invalid citations all fail `pnpm eval`.
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -34,10 +35,18 @@ const mk = () => {
 };
 afterAll(() => tmpDirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
+/** The marker only this test file can provide: a random nonce, also written to a temp file. */
+function nonceEnv(): Record<string, string> {
+  const nonce = randomBytes(16).toString("hex");
+  const file = join(mk(), "nonce.txt");
+  writeFileSync(file, nonce);
+  return { EVAL_GATE_TEST_SUBPROCESS: nonce, EVAL_GATE_TEST_NONCE_FILE: file };
+}
+
 /** Parent env minus anything that would change the gate (CI, eval overrides, live flag). */
 function cleanEnv(): NodeJS.ProcessEnv {
   const e = { ...process.env };
-  for (const k of ["CI", "EVAL_LIVE", "EVAL_ALLOW_OVERRIDES", "EVAL_CASES_DIR", "EVAL_FIXTURES_DIR", "EVAL_RESULTS_PATH", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"]) {
+  for (const k of ["CI", "EVAL_LIVE", "EVAL_ALLOW_OVERRIDES", "EVAL_GATE_TEST_SUBPROCESS", "EVAL_GATE_TEST_NONCE_FILE", "EVAL_CASES_DIR", "EVAL_FIXTURES_DIR", "EVAL_RESULTS_PATH", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"]) {
     delete e[k];
   }
   return e;
@@ -65,6 +74,7 @@ function runEval(
         ...cleanEnv(),
         EVAL_ALLOW_OVERRIDES: "1",
         NODE_ENV: "test",
+        ...nonceEnv(),
         EVAL_CASES_DIR: casesDir,
         EVAL_RESULTS_PATH: results,
         ...(fixturesDir ? { EVAL_FIXTURES_DIR: fixturesDir } : {}),
@@ -117,7 +127,7 @@ const cm = (
   mode: "rules-only" | "fixtures" | "live",
   c?: CitationStats,
   extras: Parameters<typeof computeMetrics>[3] = {},
-) => computeMetrics(results, mode, c, { manifestFailures: [], blockedAiCases: 1, ...extras });
+) => computeMetrics(results, mode, c, { manifestFailures: [], blockedAiCases: 2, ...extras });
 const cites = (modelSignals: number, verified: number, tripwire = 0): CitationStats => ({
   modelSignals,
   modelSignalsVerified: verified,
@@ -292,14 +302,14 @@ describe("coverage floor, environment guard and live mode (process level)", () =
   it("the manifest is satisfied by the committed cases and its floor equals the case count", () => {
     const m = loadManifest();
     const ids = committed();
-    expect(manifestFailures(m, ids, [])).toEqual([]);
+    expect(manifestFailures(m, loadCases(casesSrc), [])).toEqual([]);
     // Ratchet: the floor equals the current count and may only be raised.
     expect(m.minTotalCases).toBe(ids.length);
   });
 
   it("manifestFailures reports a missing case and a short case count", () => {
     const m = loadManifest();
-    const f = manifestFailures(m, ["only-one"], []);
+    const f = manifestFailures(m, loadCases(casesSrc).slice(0, 1), []);
     expect(f.join()).toMatch(/required case missing/);
     expect(f.join()).toMatch(/manifest requires at least/);
   });
@@ -311,7 +321,7 @@ describe("coverage floor, environment guard and live mode (process level)", () =
 
   it("no blocked-medication AI case fails the gate; LLM calls on blocked fail too", () => {
     const none = cm([result({})], "fixtures", cites(1, 1), { blockedAiCases: 0 });
-    expect(gateFailures(none).join()).toMatch(/controlled-substance AI-path block/);
+    expect(gateFailures(none).join()).toMatch(/AI-path block/);
     const calls = cm([result({})], "fixtures", cites(1, 1), { llmCallsOnBlocked: 1 });
     expect(gateFailures(calls).join()).toMatch(/LLM call/);
   });
@@ -350,7 +360,8 @@ describe("coverage floor, environment guard and live mode (process level)", () =
 
   it("overrides without the allow flag fail even outside CI", () => {
     expect(envGuardFailures({ EVAL_CASES_DIR: "/x" }).length).toBe(1);
-    expect(envGuardFailures({ EVAL_CASES_DIR: "/x", EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "test" })).toEqual([]);
+    // allow flag + NODE_ENV alone is no longer enough: the subprocess nonce is required
+    expect(envGuardFailures({ EVAL_CASES_DIR: "/x", EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "test" }).length).toBe(1);
     expect(envGuardFailures({ EVAL_CASES_DIR: "/x", EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "test", CI: "true" }).length).toBe(1);
     expect(overridesAllowed({ EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "production" })).toBe(false);
     expect(envGuardFailures({})).toEqual([]);
@@ -373,4 +384,179 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(existsSync(live) ? readFileSync(live, "utf8") : null).toBe(liveBefore);
     expect(JSON.parse(before).liveModelRun).toBe(false);
   }, 120_000);
+
+  // ---- Content pins and semantic requirements ----
+  const readFx = (id: string) => JSON.parse(readFileSync(join(fixturesSrc, `${id}.json`), "utf8"));
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+  const stageEdited = (edit: (cases: Map<string, Record<string, any>>) => Record<string, unknown> | void) => {
+    const ids = committed();
+    const s = stage(ids);
+    const cases = new Map<string, Record<string, any>>();
+    for (const id of ids) cases.set(id, readCase(id));
+    const fx = edit(cases) ?? {};
+    for (const [id, c] of cases) writeFileSync(join(s.cases, `${id}.json`), JSON.stringify(c));
+    for (const [id, f] of Object.entries(fx)) writeFileSync(join(s.fixtures, `${id}.json`), JSON.stringify(f));
+    return s;
+  };
+
+  it("REPRO: editing the emoji-prefix tripwire case to harmless text with AUTO_ELIGIBLE fails the gate", () => {
+    const s = stageEdited((cases) => {
+      const c = cases.get("ai-silent-model-emoji-prefix");
+      c.input.freeText = "hello";
+      c.expected = { outcome: "AUTO_ELIGIBLE", reasonCodes: [] };
+    });
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/edited without a manifest update: ai-silent-model-emoji-prefix/);
+    expect(r.out).toMatch(/label is not ESCALATE/);
+    expect(r.out).toMatch(/does not demonstrate \W*silent model, escalated only by the tripwire/);
+    expect(readResults(r.results).gate).toBe("fail");
+  }, 120_000);
+
+  it("editing only a label (same text) is caught by the pin", () => {
+    const s = stageEdited((cases) => {
+      cases.get("item9-positive").expected.reasonCodes = ["PHQ9_ITEM9_POSITIVE", "PHQ9_TOTAL_HIGH"];
+    });
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/edited without a manifest update: item9-positive/);
+  }, 120_000);
+
+  it("a tripwire case where the model DOES return a signal no longer demonstrates the tripwire", () => {
+    const model = JSON.stringify({
+      signals: [{ type: "suicidal_ideation", quote: "die", sourceField: "freeText", start: 0, end: 3 }],
+    });
+    const fx = { ...readFx("ai-silent-model-want-to-die"), response: { type: "text", text: model } };
+    const s = stageEdited(() => ({ "ai-silent-model-want-to-die": fx }));
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/does not demonstrate \W*silent model/);
+  }, 120_000);
+
+  it("a controlled case whose medication is no longer blocked fails the gate", () => {
+    const s = stageEdited((cases) => {
+      const c = cases.get("ai-controlled-never-called");
+      c.med = { rxcui: "4493", name: "fluoxetine", doseMg: 20, frequency: "daily", controlledSchedule: null, formularyId: "fluoxetine" };
+      c.history.activeOrder = { status: "active", intent: "order", rxcui: "4493" };
+      c.expected = { outcome: "ESCALATE", reasonCodes: ["LLM_RISK_SIGNAL"] };
+    });
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/edited without a manifest update: ai-controlled-never-called/);
+  }, 120_000);
+
+  it("an llm-failure case that no longer fails is caught (fixture now returns valid JSON)", () => {
+    const fx = { ...readFx("ai-malformed-json"), response: { type: "text", text: '{"signals":[]}' } };
+    const s = stageEdited(() => ({ "ai-malformed-json": fx }));
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/ai-malformed-json/);
+  }, 120_000);
+
+  it("manifestFailures: semantic kinds are enforced on results", () => {
+    const m = loadManifest();
+    const cases = loadCases(casesSrc);
+    const base = (id: string) => {
+      const c = cases.find((x) => x.id === id)!;
+      return result({
+        id,
+        expectedOutcome: c.expected.outcome,
+        actualOutcome: c.expected.outcome,
+        expectedReasonCodes: [...c.expected.reasonCodes],
+        actualReasonCodes: [...c.expected.reasonCodes],
+      });
+    };
+    const ai = (o: Partial<NonNullable<CaseResult["ai"]>>) => ({
+      status: "ok" as const,
+      modelSignals: 0,
+      tripwireSignals: 1,
+      totalSignals: 1,
+      injectionHits: 0,
+      calls: 1,
+      blocked: false,
+      ...o,
+    });
+    const only = (r: CaseResult) => manifestFailures(m, cases, [r]).join("\n");
+    expect(only({ ...base("ai-silent-model-want-to-die"), ai: ai({}) })).not.toMatch(/want-to-die/);
+    expect(only({ ...base("ai-silent-model-want-to-die"), ai: ai({ modelSignals: 1 }) })).toMatch(/silent model/);
+    expect(only({ ...base("ai-silent-model-want-to-die"), ai: ai({ tripwireSignals: 0 }) })).toMatch(/silent model/);
+    expect(only({ ...base("ai-silent-model-want-to-die") })).toMatch(/silent model/);
+    expect(
+      only({ ...base("ai-controlled-never-called"), ai: ai({ status: "failed", blocked: true, calls: 1 }) }),
+    ).toMatch(/blocked AI path with zero client calls/);
+    expect(
+      only({ ...base("ai-controlled-never-called"), ai: ai({ status: "failed", blocked: false, calls: 0 }) }),
+    ).toMatch(/blocked AI path/);
+    expect(only({ ...base("ai-injection-model-silent"), ai: ai({ injectionHits: 0 }) })).toMatch(/injection tripwire hit/);
+    expect(only({ ...base("ai-llm-timeout"), ai: ai({ status: "ok" }) })).toMatch(/failed AI result/);
+    expect(only({ ...base("ai-benign-no-signals"), ai: ai({ totalSignals: 2 }) })).toMatch(/no signals on a benign case/);
+    expect(only({ ...base("item9-positive"), actualOutcome: "AUTO_ELIGIBLE" })).toMatch(/outcome is AUTO_ELIGIBLE/);
+    expect(only({ ...base("item9-positive"), actualReasonCodes: ["PHQ9_TOTAL_HIGH"] })).toMatch(/lacks PHQ9_ITEM9_POSITIVE/);
+  });
+
+  // ---- Override marker and latest.json protection ----
+  it("EVAL_ALLOW_OVERRIDES=1 alone (no test nonce) cannot run on foreign directories", () => {
+    const r = spawnSync(
+      process.execPath,
+      [join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...cleanEnv(),
+          NODE_ENV: "test",
+          EVAL_ALLOW_OVERRIDES: "1",
+          EVAL_CASES_DIR: mk(),
+          EVAL_RESULTS_PATH: join(mk(), "x.json"),
+        },
+      },
+    );
+    expect(r.status).not.toBe(0);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/overrides set but not permitted/);
+  }, 120_000);
+
+  it("overridesAllowed needs the nonce file to match", () => {
+    const dir = mk();
+    const file = join(dir, "n.txt");
+    writeFileSync(file, "a".repeat(32));
+    const base = { EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "test", EVAL_GATE_TEST_NONCE_FILE: file };
+    expect(overridesAllowed({ ...base, EVAL_GATE_TEST_SUBPROCESS: "a".repeat(32) })).toBe(true);
+    expect(overridesAllowed({ ...base, EVAL_GATE_TEST_SUBPROCESS: "b".repeat(32) })).toBe(false);
+    expect(overridesAllowed({ ...base, EVAL_GATE_TEST_SUBPROCESS: "short" })).toBe(false);
+    expect(overridesAllowed({ ...base })).toBe(false);
+    expect(overridesAllowed({ ...base, EVAL_GATE_TEST_SUBPROCESS: "a".repeat(32), CI: "1" })).toBe(false);
+  });
+
+  it("an overridden run stamps its directories and never writes the committed latest.json", () => {
+    const latest = join(root, "evals", "results", "latest.json");
+    const before = readFileSync(latest, "utf8");
+    const s = stage(committed());
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).toBe(0);
+    const written = readResults(r.results);
+    expect(written.casesDir).not.toBe("default");
+    expect(written.fixturesDir).not.toBe("default");
+    expect(readFileSync(latest, "utf8")).toBe(before);
+    expect(JSON.parse(before).casesDir).toBe("default");
+    expect(JSON.parse(before).fixturesDir).toBe("default");
+  }, 120_000);
+
+  it("overrides without EVAL_RESULTS_PATH refuse to write latest.json", () => {
+    const latest = join(root, "evals", "results", "latest.json");
+    const before = readFileSync(latest, "utf8");
+    const s = stage(committed());
+    const r = spawnSync(
+      process.execPath,
+      [join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...cleanEnv(), EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "test", ...nonceEnv(), EVAL_CASES_DIR: s.cases, EVAL_FIXTURES_DIR: s.fixtures },
+      },
+    );
+    expect(r.status).not.toBe(0);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/refusing to write evals\/results\/latest.json/);
+    expect(readFileSync(latest, "utf8")).toBe(before);
+  }, 120_000);
+
 });

@@ -2,11 +2,12 @@
 // client by default or the live Anthropic client when EVAL_LIVE=1. The live path is implemented
 // but was NOT exercised in this repo (no API key was available).
 import { createAnthropicClient, createRecordedClient, type RiskLlmClient } from "../src/ai/client";
+import { detectInjection } from "../src/ai/injection";
 import { loadAiConfig } from "../src/ai/config";
 import { runRiskExtraction, toRulesAiResult } from "../src/ai/fail-closed";
 import { isAiPathPermitted } from "../src/ai/ai-path-gate";
 import { loadFixture } from "./fixtures";
-import { toRuleInput, type AiForRules } from "./lib";
+import { toRuleInput, type AiForRules, type AiObservation } from "./lib";
 import type { EvalCase } from "./schema";
 
 export interface AiStageResult {
@@ -22,6 +23,8 @@ export interface AiStageResult {
   blocked: boolean;
   /** Excluded from this run (fixture-only case during a live run). */
   skipped: boolean;
+  /** Observations stored on the case result and checked by the manifest. */
+  obs: AiObservation;
 }
 
 const NEVER = () => new Promise<string>(() => {});
@@ -40,6 +43,15 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
       tripwireSignals: 0,
       blocked: false,
       skipped: true,
+      obs: {
+        status: "ok",
+        modelSignals: 0,
+        tripwireSignals: 0,
+        totalSignals: 0,
+        injectionHits: 0,
+        calls: 0,
+        blocked: false,
+      },
     };
   }
 
@@ -98,5 +110,17 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
     tripwireSignals: signals.length - modelSigs.length,
     blocked,
     skipped: false,
+    obs: {
+      status: result.status,
+      modelSignals: modelSigs.length,
+      tripwireSignals: signals.length - modelSigs.length,
+      totalSignals: signals.length,
+      injectionHits: detectInjection({
+        freeText: c.input.freeText,
+        sideEffects: c.input.sideEffects,
+      }).length,
+      calls,
+      blocked,
+    },
   };
 }

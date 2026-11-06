@@ -3,6 +3,7 @@ import { loadAiConfig } from "../src/ai/config";
 import { runAiStage } from "./ai-runner";
 import {
   computeMetrics,
+  dirLabel,
   envGuardFailures,
   gateFailures,
   loadCases,
@@ -53,7 +54,7 @@ async function load(): Promise<Loaded> {
       }
       const stage = await runAiStage(c, LIVE);
       if (stage.skipped) continue;
-      results.push(runCase(c, stage.ai));
+      results.push({ ...runCase(c, stage.ai), ai: stage.obs });
       citations.modelSignals += stage.modelSignals;
       citations.modelSignalsVerified += stage.modelSignalsVerified;
       citations.tripwireSignals += stage.tripwireSignals;
@@ -65,9 +66,11 @@ async function load(): Promise<Loaded> {
     const extras: CoverageExtras = {
       manifestFailures: manifestFailures(
         manifest,
-        cases.map((c) => c.id),
+        cases,
         results,
       ),
+      casesDirLabel: dirLabel("EVAL_CASES_DIR"),
+      fixturesDirLabel: dirLabel("EVAL_FIXTURES_DIR"),
       blockedAiCases,
       llmCallsOnBlocked,
       envFailures,

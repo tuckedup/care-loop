@@ -1,7 +1,8 @@
 // Eval harness: load hand-labeled cases, run them through evaluateEligibility, compute metrics,
 // and decide the gate. Pure apart from reading case files / writing the results file.
+import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { evaluateEligibility, type RuleInput } from "../src/domain/rules";
@@ -14,9 +15,22 @@ export const OVERRIDE_VARS = ["EVAL_CASES_DIR", "EVAL_FIXTURES_DIR", "EVAL_RESUL
 
 type Env = Record<string, string | undefined>;
 
-/** Overrides are honoured only in a test process with an explicit allow flag and no CI. */
+/**
+ * Overrides are honoured only in a test process that (1) opted in, (2) runs with NODE_ENV=test,
+ * (3) has no CI, and (4) carries a nonce that the gate's own subprocess tests also write to a temp
+ * file. A plain `EVAL_ALLOW_OVERRIDES=1 pnpm eval` therefore cannot run on foreign directories.
+ * (This is a guard against accidents, not a security boundary.)
+ */
 export function overridesAllowed(env: Env = process.env): boolean {
-  return env.EVAL_ALLOW_OVERRIDES === "1" && env.NODE_ENV === "test" && !env.CI;
+  if (env.EVAL_ALLOW_OVERRIDES !== "1" || env.NODE_ENV !== "test" || env.CI) return false;
+  const nonce = env.EVAL_GATE_TEST_SUBPROCESS;
+  const file = env.EVAL_GATE_TEST_NONCE_FILE;
+  if (!nonce || nonce.length < 16 || !file) return false;
+  try {
+    return readFileSync(file, "utf8").trim() === nonce;
+  } catch {
+    return false;
+  }
 }
 
 /** Non-empty = the run must fail: path overrides are set but not permitted (e.g. under CI). */
@@ -30,13 +44,35 @@ export function envGuardFailures(env: Env = process.env): string[] {
 const override = (name: (typeof OVERRIDE_VARS)[number], env: Env = process.env) =>
   overridesAllowed(env) ? env[name] : undefined;
 
+const COMMITTED_LATEST = join(here, "results", "latest.json");
 export const casesDir = () => override("EVAL_CASES_DIR") ?? join(here, "cases");
 /** Live results never overwrite the committed fixture results. */
 export const resultsPath = () =>
   override("EVAL_RESULTS_PATH") ??
   join(here, "results", process.env.EVAL_LIVE === "1" ? "live-latest.json" : "latest.json");
 
-// ---- Required-case manifest (coverage floor) ----
+/** "default" or the override path relative to the repo root, for stamping into results. */
+export function dirLabel(name: (typeof OVERRIDE_VARS)[number]): string {
+  const v = override(name);
+  return v ? relative(join(here, ".."), v).replace(/\\/g, "/") : "default";
+}
+
+/** True when any path override is active. latest.json may then never be written. */
+export const anyOverrideActive = () => OVERRIDE_VARS.some((v) => override(v) !== undefined);
+
+// ---- Required-case manifest (coverage floor with content pins) ----
+const Sha = z.string().regex(/^[0-9a-f]{64}$/);
+
+export const REQUIREMENT_KINDS = [
+  "rules",
+  "risk",
+  "benign-clean",
+  "controlled-blocked",
+  "tripwire-silent-model",
+  "injection",
+  "llm-failure",
+] as const;
+
 export const ManifestSchema = z
   .object({
     /** Ratchet: the case count may only go up. SPEC target (60+, 25+ risk cases) is still open. */
@@ -44,7 +80,17 @@ export const ManifestSchema = z
     required: z
       .array(
         z
-          .object({ requirement: z.string().min(1), caseIds: z.array(z.string().min(1)).min(1) })
+          .object({
+            requirement: z.string().min(1),
+            /** What the case must demonstrate (see manifestFailures). */
+            kind: z.enum(REQUIREMENT_KINDS),
+            /** Required actual (and labeled) outcome. */
+            outcome: z.enum(["AUTO_ELIGIBLE", "ESCALATE", "REJECT", "FOLLOW_UP_REQUIRED"]),
+            /** Required reason code (actual and labeled), when the outcome has one. */
+            reasonCode: z.string().min(1).optional(),
+            /** sha256 pins of freeText + medication + expected. Editing a case requires a reviewed manifest update. */
+            entries: z.array(z.object({ id: z.string().min(1), sha256: Sha }).strict()).min(1),
+          })
           .strict(),
       )
       .min(1),
@@ -56,31 +102,93 @@ export function loadManifest(path: string = join(here, "required-cases.json")): 
   return ManifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
+function stable(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stable(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v);
+}
+
+/** sha256 over the parts of a case that define what it tests. */
+export function caseHash(c: EvalCase): string {
+  return createHash("sha256")
+    .update(stable({ freeText: c.input.freeText, medication: c.med, expected: c.expected }))
+    .digest("hex");
+}
+
 /**
- * Every manifest case must be loaded; if it was evaluated it must have passed. (In live mode
- * fixture-only cases are not evaluated but must still exist.) Also enforces the minimum count.
+ * Every manifest case must be loaded, unchanged (hash), and, if evaluated, must show what its
+ * requirement says it demonstrates (not just pass). In live mode fixture-only cases are not
+ * evaluated but must still exist and match their pin. Also enforces the minimum count.
  */
 export function manifestFailures(
   manifest: Manifest,
-  loadedIds: readonly string[],
+  cases: readonly EvalCase[],
   results: readonly CaseResult[],
 ): string[] {
   const f: string[] = [];
-  const loaded = new Set(loadedIds);
+  const byCase = new Map(cases.map((c) => [c.id, c]));
   const byId = new Map(results.map((r) => [r.id, r]));
   for (const req of manifest.required) {
-    for (const id of req.caseIds) {
-      if (!loaded.has(id)) f.push(`required case missing: ${id} (${req.requirement})`);
-      else {
-        const r = byId.get(id);
-        if (r && !(r.outcomeMatch && r.reasonsMatch)) {
-          f.push(`required case failing: ${id} (${req.requirement})`);
-        }
+    for (const { id, sha256 } of req.entries) {
+      const tag = `${id} (${req.requirement})`;
+      const c = byCase.get(id);
+      if (!c) {
+        f.push(`required case missing: ${tag}`);
+        continue;
+      }
+      if (caseHash(c) !== sha256) {
+        f.push(`required case edited without a manifest update: ${tag}`);
+      }
+      if (c.expected.outcome !== req.outcome) f.push(`required case label is not ${req.outcome}: ${tag}`);
+      if (req.reasonCode && !c.expected.reasonCodes.includes(req.reasonCode as never)) {
+        f.push(`required case label lacks ${req.reasonCode}: ${tag}`);
+      }
+      const r = byId.get(id);
+      if (!r) continue; // not evaluated (live-mode skip)
+      if (!(r.outcomeMatch && r.reasonsMatch)) f.push(`required case failing: ${tag}`);
+      if (r.actualOutcome !== req.outcome) f.push(`required case outcome is ${r.actualOutcome}: ${tag}`);
+      if (req.reasonCode && !r.actualReasonCodes.includes(req.reasonCode)) {
+        f.push(`required case result lacks ${req.reasonCode}: ${tag}`);
+      }
+      const ai = r.ai;
+      const need = (ok: boolean, what: string) => {
+        if (!ok) f.push(`required case does not demonstrate "${what}": ${tag}`);
+      };
+      switch (req.kind) {
+        case "tripwire-silent-model":
+          need(
+            !!ai && ai.status === "ok" && ai.modelSignals === 0 && ai.tripwireSignals > 0,
+            "silent model, escalated only by the tripwire",
+          );
+          break;
+        case "controlled-blocked":
+          need(
+            !!ai && ai.blocked && ai.calls === 0 && ai.status === "failed",
+            "blocked AI path with zero client calls",
+          );
+          break;
+        case "injection":
+          need(!!ai && ai.injectionHits > 0, "an injection tripwire hit");
+          break;
+        case "llm-failure":
+          need(!!ai && ai.status === "failed", "a failed AI result");
+          break;
+        case "benign-clean":
+          need(!ai || ai.totalSignals === 0, "no signals on a benign case");
+          break;
+        default:
+          break;
       }
     }
   }
-  if (loaded.size < manifest.minTotalCases) {
-    f.push(`only ${loaded.size} cases loaded; manifest requires at least ${manifest.minTotalCases}`);
+  if (cases.length < manifest.minTotalCases) {
+    f.push(`only ${cases.length} cases loaded; manifest requires at least ${manifest.minTotalCases}`);
   }
   return f;
 }
@@ -141,6 +249,21 @@ export interface CaseResult {
   reasonsMatch: boolean;
   /** true when the case went through the AI stage (fixture or live). */
   usedAi: boolean;
+  /** Observations from the AI stage (absent for rules-only cases). */
+  ai?: AiObservation;
+}
+
+export interface AiObservation {
+  status: "ok" | "failed";
+  modelSignals: number;
+  tripwireSignals: number;
+  totalSignals: number;
+  /** Hits of the local injection detector on the case text (independent of the model). */
+  injectionHits: number;
+  /** Model client calls made for this case. */
+  calls: number;
+  /** The medication was blocked from the AI path by the positive allow-list. */
+  blocked: boolean;
 }
 
 const sameSet = (a: string[], b: string[]) => {
@@ -184,6 +307,9 @@ export interface CoverageExtras {
   llmCallsOnBlocked?: number;
   /** Environment guard failures (path overrides without permission). */
   envFailures?: string[];
+  /** "default" or a relative override path (stamped into results). */
+  casesDirLabel?: string;
+  fixturesDirLabel?: string;
 }
 
 export interface Metrics {
@@ -192,6 +318,8 @@ export interface Metrics {
   blockedAiCases: number;
   llmCallsOnBlocked: number;
   envFailures: string[];
+  casesDir: string;
+  fixturesDir: string;
   mode: "rules-only" | "fixtures" | "live";
   /** Where the model responses came from. null in live mode (real model). */
   fixtureKind: "synthetic-handwritten" | null;
@@ -241,6 +369,8 @@ export function computeMetrics(
     blockedAiCases: extras.blockedAiCases ?? 0,
     llmCallsOnBlocked: extras.llmCallsOnBlocked ?? 0,
     envFailures: extras.envFailures ?? [],
+    casesDir: extras.casesDirLabel ?? "default",
+    fixturesDir: extras.fixturesDirLabel ?? "default",
     mode,
     fixtureKind: mode === "live" ? null : "synthetic-handwritten",
     liveModelRun: mode === "live",
@@ -278,7 +408,9 @@ export function gateFailures(m: Metrics): string[] {
   f.push(...m.envFailures);
   if (m.manifestFailures === null) f.push("required-case manifest was not checked");
   else f.push(...m.manifestFailures);
-  if (m.blockedAiCases === 0) f.push("no AI case exercised the controlled-substance AI-path block");
+  if (m.blockedAiCases < 2) {
+    f.push(`only ${m.blockedAiCases} AI case(s) exercised the AI-path block; at least 2 required`);
+  }
   if (m.llmCallsOnBlocked > 0) f.push(`${m.llmCallsOnBlocked} LLM call(s) for blocked medication`);
   if (m.totalCases === 0) f.push("zero eval cases ran");
   if (m.escalationCases === 0) f.push("no ESCALATE cases: escalation recall is undefined");
@@ -297,6 +429,10 @@ export function gateFailures(m: Metrics): string[] {
 }
 
 export function writeResults(m: Metrics, cases: CaseResult[], path: string = resultsPath()): void {
+  // With any path override active, the committed latest.json must never be written.
+  if (anyOverrideActive() && resolve(path) === resolve(COMMITTED_LATEST)) {
+    throw new Error("refusing to write evals/results/latest.json while path overrides are active");
+  }
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(
     path,

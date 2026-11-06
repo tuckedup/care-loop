@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Would report a signal, but the medication is blocked so the runner asserts it is never requested.",
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[]}"
+  }
+}

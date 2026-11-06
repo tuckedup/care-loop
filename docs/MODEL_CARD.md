@@ -34,6 +34,13 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 - The model can miss risk. A model that returns no signals for risky text is only caught if a
   tripwire phrase happens to match; a structured check-in answer is the other safeguard.
+- Tripwire normalisation handles case, accents, many Cyrillic/Greek/Latin look-alikes (dotless i,
+  small capitals), digit look-alikes (k1ll), invisible/blank characters (Hangul fillers, Braille
+  blank, zero-width) and letter-spaced words ("s u i c i d e"). Remaining known misses:
+  look-alikes outside the small mapped set (e.g. most other scripts, full-width is handled by
+  NFKD only), letter-spacing with punctuation ("s.u.i.c.i.d.e", "s-u-i-c-i-d-e"), reversed or
+  encoded text, leetspeak beyond simple digits, single-letter-spaced runs broken by one stray
+  character, abbreviations other than "kms", and everything listed next.
 - Known tripwire misses (non-exhaustive): non-English text; indirect or euphemistic phrasing
   ("go to sleep and not wake up", "disappear", "they would miss me less"); methods not listed;
   deliberate misspellings beyond simple digit/look-alike substitution; spaced-out letters

@@ -37,9 +37,22 @@ AI renewal features (F031 onward, anything in `src/ai` or the AI decision path) 
 - the coverage floor: every case in `evals/required-cases.json` must exist and pass, and the number
   of case files must be at least `minTotalCases`. The floor only ratchets up; raise it when cases
   are added. The SPEC section 10 target (60+ cases, 25+ risk cases) is still open;
+- required cases that no longer demonstrate what their requirement says. Each manifest entry names
+  a `kind`: `tripwire-silent-model` (the model returned no signals and the tripwire escalated),
+  `controlled-blocked` (AI path blocked, zero client calls, failed AI result), `injection` (the
+  injection detector hit the text), `llm-failure` (the AI result failed), `benign-clean`
+  (AUTO_ELIGIBLE with no signals), `risk`/`rules` (the required outcome and reason code, both in the
+  label and in the actual result). At least two distinct cases must exercise the AI-path block;
+- edited required cases: every manifest entry carries a sha256 pin of the case's free text,
+  medication and expected label. Changing a required case therefore also requires regenerating its
+  pin in `evals/required-cases.json`, which is a reviewed act (state in the PR why the label or text
+  changed; never edit a case or its pin to make a failing run pass);
 - path overrides in the environment: `EVAL_CASES_DIR`, `EVAL_FIXTURES_DIR` and `EVAL_RESULTS_PATH`
   exist only for the gate's own subprocess tests and are honoured only when `EVAL_ALLOW_OVERRIDES=1`,
-  `NODE_ENV=test` and `CI` is unset. Setting them otherwise (e.g. in CI) fails the gate.
+  `NODE_ENV=test`, `CI` is unset and a per-run nonce set by `scripts/eval-gate.test.ts` matches a temp
+  file it wrote. Setting them otherwise (e.g. in CI, or a plain `EVAL_ALLOW_OVERRIDES=1 pnpm eval`)
+  fails the gate. This is a guard against accidents, not a security boundary. An overridden run
+  stamps `casesDir`/`fixturesDir` into its results and can never write the committed `latest.json`.
 
 `EVAL_LIVE=1` without `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` fails before running anything and
 writes nothing. Live results go to `evals/results/live-latest.json`, never over `latest.json`.

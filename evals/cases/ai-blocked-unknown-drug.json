@@ -1,0 +1,60 @@
+{
+  "id": "ai-blocked-unknown-drug",
+  "scenario": "Unrecognised medication name, no ids, no active order; the model must never be called",
+  "category": "ai-path-block",
+  "labeledFrom": "SPEC text: R02 (an unrecognised medication is not on the formulary allowlist) and R04 (no active clinician order for this drug on file). REJECT outranking ESCALATE is an implementation precedence choice (TODO in docs/DECISIONS.md). The zero-model-call requirement is the CLAUDE.md rule that only allowlisted, non-controlled drugs enter the AI path. Also R13: because the medication is blocked from the AI path there is no AI result, and an absent or failed LLM result escalates (fail closed), so LLM_FAILURE is in the set (label corrected from an initial draft that omitted R13).",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Please refill my usual medication, I am feeling okay.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": null,
+    "name": "unknownium",
+    "doseMg": null,
+    "frequency": null,
+    "controlledSchedule": null,
+    "formularyId": null
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": null,
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "aiFixture": "ai-blocked-unknown-drug",
+  "expected": {
+    "outcome": "REJECT",
+    "reasonCodes": [
+      "NOT_ON_FORMULARY",
+      "NO_ACTIVE_ORDER",
+      "LLM_FAILURE"
+    ]
+  }
+}

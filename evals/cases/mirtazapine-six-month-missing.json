@@ -1,0 +1,65 @@
+{
+  "id": "mirtazapine-six-month-missing",
+  "scenario": "Mirtazapine, baseline monitoring recorded 7 months ago, six-month monitoring not recorded",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2: baseline AND six-month metabolic/CV monitoring are required for mirtazapine; seven months is clearly past six months, so six-month monitoring is due and missing. ESCALATE as the outcome is the implementer's choice; TODO: confirm with a clinician (also the recurrence interval after the first six-month check is unsourced).",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "15996",
+    "name": "mirtazapine",
+    "doseMg": 15,
+    "frequency": "nightly",
+    "controlledSchedule": null,
+    "formularyId": "mirtazapine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "15996"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": {
+      "baselineRecorded": true,
+      "monthsSinceBaseline": 7,
+      "sixMonthRecorded": false
+    }
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "MIRTAZAPINE_MONITORING_MISSING"
+    ]
+  }
+}

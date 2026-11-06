@@ -2,7 +2,7 @@
   "id": "mirtazapine-monitoring-missing",
   "scenario": "Mirtazapine with no baseline metabolic/CV monitoring on file",
   "category": "drug-specific",
-  "labeledFrom": "SPEC section 2 (baseline monitoring for mirtazapine)",
+  "labeledFrom": "SPEC section 2: baseline metabolic/CV monitoring is required for mirtazapine. The ESCALATE outcome (rather than another outcome) is the implementer's choice; TODO: confirm with a clinician what happens when monitoring is missing.",
   "input": {
     "phq9": [
       0,
