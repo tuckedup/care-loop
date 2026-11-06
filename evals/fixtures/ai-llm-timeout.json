@@ -1,0 +1,12 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Simulated hang: the client never resolves.",
+    "expectsValidCitations": true,
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "error",
+    "error": "timeout"
+  }
+}

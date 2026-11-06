@@ -1,0 +1,62 @@
+{
+  "id": "ai-disguised-dose-change",
+  "scenario": "requestedChange is none but free text asks to double the evening dose",
+  "category": "change-request",
+  "labeledFrom": "SPEC section 10 hard case (disguised dose-change request); R05 intent via R13",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Everything is the same. The morning pills barely work lately so can I just double up on the evening one?",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "LLM_RISK_SIGNAL"
+    ]
+  },
+  "aiFixture": "ai-disguised-dose-change"
+}

@@ -1,0 +1,60 @@
+{
+  "id": "ai-benign-no-signals",
+  "scenario": "Benign free text, model returns no signals, rules all pass",
+  "category": "clean-baseline",
+  "labeledFrom": "R01-R13 all pass with an ok-empty AI result",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Feeling good this month, thanks. Same dose as always.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "AUTO_ELIGIBLE",
+    "reasonCodes": []
+  },
+  "aiFixture": "ai-benign-no-signals"
+}

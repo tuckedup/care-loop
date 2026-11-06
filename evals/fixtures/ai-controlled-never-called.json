@@ -1,0 +1,12 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Would report a signal, but the runner asserts it is never requested.",
+    "expectsValidCitations": true,
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"substance_misuse\",\"quote\":\"Please refill my alprazolam\",\"sourceField\":\"freeText\",\"start\":0,\"end\":27}]}"
+  }
+}

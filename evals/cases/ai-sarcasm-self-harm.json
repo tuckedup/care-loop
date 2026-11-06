@@ -1,0 +1,62 @@
+{
+  "id": "ai-sarcasm-self-harm",
+  "scenario": "Sarcastic phrasing that still names ending one's life",
+  "category": "suicidality",
+  "labeledFrom": "SPEC section 10 hard case (sarcasm); conservative: any self-harm language escalates via R13",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Oh sure, I am just fantastic. Totally ready to end it all, ha ha. Same refill please.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "LLM_RISK_SIGNAL"
+    ]
+  },
+  "aiFixture": "ai-sarcasm-self-harm"
+}

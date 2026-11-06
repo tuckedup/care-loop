@@ -1,0 +1,12 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Canned response flagging the dose change request.",
+    "expectsValidCitations": true,
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"dose_or_drug_change_request\",\"quote\":\"can I just double up on the evening one\",\"sourceField\":\"freeText\",\"start\":64,\"end\":103}]}"
+  }
+}

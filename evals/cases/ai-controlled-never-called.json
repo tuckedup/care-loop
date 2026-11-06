@@ -1,0 +1,63 @@
+{
+  "id": "ai-controlled-never-called",
+  "scenario": "Controlled medication: the model must never be called",
+  "category": "controlled-substance",
+  "labeledFrom": "R02 + R03; CLAUDE.md: controlled substances never enter the AI path",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Please refill my alprazolam, the usual.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "596",
+    "name": "alprazolam",
+    "doseMg": 0.5,
+    "frequency": "daily",
+    "controlledSchedule": "IV",
+    "formularyId": "alprazolam"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "596"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "REJECT",
+    "reasonCodes": [
+      "NOT_ON_FORMULARY",
+      "CONTROLLED_SUBSTANCE"
+    ]
+  },
+  "aiFixture": "ai-controlled-never-called"
+}

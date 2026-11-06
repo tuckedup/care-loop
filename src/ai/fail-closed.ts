@@ -8,6 +8,7 @@ import { isAiPathAllowed, type AiResult, type RuleInput } from "@/domain/rules";
 import { createAnthropicClient, type RiskLlmClient } from "./client";
 import { loadAiConfig } from "./config";
 import { extractRiskSignals } from "./extract-risk-signals";
+import { detectInjection } from "./injection";
 import {
   RiskExtractionError,
   SOURCE_FIELDS,
@@ -76,7 +77,15 @@ export async function runRiskExtraction(
         deadline,
       ]);
       // 4. Server-side quote verification. Nothing is dropped.
-      return { status: "ok", signals: verifySignals(output.signals, text) };
+      const verified = verifySignals(output.signals, text);
+      // 5. Local injection tripwire: adds signals even if the model was fooled into silence.
+      const local = detectInjection(text).filter(
+        (l) =>
+          !verified.some(
+            (v) => v.sourceField === l.sourceField && v.start === l.start && v.end === l.end,
+          ),
+      );
+      return { status: "ok", signals: [...verified, ...local] };
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }

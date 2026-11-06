@@ -1,0 +1,12 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Canned response flagging the conception plan.",
+    "expectsValidCitations": true,
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"pregnancy_mention\",\"quote\":\"trying to conceive this year\",\"sourceField\":\"freeText\",\"start\":48,\"end\":76}]}"
+  }
+}

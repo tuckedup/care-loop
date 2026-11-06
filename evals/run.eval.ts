@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { runAiStage } from "./ai-runner";
 import {
   computeMetrics,
   gateFailures,
@@ -9,24 +10,48 @@ import {
 } from "./lib";
 import type { EvalCase } from "./schema";
 
-type Loaded = { ok: true; cases: EvalCase[] } | { ok: false; error: unknown };
-const loaded: Loaded = (() => {
+const LIVE = process.env.EVAL_LIVE === "1";
+
+type Loaded =
+  | { ok: true; results: CaseResult[]; citations: { total: number; verified: number } }
+  | { ok: false; error: unknown };
+
+async function load(): Promise<Loaded> {
   try {
-    return { ok: true, cases: loadCases() };
+    const cases: EvalCase[] = loadCases();
+    const results: CaseResult[] = [];
+    const citations = { total: 0, verified: 0 };
+    for (const c of cases) {
+      if (!c.aiFixture) {
+        // Rules-only case: AI result is "ok, no signals".
+        results.push(runCase(c));
+        continue;
+      }
+      const stage = await runAiStage(c, LIVE);
+      if (stage.skipped) continue;
+      results.push(runCase(c, stage.ai));
+      if (stage.expectsValidCitations) {
+        citations.total += stage.signalsTotal;
+        citations.verified += stage.signalsVerified;
+      }
+    }
+    return { ok: true, results, citations };
   } catch (error) {
     return { ok: false, error };
   }
-})();
+}
+
+const loaded = await load();
 
 describe("eval suite", () => {
   if (!loaded.ok) {
-    // Zero cases / unreadable / schema-invalid cases fail the run (the gate fails closed).
+    // Zero cases / unreadable / schema-invalid cases / missing fixtures fail the run.
     it("loads a non-empty, schema-valid case set", () => {
       throw loaded.error;
     });
     return;
   }
-  const results: CaseResult[] = loaded.cases.map((c) => runCase(c));
+  const { results, citations } = loaded;
 
   for (const r of results) {
     it(`${r.id}`, () => {
@@ -35,8 +60,14 @@ describe("eval suite", () => {
     });
   }
 
-  it("gate: escalation recall 1.0, no unsafe approvals; writes latest.json", () => {
-    const metrics = computeMetrics(results, process.env.EVAL_LIVE === "1" ? "live" : "rules-only");
+  it("gate: escalation recall 1.0, citation validity 1.0, no unsafe approvals; writes latest.json", () => {
+    const usesAi = results.length > 0 && results.some((r) => r.usedAi);
+    const mode = LIVE ? "live" : usesAi ? "fixtures" : "rules-only";
+    const metrics = computeMetrics(
+      results,
+      mode,
+      citations.total === 0 ? null : citations.verified / citations.total,
+    );
     writeResults(metrics, results);
     expect(gateFailures(metrics)).toEqual([]);
   });

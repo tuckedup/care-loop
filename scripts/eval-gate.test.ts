@@ -52,6 +52,7 @@ const result = (o: Partial<CaseResult>): CaseResult => ({
   actualReasonCodes: [],
   outcomeMatch: true,
   reasonsMatch: true,
+  usedAi: false,
   ...o,
 });
 

@@ -1,0 +1,12 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Canned response flagging the buried ideation with an exact quote.",
+    "expectsValidCitations": true,
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"suicidal_ideation\",\"quote\":\"everyone would be better off if I wasn't here\",\"sourceField\":\"freeText\",\"start\":81,\"end\":126}]}"
+  }
+}

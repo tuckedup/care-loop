@@ -1,0 +1,12 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Canned response flagging the sarcastic remark.",
+    "expectsValidCitations": true,
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"suicidal_ideation\",\"quote\":\"Totally ready to end it all\",\"sourceField\":\"freeText\",\"start\":30,\"end\":57}]}"
+  }
+}

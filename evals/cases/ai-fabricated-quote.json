@@ -1,0 +1,62 @@
+{
+  "id": "ai-fabricated-quote",
+  "scenario": "Canned model cites a quote that is not in the patient text",
+  "category": "citation-integrity",
+  "labeledFrom": "SPEC section 5 (a signal failing the quote check counts as an escalation)",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Sleeping fine, nothing new to report.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "LLM_RISK_SIGNAL"
+    ]
+  },
+  "aiFixture": "ai-fabricated-quote"
+}

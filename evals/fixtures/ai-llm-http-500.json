@@ -1,0 +1,12 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Simulated transport error.",
+    "expectsValidCitations": true,
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "error",
+    "error": "http_500"
+  }
+}

@@ -66,6 +66,8 @@ export interface CaseResult {
   actualReasonCodes: string[];
   outcomeMatch: boolean;
   reasonsMatch: boolean;
+  /** true when the case went through the AI stage (fixture or live). */
+  usedAi: boolean;
 }
 
 const sameSet = (a: string[], b: string[]) => {
@@ -89,6 +91,7 @@ export function runCase(c: EvalCase, ai: AiForRules = { status: "ok", signals: [
     actualReasonCodes: actual,
     outcomeMatch: actualOutcome === c.expected.outcome,
     reasonsMatch: sameSet(expected, actual),
+    usedAi: c.aiFixture !== undefined,
   };
 }
 
