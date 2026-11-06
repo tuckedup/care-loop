@@ -6,11 +6,12 @@ import { requirePageRole } from "@/infra/auth/guard";
 import { getSql } from "@/infra/db/client";
 import { isEscalated } from "@/infra/projections/renewal-queue";
 import type { MedRow } from "@/infra/projections/patient-med-list";
-import { ReviewPanel, type ReviewPanelProps } from "../../_components/review-panel";
+import { ReviewPanel } from "../../_components/review-panel";
 import { Sparkline } from "../../_components/sparkline";
 import { loadVisitData, type VisitData } from "../../_lib/data";
 import { loadSummary } from "../../_lib/summary";
-import { approvalBlock, describeEvent, isItem9Code, reasonLabel } from "../../_lib/view-model";
+import { panelState } from "../../_lib/panel-state";
+import { anchorId, describeEvent, isItem9Code, reasonLabel } from "../../_lib/view-model";
 
 export const dynamic = "force-dynamic";
 
@@ -54,64 +55,6 @@ function Med({ m, requested }: { m: MedRow; requested: boolean }) {
   );
 }
 
-function panelState(
-  data: VisitData,
-  role: string,
-  me: string,
-  awaiting: boolean,
-  failedRuleIds: string[],
-  outcome: string | null,
-): ReviewPanelProps {
-  const { row } = data;
-  const completed = row.status === "completed";
-  const readOnly = role !== "clinician";
-  const bookedAlready = data.events.some((e) => e.event.type === "VisitBooked");
-  const mine = row.clinicianId === me;
-
-  let startReason: string | null = null;
-  let decisionReason: string | null = null;
-  let reviewState: ReviewPanelProps["reviewState"] = "not_started";
-  if (readOnly) {
-    startReason = decisionReason = "Read-only: only clinicians can start a review or decide.";
-    reviewState = "read_only";
-  } else if (completed) {
-    startReason =
-      decisionReason = `Already decided${row.decision ? ` (${row.decision.replaceAll("_", " ")})` : ""}.`;
-    reviewState = "decided";
-  } else if (awaiting) {
-    startReason = decisionReason =
-      "Awaiting evaluation: the decision pipeline has not evaluated this renewal yet, so review cannot start. It is evaluated by the next catch-up run.";
-  } else if (row.clinicianId === null) {
-    decisionReason = "Start the review first to enable Approve, Deny and Book visit.";
-  } else if (mine) {
-    startReason = "Review already started by you.";
-    reviewState = "started";
-  } else {
-    startReason =
-      decisionReason = `Review already started by ${row.clinicianId}; only that clinician may decide.`;
-    reviewState = "other_reviewer";
-  }
-
-  // A system follow-up (not escalated) completes the row but still needs a visit booked.
-  const followUpOnly =
-    !readOnly && completed && row.decision === "follow_up_required" && !isEscalated(row);
-  let bookReason = decisionReason;
-  if (followUpOnly) bookReason = bookedAlready ? "A visit is already booked." : null;
-
-  const approveReason =
-    decisionReason === null
-      ? approvalBlock({ outcome, reasonCodes: row.reasonCodes, failedRuleIds })
-      : null;
-  return {
-    renewalId: row.renewalId,
-    startReason,
-    decisionReason,
-    approveReason,
-    bookReason,
-    reviewState,
-  };
-}
-
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="mt-8">
@@ -128,7 +71,7 @@ async function SummarySection({ data }: { data: VisitData }) {
   if (result.status !== "ok") {
     // Fail closed: no summary text at all.
     return (
-      <p data-testid="summary-unavailable" role="status">
+      <p data-testid="summary-unavailable" data-reason={result.reason} role="status">
         Summary unavailable
       </p>
     );
@@ -136,19 +79,15 @@ async function SummarySection({ data }: { data: VisitData }) {
   const labels = new Map<string, string>();
   for (const e of data.events) labels.set(e.id, e.type);
   for (const v of data.visits) labels.set(v.eventId, "VisitBooked");
-  for (const n of data.notes) labels.set(n.noteId, `Visit note ${n.noteId}`);
+  for (const n of data.notes) labels.set(n.sourceId, `Visit note ${n.noteId}`);
   return (
     <div data-testid="summary-ok">
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        AI-generated from the sources below; every line links to its source. This summary never
-        decides anything.
-      </p>
       <ul className="mt-2 list-disc pl-5" data-testid="summary-lines">
         {result.lines.map((l, i) => (
           <li key={i} data-source-id={l.sourceId}>
             {l.text}{" "}
             <a
-              href={`#src-${encodeURIComponent(l.sourceId)}`}
+              href={`#${anchorId(l.sourceId)}`}
               className="text-sm underline"
               data-testid="citation"
             >
@@ -159,8 +98,8 @@ async function SummarySection({ data }: { data: VisitData }) {
       </ul>
       {result.droppedLines > 0 ? (
         <p className="mt-2 text-sm" data-testid="summary-dropped">
-          {result.droppedLines} line{result.droppedLines === 1 ? "" : "s"} removed: uncited or
-          citing an unknown source.
+          {result.droppedLines} line{result.droppedLines === 1 ? "" : "s"} removed: uncited, citing
+          an unknown source, or recommendation / reassurance wording.
         </p>
       ) : null}
     </div>
@@ -416,6 +355,10 @@ export default async function VisitPage({
       </Section>
 
       <Section id="summary-heading" title="Summary">
+        <p className="text-sm font-medium" data-testid="summary-label">
+          AI-generated summary, not a recommendation; escalation reason codes above are
+          authoritative
+        </p>
         <Suspense fallback={<p role="status">Generating summary...</p>}>
           <SummarySection data={data} />
         </Suspense>
@@ -431,12 +374,12 @@ export default async function VisitPage({
         ) : (
           <ul className="text-sm">
             {data.visits.map((v) => (
-              <li key={v.visitId} id={`src-${v.eventId}`} data-testid="visit-history-item">
+              <li key={v.visitId} id={anchorId(v.eventId)} data-testid="visit-history-item">
                 Visit {v.visitId}: {fmt(v.start)} to {fmt(v.end)}
                 {data.notes
                   .filter((n) => n.visitId === v.visitId)
                   .map((n) => (
-                    <span key={n.noteId} id={`src-${n.noteId}`} data-testid="visit-note">
+                    <span key={n.noteId} id={anchorId(n.sourceId)} data-testid="visit-note">
                       {" "}
                       · note {n.noteId} signed by {n.clinicianId}
                     </span>
@@ -452,7 +395,7 @@ export default async function VisitPage({
           {data.events.map((e) => (
             <li
               key={e.id}
-              id={`src-${e.id}`}
+              id={anchorId(e.id)}
               data-event-id={e.id}
               className="py-1 target:bg-yellow-100 target:text-slate-900"
             >

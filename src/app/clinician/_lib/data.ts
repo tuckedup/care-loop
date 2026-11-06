@@ -12,7 +12,7 @@ import { listPatientMeds, type MedRow } from "@/infra/projections/patient-med-li
 import { getPhq9Trend, type TrendPoint } from "@/infra/projections/phq9-trend";
 import { listRenewalQueue, type RenewalQueueRow } from "@/infra/projections/renewal-queue";
 import { runAllProjections } from "@/infra/projections/registry";
-import { eventSourceId } from "./view-model";
+import { eventSourceId, noteSourceId } from "./view-model";
 
 export async function syncProjections(sql: Sql): Promise<void> {
   await runAllProjections(sql, registerAllProjections());
@@ -111,6 +111,8 @@ export interface SourceEvent {
 
 export interface VisitNote {
   noteId: string;
+  /** Sanitised citation / anchor id (note-...), never equal to an evt-N id. */
+  sourceId: string;
   visitId: string;
   clinicianId: string;
   eventId: string;
@@ -208,6 +210,7 @@ export async function loadVisitData(sql: Sql, renewalId: string): Promise<VisitD
           if (e.type === "VisitNoteSigned") {
             notes.push({
               noteId: e.data.noteId,
+              sourceId: noteSourceId(e.data.noteId),
               visitId: e.data.visitId,
               clinicianId: e.data.clinicianId,
               eventId: eventSourceId(s.global_position),

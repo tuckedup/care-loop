@@ -140,11 +140,24 @@ unknown id, is malformed or is a duplicate, and shows how many lines were remove
 no client, no model, a timeout, an error, non-JSON or schema-invalid output, or no valid cited line
 left all yield "Summary unavailable" with no summary text, and the clinician actions are never
 blocked. The same positive AI gate as the decision pipeline runs first, so controlled or
-unidentified medications never reach the model (tested with a spy client). Patient free text is
-placed inside the prompt as delimited data and cannot forge the delimiter.
+unidentified medications never reach the model (tested with a spy client).
+
+What the server guarantees, and what it does not. Guaranteed: (1) every shown line cites an id the
+server supplied (id membership only); (2) a deterministic deny-list drops any line with
+recommendation, reassurance or approval wording (approve, recommend, safe, low risk, eligible, ok to
+renew, no concerns and variants with spacing, homoglyphs and fullwidth forms), and for escalated
+renewals any line asserting an absence of risk; dropped lines are counted and shown as "N lines
+removed"; (3) source text reaches the model as one JSON array with control and format characters
+removed and every bracket replaced, and source ids must be plain `[A-Za-z0-9_-]` tokens. NOT
+guaranteed: a cited line's claims are not verified against the text of its source, so a misleading
+sentence that avoids the deny-list can still be shown under a real id; the deny-list is a heuristic
+and not exhaustive; prompt injection resistance of the model itself is not claimed. The page labels
+the summary "AI-generated summary, not a recommendation; escalation reason codes above are
+authoritative", and the reason codes remain the authoritative record.
 
 Known limits: the summary has not been run against a live model; its quality is not evaluated (no
 CREOLA-style labelling yet, see SPEC section 11); the call carries no idempotency key (it is a
 read-only generation); successful summaries are cached in process memory for five minutes. Test
 fixtures are hand-written (synthetic-handwritten). `SUMMARY_FIXTURE=synthetic-handwritten` enables a
-hand-written fixture model outside production only, for e2e.
+hand-written fixture model only when `NODE_ENV` is exactly `development` or `test` (default deny),
+for e2e.

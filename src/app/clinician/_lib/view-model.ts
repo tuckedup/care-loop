@@ -145,3 +145,27 @@ export function describeEvent(e: DomainEvent): string {
       return `${e.type}.`;
   }
 }
+
+/** FNV-1a, only used to keep sanitised note ids distinct (not a security primitive). */
+function shortHash(s: string): string {
+  let h = 0x811c9dc5;
+  for (const c of s) {
+    h ^= c.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+/**
+ * Citation / anchor id for a visit note: always "note-" + a sanitised id (so it can never equal an
+ * "evt-<n>" id and is safe in an element id, a URL fragment and a prompt). If sanitising changed
+ * the id, a hash suffix keeps different raw ids distinct.
+ */
+export function noteSourceId(noteId: string): string {
+  const clean = noteId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 80);
+  const id = clean === noteId ? clean : `${clean}-${shortHash(noteId)}`;
+  return `note-${id}`;
+}
+
+/** The ONE place an element id / fragment is built from a (server-validated) source id. */
+export const anchorId = (sourceId: string): string => `src-${sourceId}`;

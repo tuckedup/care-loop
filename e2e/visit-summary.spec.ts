@@ -37,6 +37,7 @@ test("fail closed: summary unavailable shows no summary text and never blocks th
   test.skip(fixture, "fixture mode is on; see the citation test");
   await page.goto(`/clinician/renewals/${renewalId}`);
   await expect(page.getByTestId("summary-unavailable")).toHaveText("Summary unavailable");
+  await expect(page.getByTestId("summary-label")).toContainText("not a recommendation");
   await expect(page.getByTestId("summary-lines")).toHaveCount(0);
   await expect(page.getByTestId("summary-ok")).toHaveCount(0);
   await page.getByRole("button", { name: "Start review" }).click();
@@ -53,7 +54,13 @@ test("citations link to source events; uncited and unknown-id lines are dropped 
   expect(await lines.count()).toBeGreaterThan(0);
   await expect(page.getByTestId("summary-ok")).not.toContainText("UNCITED");
   await expect(page.getByTestId("summary-ok")).not.toContainText("UNKNOWN-ID");
-  await expect(page.getByTestId("summary-dropped")).toContainText("2 lines removed");
+  // A reassuring line under a REAL source id is dropped by the deny-list.
+  await expect(page.getByTestId("summary-ok")).not.toContainText("REASSURANCE");
+  await expect(page.getByTestId("summary-ok")).not.toContainText(/safe to approve/i);
+  await expect(page.getByTestId("summary-label")).toContainText(
+    "AI-generated summary, not a recommendation; escalation reason codes above are authoritative",
+  );
+  await expect(page.getByTestId("summary-dropped")).toContainText("3 lines removed");
   // Every citation resolves to an element on the page.
   const hrefs = await page
     .getByTestId("citation")
