@@ -132,7 +132,14 @@ const payloads = {
     autonomyMode: AutonomyModeSchema,
     clinicianId: id.optional(),
   }),
-  RenewalDenied: z.object({ v: v1, renewalId: id, reason: z.string().min(1).max(500) }),
+  RenewalDenied: z.object({
+    v: v1,
+    renewalId: id,
+    reason: z.string().min(1).max(500),
+    /** Additive (F042). Absent on older events; the queue then infers the actor from review start. */
+    by: z.enum(["system", "clinician"]).optional(),
+    clinicianId: id.optional(),
+  }),
   RxRenewalQueued: z.object({
     v: v1,
     renewalId: id,
@@ -171,6 +178,9 @@ const payloads = {
     patientId: id,
     start: isoDateTime,
     end: isoDateTime,
+    /** Additive (F042): the clinician who booked it and the renewal it follows up. */
+    clinicianId: id.optional(),
+    renewalId: id.optional(),
   }),
   VisitNoteSigned: z.object({ v: v1, visitId: id, noteId: id, clinicianId: id }),
   CalendarSlotCreated: z.object({
