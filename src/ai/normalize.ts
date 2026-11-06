@@ -156,49 +156,61 @@ export function normalizeWithMap(input: string, opts: NormalizeOptions = {}): No
 
 const LETTER = /^[a-z]$/;
 
+export interface CollapsedText extends NormalizedText {
+  /** Per collapsed char: true if it belongs to a collapsed run of single-letter tokens. */
+  inRun: boolean[];
+}
+
 /**
- * Collapses letter-spaced words ("s u i c i d e", "k i l l  m y s e l f" -> "killmyself"):
- * inside a run of at least two single-letter tokens separated by single spaces, the spaces are
- * removed. The offset maps are carried over, so spans still point into the ORIGINAL text.
- * Word breaks inside such a run are lost, so matchers must use space-less pattern variants.
+ * Collapses letter-spaced words ("s u i c i d e", "k  i l l  m y s e l f", "I w a n t t o d i e")
+ * into a single string. A TOKEN is one a-z letter whose neighbours are not letters (so trailing
+ * punctuation and brackets are fine); a RUN is two or more tokens separated by whitespace (the
+ * normaliser already folded any whitespace width into one space). The spaces inside a run are
+ * removed, so word breaks inside it are lost: matchers must use boundary-less, space-less pattern
+ * variants and require the match to overlap `inRun`. Offset maps are carried over, so spans still
+ * point into the ORIGINAL text. Linear time.
  */
-export function collapseSpacedLetters(n: NormalizedText): NormalizedText {
+export function collapseSpacedLetters(n: NormalizedText): CollapsedText {
   const t = n.text;
-  const keep: boolean[] = new Array<boolean>(t.length).fill(true);
+  const len = t.length;
+  const isLetter = (j: number) => j >= 0 && j < len && LETTER.test(t[j] as string);
+  const isTok = (j: number) => isLetter(j) && !isLetter(j - 1) && !isLetter(j + 1);
+  const keep: boolean[] = new Array<boolean>(len).fill(true);
+  const runMask: boolean[] = new Array<boolean>(len).fill(false);
   let i = 0;
-  while (i < t.length) {
-    // A run starts at a single-letter token: letter at i, boundary before and after.
-    const isTok = (j: number) =>
-      LETTER.test(t[j] ?? "") && (j === 0 || t[j - 1] === " ") && (j + 1 === t.length || t[j + 1] === " ");
+  while (i < len) {
     if (!isTok(i)) {
       i += 1;
       continue;
     }
-    const spaces: number[] = [];
     let j = i;
     let count = 1;
-    // A gap wider than one original character is treated as a word break.
-    const narrow = (sp: number) => (n.end[sp] ?? 0) - (n.start[sp] ?? 0) === 1;
-    while (j + 2 < t.length && t[j + 1] === " " && narrow(j + 1) && isTok(j + 2)) {
-      spaces.push(j + 1);
+    while (j + 2 < len && t[j + 1] === " " && isTok(j + 2)) {
+      keep[j + 1] = false;
       j += 2;
       count += 1;
     }
-    if (count >= 2) for (const sp of spaces) keep[sp] = false;
+    if (count >= 2) {
+      for (let k = i; k <= j; k++) runMask[k] = true;
+    } else {
+      // A lone token is not a run (undo nothing: no spaces were removed when count is 1).
+    }
     i = j + 1;
   }
   const chars: string[] = [];
   const start: number[] = [];
   const end: number[] = [];
-  for (let k = 0; k < t.length; k++) {
+  const inRun: boolean[] = [];
+  for (let k = 0; k < len; k++) {
     if (!keep[k]) {
       // The removed space is covered by extending the previous unit's span.
-      if (end.length > 0) end[end.length - 1] = n.end[k] ?? end[end.length - 1]!;
+      if (end.length > 0) end[end.length - 1] = n.end[k] ?? (end[end.length - 1] as number);
       continue;
     }
     chars.push(t[k] as string);
     start.push(n.start[k] as number);
     end.push(n.end[k] as number);
+    inRun.push(runMask[k] as boolean);
   }
-  return { text: chars.join(""), start, end };
+  return { text: chars.join(""), start, end, inRun };
 }

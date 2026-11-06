@@ -34,18 +34,25 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 - The model can miss risk. A model that returns no signals for risky text is only caught if a
   tripwire phrase happens to match; a structured check-in answer is the other safeguard.
-- Tripwire normalisation handles case, accents, many Cyrillic/Greek/Latin look-alikes (dotless i,
-  small capitals), digit look-alikes (k1ll), invisible/blank characters (Hangul fillers, Braille
-  blank, zero-width) and letter-spaced words ("s u i c i d e"). Remaining known misses:
-  look-alikes outside the small mapped set (e.g. most other scripts, full-width is handled by
-  NFKD only), letter-spacing with punctuation ("s.u.i.c.i.d.e", "s-u-i-c-i-d-e"), reversed or
-  encoded text, leetspeak beyond simple digits, single-letter-spaced runs broken by one stray
-  character, abbreviations other than "kms", and everything listed next.
-- Known tripwire misses (non-exhaustive): non-English text; indirect or euphemistic phrasing
-  ("go to sleep and not wake up", "disappear", "they would miss me less"); methods not listed;
-  deliberate misspellings beyond simple digit/look-alike substitution; spaced-out letters
-  ("s u i c i d e"); risk expressed only through context. The list also over-escalates on innocent
-  uses of its words (e.g. "die", "overdose" asked about as a safety question).
+- What the tripwire normalisation DOES handle: case, accents, many Cyrillic/Greek/Latin look-alikes
+  (dotless i, small capitals), digit look-alikes ("k1ll"), invisible/blank characters (Hangul
+  fillers, Braille blank, zero-width), and letter-spaced words, i.e. two or more single letters
+  separated by whitespace of any width, also with trailing punctuation, brackets, preceding
+  one-letter words or whole-sentence spacing ("s u i c i d e.", "(k i l l  m y s e l f)",
+  "I w a n t t o d i e"). Matches on spaced text must touch the spaced run; plain text keeps its
+  stricter word-boundary patterns.
+- What it still does NOT handle (known misses, non-exhaustive):
+  - letter-spacing with punctuation or other separators ("s.u.i.c.i.d.e", "s-u-i-c-i-d-e",
+    "s_u_i_c_i_d_e"), or spacing broken by a stray character or a zero-width character
+    between letters;
+  - spaced phrases that contain an apostrophe or hyphen ("c a n ' t g o o n", "s e l f - h a r m");
+  - look-alikes outside the small mapped set (most other scripts), reversed or encoded text
+    (rot13, base64, leetspeak beyond simple digits), abbreviations other than "kms";
+  - non-English text; indirect or euphemistic phrasing ("go to sleep and not wake up", "they
+    would miss me less"); methods not listed; deliberate misspellings beyond the substitutions
+    above; risk expressed only through context.
+  - Over-escalation: the lists also fire on innocent uses of their words (e.g. "die", "overdose"
+    asked about as a safety question) and on spaced single letters that happen to spell a phrase.
 - The tripwire lexicons are small, English-only and not exhaustive; they will miss many phrasings
   and over-escalate on some innocent uses of the same words. Not clinically validated.
 - Offsets from a live model are often wrong, which makes real signals unverifiable (they still

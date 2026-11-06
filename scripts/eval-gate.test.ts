@@ -14,6 +14,8 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { runAiStage } from "../evals/ai-runner";
+import { computePins, serialize } from "./eval-pins";
 import {
   computeMetrics,
   envGuardFailures,
@@ -471,6 +473,7 @@ describe("coverage floor, environment guard and live mode (process level)", () =
       modelSignals: 0,
       tripwireSignals: 1,
       totalSignals: 1,
+      signalTypes: [] as string[],
       injectionHits: 0,
       calls: 1,
       blocked: false,
@@ -489,7 +492,7 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     ).toMatch(/blocked AI path/);
     expect(only({ ...base("ai-injection-model-silent"), ai: ai({ injectionHits: 0 }) })).toMatch(/injection tripwire hit/);
     expect(only({ ...base("ai-llm-timeout"), ai: ai({ status: "ok" }) })).toMatch(/failed AI result/);
-    expect(only({ ...base("ai-benign-no-signals"), ai: ai({ totalSignals: 2 }) })).toMatch(/no signals on a benign case/);
+    expect(only({ ...base("ai-benign-no-signals"), ai: ai({ totalSignals: 2 }) })).toMatch(/an exercised AI path with an ok result and zero signals/);
     expect(only({ ...base("item9-positive"), actualOutcome: "AUTO_ELIGIBLE" })).toMatch(/outcome is AUTO_ELIGIBLE/);
     expect(only({ ...base("item9-positive"), actualReasonCodes: ["PHQ9_TOTAL_HIGH"] })).toMatch(/lacks PHQ9_ITEM9_POSITIVE/);
   });
@@ -558,5 +561,102 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(`${r.stdout}${r.stderr}`).toMatch(/refusing to write evals\/results\/latest.json/);
     expect(readFileSync(latest, "utf8")).toBe(before);
   }, 120_000);
+
+
+  // ---- Pin completeness, reproducible regeneration, live-mode blocked cases ----
+  it("pins are reproducible: eval-pins output equals the committed manifest", () => {
+    const next = computePins(loadManifest(), loadCases(casesSrc));
+    expect(serialize(next)).toBe(readFileSync(join(root, "evals", "required-cases.json"), "utf8").replace(/\r\n/g, "\n"));
+  });
+
+  it("computePins refuses a manifest that lists an unknown case", () => {
+    const m = loadManifest();
+    const bad = { ...m, required: [{ ...m.required[0]!, entries: [{ id: "nope", sha256: "0".repeat(64) }] }] };
+    expect(() => computePins(bad, loadCases(casesSrc))).toThrow(/unknown case/);
+  });
+
+  it("removing aiFixture from a benign AI case fails the gate", () => {
+    const s = stageEdited((cases) => {
+      delete cases.get("ai-benign-no-signals")!.aiFixture;
+    });
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/edited without a manifest update: ai-benign-no-signals/);
+    expect(r.out).toMatch(/does not demonstrate \W*an exercised AI path/);
+  }, 120_000);
+
+  it("editing history or an unrelated input field of a required case fails the pin", () => {
+    const s = stageEdited((cases) => {
+      cases.get("clean-renewal-fluoxetine")!.history.refillLimit = 5;
+      cases.get("item9-positive")!.input.sideEffects = "edited";
+    });
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/edited without a manifest update: clean-renewal-fluoxetine/);
+    expect(r.out).toMatch(/edited without a manifest update: item9-positive/);
+  }, 120_000);
+
+  it("editing an AI fixture of a required case fails the pin", () => {
+    const fx = { ...readFx("ai-benign-no-signals"), header: { ...readFx("ai-benign-no-signals").header, description: "changed" } };
+    const s = stageEdited(() => ({ "ai-benign-no-signals": fx }));
+    const r = runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/edited without a manifest update: ai-benign-no-signals/);
+  }, 120_000);
+
+  it("manifestFailures: AI risk cases need a signal of the expected type", () => {
+    const m = loadManifest();
+    const cases = loadCases(casesSrc);
+    const c = cases.find((x) => x.id === "ai-buried-suicidal-ideation")!;
+    const r = result({
+      id: c.id,
+      expectedOutcome: c.expected.outcome,
+      actualOutcome: c.expected.outcome,
+      expectedReasonCodes: [...c.expected.reasonCodes],
+      actualReasonCodes: [...c.expected.reasonCodes],
+      ai: {
+        status: "ok",
+        modelSignals: 1,
+        tripwireSignals: 0,
+        totalSignals: 1,
+        signalTypes: ["pregnancy_mention"],
+        injectionHits: 0,
+        calls: 1,
+        blocked: false,
+      },
+    });
+    expect(manifestFailures(m, cases, [r]).join()).toMatch(/no signal of type suicidal_ideation\|self_harm/);
+    const ok = { ...r, ai: { ...r.ai!, signalTypes: ["suicidal_ideation"] } };
+    expect(manifestFailures(m, cases, [ok]).join()).not.toMatch(/ai-buried-suicidal-ideation/);
+    // A manifest that forgets signalTypes for an AI risk case is itself a failure.
+    const loose = JSON.parse(JSON.stringify(m));
+    for (const req of loose.required) delete req.signalTypes;
+    expect(manifestFailures(loose, cases, []).join()).toMatch(/AI risk case needs signalTypes/);
+  });
+
+  it("live mode: blocked cases still run (zero calls, throwing client) and count toward the gate floor", async () => {
+    const cases = loadCases(casesSrc);
+    const throwing = {
+      complete: () => {
+        throw new Error("the model must never be called for a blocked medication");
+      },
+    };
+    const blockedIds = ["ai-controlled-never-called", "ai-blocked-homoglyph-drug", "ai-blocked-unknown-drug"];
+    let blocked = 0;
+    for (const id of blockedIds) {
+      const c = cases.find((x) => x.id === id)!;
+      const st = await runAiStage(c, true, { liveClient: throwing, liveModel: "m" });
+      expect(st.skipped, id).toBe(false);
+      expect(st.calls, id).toBe(0);
+      expect(st.obs.status, id).toBe("failed");
+      if (st.blocked) blocked += 1;
+    }
+    expect(blocked).toBeGreaterThanOrEqual(2);
+    const m = cm([result({})], "live", cites(1, 1), { blockedAiCases: blocked });
+    expect(gateFailures(m).join()).not.toMatch(/AI-path block/);
+    // A fixture-only case is skipped in live mode.
+    const timeout = cases.find((x) => x.id === "ai-llm-timeout")!;
+    expect((await runAiStage(timeout, true, { liveClient: throwing, liveModel: "m" })).skipped).toBe(true);
+  });
 
 });

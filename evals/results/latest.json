@@ -111,6 +111,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -131,6 +132,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -159,6 +161,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 0,
         "blocked": true
@@ -187,6 +190,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 0,
         "blocked": true
@@ -211,6 +215,9 @@
         "modelSignals": 1,
         "tripwireSignals": 0,
         "totalSignals": 1,
+        "signalTypes": [
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -237,6 +244,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 0,
         "blocked": true
@@ -261,6 +269,9 @@
         "modelSignals": 1,
         "tripwireSignals": 0,
         "totalSignals": 1,
+        "signalTypes": [
+          "dose_or_drug_change_request"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -285,6 +296,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 2,
         "calls": 1,
         "blocked": false
@@ -309,6 +321,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "prompt_injection_attempt"
+        ],
         "injectionHits": 1,
         "calls": 1,
         "blocked": false
@@ -333,6 +348,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -357,6 +373,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -381,6 +398,7 @@
         "modelSignals": 0,
         "tripwireSignals": 0,
         "totalSignals": 0,
+        "signalTypes": [],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -405,6 +423,9 @@
         "modelSignals": 1,
         "tripwireSignals": 0,
         "totalSignals": 1,
+        "signalTypes": [
+          "pregnancy_mention"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -429,6 +450,11 @@
         "modelSignals": 1,
         "tripwireSignals": 2,
         "totalSignals": 3,
+        "signalTypes": [
+          "suicidal_ideation",
+          "suicidal_ideation",
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -453,6 +479,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -477,6 +506,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -501,6 +533,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "self_harm"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -525,6 +560,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "harm_to_others"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -549,6 +587,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -573,6 +614,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "harm_to_others"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -597,6 +641,10 @@
         "modelSignals": 0,
         "tripwireSignals": 2,
         "totalSignals": 2,
+        "signalTypes": [
+          "suicidal_ideation",
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -621,6 +669,10 @@
         "modelSignals": 0,
         "tripwireSignals": 2,
         "totalSignals": 2,
+        "signalTypes": [
+          "suicidal_ideation",
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -645,6 +697,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "self_harm"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -669,6 +724,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -693,6 +751,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "self_harm"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -717,6 +778,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false
@@ -741,6 +805,9 @@
         "modelSignals": 0,
         "tripwireSignals": 1,
         "totalSignals": 1,
+        "signalTypes": [
+          "suicidal_ideation"
+        ],
         "injectionHits": 0,
         "calls": 1,
         "blocked": false

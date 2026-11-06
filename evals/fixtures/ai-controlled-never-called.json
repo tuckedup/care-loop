@@ -2,7 +2,7 @@
   "header": {
     "kind": "synthetic-handwritten",
     "description": "Would report a signal, but the runner asserts it is never requested.",
-    "liveApplicable": false
+    "liveApplicable": true
   },
   "response": {
     "type": "text",

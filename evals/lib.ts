@@ -67,6 +67,7 @@ export const REQUIREMENT_KINDS = [
   "rules",
   "risk",
   "benign-clean",
+  "benign-clean-ai",
   "controlled-blocked",
   "tripwire-silent-model",
   "injection",
@@ -88,7 +89,9 @@ export const ManifestSchema = z
             outcome: z.enum(["AUTO_ELIGIBLE", "ESCALATE", "REJECT", "FOLLOW_UP_REQUIRED"]),
             /** Required reason code (actual and labeled), when the outcome has one. */
             reasonCode: z.string().min(1).optional(),
-            /** sha256 pins of freeText + medication + expected. Editing a case requires a reviewed manifest update. */
+            /** AI risk cases: at least one signal of one of these types must exist (model or tripwire). */
+            signalTypes: z.array(z.string().min(1)).min(1).optional(),
+            /** sha256 pins of the whole case input, medication, history, expected label and AI fixture contents. Editing a case requires a reviewed manifest update. */
             entries: z.array(z.object({ id: z.string().min(1), sha256: Sha }).strict()).min(1),
           })
           .strict(),
@@ -114,10 +117,34 @@ function stable(v: unknown): string {
   return JSON.stringify(v);
 }
 
-/** sha256 over the parts of a case that define what it tests. */
+export const fixturesDirPath = () => override("EVAL_FIXTURES_DIR") ?? join(here, "fixtures");
+
+/** Hash of the AI fixture file's parsed contents, or "missing"/"unreadable". */
+function fixtureContentHash(name: string): string {
+  try {
+    const raw: unknown = JSON.parse(readFileSync(join(fixturesDirPath(), `${name}.json`), "utf8"));
+    return createHash("sha256").update(stable(raw)).digest("hex");
+  } catch {
+    return "missing-or-unreadable";
+  }
+}
+
+/**
+ * sha256 over everything that defines what a case tests: the full check-in input, medication,
+ * history, expected label and (id + contents of) its AI fixture. Free-form documentation fields
+ * (scenario, category, labeledFrom) are not pinned so provenance notes can be corrected.
+ */
 export function caseHash(c: EvalCase): string {
   return createHash("sha256")
-    .update(stable({ freeText: c.input.freeText, medication: c.med, expected: c.expected }))
+    .update(
+      stable({
+        input: c.input,
+        medication: c.med,
+        history: c.history,
+        expected: c.expected,
+        aiFixture: c.aiFixture ? { id: c.aiFixture, content: fixtureContentHash(c.aiFixture) } : null,
+      }),
+    )
     .digest("hex");
 }
 
@@ -149,6 +176,9 @@ export function manifestFailures(
       if (req.reasonCode && !c.expected.reasonCodes.includes(req.reasonCode as never)) {
         f.push(`required case label lacks ${req.reasonCode}: ${tag}`);
       }
+      if (req.kind === "risk" && c.aiFixture && !req.signalTypes) {
+        f.push(`AI risk case needs signalTypes in the manifest: ${tag}`);
+      }
       const r = byId.get(id);
       if (!r) continue; // not evaluated (live-mode skip)
       if (!(r.outcomeMatch && r.reasonsMatch)) f.push(`required case failing: ${tag}`);
@@ -157,6 +187,12 @@ export function manifestFailures(
         f.push(`required case result lacks ${req.reasonCode}: ${tag}`);
       }
       const ai = r.ai;
+      if (req.signalTypes) {
+        const types = req.signalTypes;
+        if (!ai || !ai.signalTypes.some((t) => types.includes(t))) {
+          f.push(`required case has no signal of type ${types.join("|")}: ${tag}`);
+        }
+      }
       const need = (ok: boolean, what: string) => {
         if (!ok) f.push(`required case does not demonstrate "${what}": ${tag}`);
       };
@@ -181,6 +217,12 @@ export function manifestFailures(
           break;
         case "benign-clean":
           need(!ai || ai.totalSignals === 0, "no signals on a benign case");
+          break;
+        case "benign-clean-ai":
+          need(
+            !!ai && ai.status === "ok" && ai.totalSignals === 0,
+            "an exercised AI path with an ok result and zero signals",
+          );
           break;
         default:
           break;
@@ -260,6 +302,8 @@ export interface AiObservation {
   totalSignals: number;
   /** Hits of the local injection detector on the case text (independent of the model). */
   injectionHits: number;
+  /** Types of every signal returned (model or tripwire). */
+  signalTypes: string[];
   /** Model client calls made for this case. */
   calls: number;
   /** The medication was blocked from the AI path by the positive allow-list. */

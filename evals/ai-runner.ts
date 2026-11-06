@@ -29,12 +29,24 @@ export interface AiStageResult {
 
 const NEVER = () => new Promise<string>(() => {});
 
-export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageResult> {
+export interface LiveOverrides {
+  /** Test seam: stands in for the real Anthropic client in live mode. */
+  liveClient?: RiskLlmClient | null;
+  liveModel?: string;
+}
+
+export async function runAiStage(
+  c: EvalCase,
+  live: boolean,
+  opts: LiveOverrides = {},
+): Promise<AiStageResult> {
   if (!c.aiFixture) {
     throw new Error(`case ${c.id} has no aiFixture; rules-only cases do not run the AI stage`);
   }
   const fixture = loadFixture(c.aiFixture);
-  if (live && !fixture.header.liveApplicable) {
+  // Blocked medications make no model call, so they run in live mode too (and must be counted).
+  const blockedUpFront = !isAiPathPermitted(toRuleInput(c, { status: "failed" }));
+  if (live && !fixture.header.liveApplicable && !blockedUpFront) {
     return {
       ai: { status: "ok", signals: [] },
       calls: 0,
@@ -48,6 +60,7 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
         modelSignals: 0,
         tripwireSignals: 0,
         totalSignals: 0,
+        signalTypes: [],
         injectionHits: 0,
         calls: 0,
         blocked: false,
@@ -58,10 +71,17 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
   let client: RiskLlmClient & { calls?: unknown[] };
   let model: string | undefined;
   let counted: { calls: unknown[] } | null = null;
+  let liveInner: RiskLlmClient | null = null;
   if (live) {
     const cfg = loadAiConfig();
-    model = cfg.model;
-    const inner = cfg.apiKey ? createAnthropicClient({ apiKey: cfg.apiKey }) : null;
+    model = opts.liveModel ?? cfg.model;
+    const inner =
+      opts.liveClient !== undefined
+        ? opts.liveClient
+        : cfg.apiKey
+          ? createAnthropicClient({ apiKey: cfg.apiKey })
+          : null;
+    liveInner = inner;
     const calls: unknown[] = [];
     counted = { calls };
     client = {
@@ -88,7 +108,7 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
     ruleInput,
     { freeText: c.input.freeText, sideEffects: c.input.sideEffects },
     {
-      client: live && !loadAiConfig().apiKey ? null : client,
+      client: live && !liveInner ? null : client,
       model,
       timeoutMs: live ? 60_000 : 50,
     },
@@ -115,6 +135,7 @@ export async function runAiStage(c: EvalCase, live: boolean): Promise<AiStageRes
       modelSignals: modelSigs.length,
       tripwireSignals: signals.length - modelSigs.length,
       totalSignals: signals.length,
+      signalTypes: signals.map((x) => x.type),
       injectionHits: detectInjection({
         freeText: c.input.freeText,
         sideEffects: c.input.sideEffects,

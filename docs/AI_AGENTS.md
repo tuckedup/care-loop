@@ -43,10 +43,17 @@ AI renewal features (F031 onward, anything in `src/ai` or the AI decision path) 
   injection detector hit the text), `llm-failure` (the AI result failed), `benign-clean`
   (AUTO_ELIGIBLE with no signals), `risk`/`rules` (the required outcome and reason code, both in the
   label and in the actual result). At least two distinct cases must exercise the AI-path block;
-- edited required cases: every manifest entry carries a sha256 pin of the case's free text,
-  medication and expected label. Changing a required case therefore also requires regenerating its
-  pin in `evals/required-cases.json`, which is a reviewed act (state in the PR why the label or text
-  changed; never edit a case or its pin to make a failing run pass);
+- edited required cases: every manifest entry carries a sha256 pin over the case's full check-in
+  input, medication, history, expected label and the id and contents of its AI fixture (the
+  free-form `scenario`, `category` and `labeledFrom` notes are not pinned). Changing any of them
+  makes the gate fail until the pin is regenerated with `pnpm eval:pins` (`pnpm eval:pins --
+  --check` verifies the pins are current; `scripts/eval-pins.ts`). Regenerating a pin is a
+  reviewed act: state in the change why the case changed, and never edit a case or its pin just to
+  make a failing run pass. `eval:pins` also ratchets `minTotalCases` upward, never down. The
+  requirement table itself (ids, kind, outcome, reason code, `signalTypes`) is edited by hand;
+- AI risk cases must contain a model or tripwire signal of an expected type (`signalTypes`), and
+  the `benign-clean-ai` kind requires an exercised AI path (fixture present, ok result, zero
+  signals); removing an AI fixture from such a case fails the gate;
 - path overrides in the environment: `EVAL_CASES_DIR`, `EVAL_FIXTURES_DIR` and `EVAL_RESULTS_PATH`
   exist only for the gate's own subprocess tests and are honoured only when `EVAL_ALLOW_OVERRIDES=1`,
   `NODE_ENV=test`, `CI` is unset and a per-run nonce set by `scripts/eval-gate.test.ts` matches a temp

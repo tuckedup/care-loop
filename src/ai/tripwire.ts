@@ -81,17 +81,26 @@ export const TRIPWIRE_LEXICON: readonly LexiconEntry[] = [
   },
 ];
 
-/**
- * Space-less variants, matched on text where letter-spaced words were collapsed
- * ("k i l l  m y s e l f" -> "killmyself"). Derived mechanically from the lexicon.
- */
-const SPACELESS_LEXICON: readonly LexiconEntry[] = TRIPWIRE_LEXICON.map(({ type, re }) => ({
-  type,
-  re: new RegExp(re.source.replace(/ \?/g, "").replace(/ /g, ""), re.flags),
-}));
+const BS = String.fromCharCode(92) + "b"; // the regex word-boundary token, written as text
 
-/** On collapsed text both the spaced and space-less pattern forms are tried. */
-const COLLAPSED_LEXICON: readonly LexiconEntry[] = [...TRIPWIRE_LEXICON, ...SPACELESS_LEXICON];
+const derive = (dropSpaces: boolean): readonly LexiconEntry[] =>
+  TRIPWIRE_LEXICON.map(({ type, re }) => {
+    let src = re.source.split(BS).join("");
+    if (dropSpaces) src = src.replace(/ \?/g, "").replace(/ /g, "");
+    return { type, re: new RegExp(src, re.flags) };
+  });
+
+/**
+ * Variants used ONLY on collapsed text (letter-spaced words), and only for matches that overlap a
+ * collapsed run: without word boundaries (run edges glue onto neighbours: "I k i l l ...") and
+ * with spaces kept (partly spaced phrases) or dropped (fully spaced phrases). Plain text keeps its
+ * word-boundary patterns, so these looser forms cannot cause false positives outside runs.
+ */
+const COLLAPSED_LEXICON: readonly LexiconEntry[] = [
+  ...TRIPWIRE_LEXICON,
+  ...derive(false),
+  ...derive(true),
+];
 
 const MAX_PER_FIELD = 20;
 /** Characters scanned per field. The AI layer rejects longer text before calling this. */
@@ -134,23 +143,29 @@ export function detectTripwire(input: RiskTextInput): VerifiedSignal[] {
     }
     const A = normalizeWithMap(original, { leet: true });
     const B = normalizeWithMap(original, { leet: true, blanksAsSpace: true });
-    const variants: { n: NormalizedText; lex: readonly LexiconEntry[] }[] = [
+    const variants: { n: NormalizedText; lex: readonly LexiconEntry[]; collapsed?: boolean[] }[] = [
       { n: A, lex: TRIPWIRE_LEXICON },
-      { n: collapseSpacedLetters(A), lex: COLLAPSED_LEXICON },
+      { ...(() => { const c = collapseSpacedLetters(A); return { n: c as NormalizedText, collapsed: c.inRun }; })(), lex: COLLAPSED_LEXICON },
     ];
     if (B.text !== A.text) {
       variants.push(
         { n: B, lex: TRIPWIRE_LEXICON },
-        { n: collapseSpacedLetters(B), lex: COLLAPSED_LEXICON },
+        { ...(() => { const c = collapseSpacedLetters(B); return { n: c as NormalizedText, collapsed: c.inRun }; })(), lex: COLLAPSED_LEXICON },
       );
     }
     let count = 0;
-    for (const { n: norm, lex } of variants) {
+    for (const { n: norm, lex, collapsed } of variants) {
       for (const { type, re } of lex) {
         re.lastIndex = 0;
         for (const m of norm.text.matchAll(re)) {
           const a = m.index ?? 0;
           const b = a + m[0].length;
+          if (collapsed) {
+            // On collapsed text only matches touching a collapsed run count (see COLLAPSED_LEXICON).
+            let touches = false;
+            for (let k = a; k < b; k++) if (collapsed[k]) touches = true;
+            if (!touches) continue;
+          }
           const s = norm.start[a];
           const e = norm.end[b - 1];
           if (count >= MAX_PER_FIELD) {

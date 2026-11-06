@@ -9,11 +9,11 @@
       "entries": [
         {
           "id": "controlled-alprazolam",
-          "sha256": "7f0dbc4f8a32a5c56f55d89f2ac12132210e2a87a44190353b5a78c35c58345c"
+          "sha256": "e2955a2e9628a602532859498e8c44d6ec10e1b5d6a1821a0ae41242091ab0f0"
         },
         {
           "id": "controlled-lisdexamfetamine",
-          "sha256": "ee4f0464542d169c1e77c74b99839bc5807933633927dc6f5a820e1538442629"
+          "sha256": "bc01b24691361ad232f07cf75551bad075f7ee6dce0efaa588efe65bf108ec66"
         }
       ]
     },
@@ -25,7 +25,7 @@
       "entries": [
         {
           "id": "ai-controlled-never-called",
-          "sha256": "1a9d764a4f59b53b2b4c9d8280c6a3c3e2af0edb75e464ecdff452c6e3b79d44"
+          "sha256": "f41dd07442dfa94e3708b2d24f9b1756201c148abc873141e881c730040a6ca1"
         }
       ]
     },
@@ -37,11 +37,11 @@
       "entries": [
         {
           "id": "ai-blocked-homoglyph-drug",
-          "sha256": "365f51d21846b042c19e16f5cd529ead8c25aa44828fb5edeaef90210090f27a"
+          "sha256": "ce914c27ec35d01fb59c23f62f69124439f1c51e75d1db89b53773760505a007"
         },
         {
           "id": "ai-blocked-unknown-drug",
-          "sha256": "11217ab7ce362721971745f787898d263f6c13da7e117e5694c5e6ab64b1d409"
+          "sha256": "ff6a377474cbf8374f471d1a7bc83d04b794ea62eb7d35d8f683a1436f902a90"
         }
       ]
     },
@@ -50,14 +50,18 @@
       "kind": "risk",
       "outcome": "ESCALATE",
       "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "suicidal_ideation",
+        "self_harm"
+      ],
       "entries": [
         {
           "id": "ai-buried-suicidal-ideation",
-          "sha256": "07a6a1fc26b85af462cc41324a678f4aaa5c35347ca3a76f7bbbf8a4d3c15fea"
+          "sha256": "9e77aa59692936753980e1f666eb6a5b095c32e29a3332b2e4602478a8f73e8c"
         },
         {
           "id": "ai-sarcasm-self-harm",
-          "sha256": "772879f42281b30b7e45326e15e2708d61968ae7f422469db4d25f9449ddcd3a"
+          "sha256": "9d61328d3b88a5b6e0f522faf7eeeec4a1b511c32a6a8b86936a2e0e276040fe"
         }
       ]
     },
@@ -69,7 +73,7 @@
       "entries": [
         {
           "id": "item9-positive",
-          "sha256": "bf8467284eac5d9f484881780d72bc54ccfe7b7fabdea0a03011dba76f1b7110"
+          "sha256": "71282e5d6d2f50ecabddee8090f8704cfd95894469013979e1ad200f58684659"
         }
       ]
     },
@@ -81,7 +85,7 @@
       "entries": [
         {
           "id": "pregnancy-unsure",
-          "sha256": "93e0aa2c95ea156dde17ac4a5708bca5a26f9815962d711330e236d236677529"
+          "sha256": "14893a54965fa3745dded5295c6502630087c3acc2533dc33cd080cd6bbef2ce"
         }
       ]
     },
@@ -90,10 +94,13 @@
       "kind": "risk",
       "outcome": "ESCALATE",
       "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "pregnancy_mention"
+      ],
       "entries": [
         {
           "id": "ai-pregnancy-in-passing",
-          "sha256": "74eede8f4c570eb864a3fbd479eb53dcd1df9a29a70ae52bb023041724571811"
+          "sha256": "babced2f391a6359203ba8bedcb99f9379960ee31edefd3bec85b2677df49789"
         }
       ]
     },
@@ -105,7 +112,7 @@
       "entries": [
         {
           "id": "mania-screen-positive",
-          "sha256": "4e38f02c3a2027f01961b9e042869bff42681b4fa6c197f79e29aa30641c013c"
+          "sha256": "c8280e299f9b5a56aa6ccc2efe351287f4e71bb46b028249f64e6eecca27f81e"
         }
       ]
     },
@@ -117,7 +124,7 @@
       "entries": [
         {
           "id": "severe-side-effect",
-          "sha256": "d058b933ae5ec1b4fc791c434d01bd3c2b89e9601e971799c35763bf3561a282"
+          "sha256": "13bf518ed9ad9653534114a7389e77bc798652dce95d835a4a510c3552bed2a0"
         }
       ]
     },
@@ -129,7 +136,7 @@
       "entries": [
         {
           "id": "requested-human",
-          "sha256": "9eeab9a3051ff2ab0721353594373cd4357fac14c42417f837b1e7491e1fa465"
+          "sha256": "b49c51678f6dbb7f5bb607a6e500a925ebde0ef1b89c23f40ab058694498684a"
         }
       ]
     },
@@ -141,7 +148,7 @@
       "entries": [
         {
           "id": "refill-limit-reached",
-          "sha256": "dc9bff49c7ecf685a47691edd16f8c64361f175e9818449025c29686d7284023"
+          "sha256": "513359e5444b0c28a2923a8aed12a0af8373a3cd83d34b5b9f52f6a5ec697e41"
         }
       ]
     },
@@ -153,7 +160,7 @@
       "entries": [
         {
           "id": "injection-string-with-pregnancy-unsure",
-          "sha256": "ad7b6fb9e96b9ba09536e1f64a702602ab6f3d477632762385a8b834483d32a0"
+          "sha256": "68ffd657ac1aa1e1aee628003f9100e57f02559175b0254903704973c778ce66"
         }
       ]
     },
@@ -165,7 +172,7 @@
       "entries": [
         {
           "id": "ai-injection-model-silent",
-          "sha256": "b9484ce17b13e10ebbad8d11a956a8c173e8685d56c70af493d95381b6b77dae"
+          "sha256": "829850c1aa3054d23c20f59fdf0823c7b475f4402eb2457093d30b9ce9ba5dfe"
         }
       ]
     },
@@ -177,7 +184,7 @@
       "entries": [
         {
           "id": "ai-injection-model-obeys",
-          "sha256": "445fb5d8ad544056b6247722ef142baef024d67de9f077e3c41e2b0067e2d69a"
+          "sha256": "92122369a8ecc4808658e594ef2e281ae0422ee389d92aa77d47894f00317205"
         }
       ]
     },
@@ -189,15 +196,15 @@
       "entries": [
         {
           "id": "ai-llm-timeout",
-          "sha256": "00c877cb34da2b4e3137485607322af87e3d1aec567b934f79d77aa2322c336a"
+          "sha256": "185e018d3e4b911504d7ae6e8e335ab9628d9d31da6c5f1ac43316059a6ce1db"
         },
         {
           "id": "ai-llm-http-500",
-          "sha256": "00c877cb34da2b4e3137485607322af87e3d1aec567b934f79d77aa2322c336a"
+          "sha256": "b6f040661adb880fbcba5cb30da9f3402d3b37efb9ad8b3368ff8192e2a228eb"
         },
         {
           "id": "ai-malformed-json",
-          "sha256": "00c877cb34da2b4e3137485607322af87e3d1aec567b934f79d77aa2322c336a"
+          "sha256": "2f7f292b16cce6685c34af55d0df521930daeb4a65f9f255120d1854983ded56"
         }
       ]
     },
@@ -209,55 +216,55 @@
       "entries": [
         {
           "id": "ai-silent-model-emoji-prefix",
-          "sha256": "73f50f4f75913f579de5216ce6cb2c4e366f1fbe68202cb3646229a7f97af183"
+          "sha256": "867a32a03cd5ab507d1d0b8941315d8b7e79b1d46d656d485a534adc3e70a151"
         },
         {
           "id": "ai-silent-model-end-my-life",
-          "sha256": "bd235ecee707cc9e59c911ae68d24b24a790a0bb5bec5ca3a83dae5e95ebc7d1"
+          "sha256": "f912aaa16f6fd7a8b669c189b6cc4d4c96ba45c019c4c941cbe5056e8d10d077"
         },
         {
           "id": "ai-silent-model-hang-myself",
-          "sha256": "e3594e449d706a3944dd41a0616bc91d2a89f48a9b8c421fba2219340bfd95e7"
+          "sha256": "93cfc236ff892c550aab24486ef9a7844eba1258837325525fbc5166f7ed64c2"
         },
         {
           "id": "ai-silent-model-harm-others",
-          "sha256": "d54114f7a187808fedfffa2d3631ff9b8cd9678928a0c827a652115e0cb8eb06"
+          "sha256": "04b75b9fd1702e878cbc435a4ef001c5a81096a1e0108f2a2f1d1d1ac38998dd"
         },
         {
           "id": "ai-silent-model-homoglyph-suicide",
-          "sha256": "1f5ea3da9f841044f7ec4270d9cb44597318bd6fdde7dd3c881f468036f16045"
+          "sha256": "64acdc00b007716c21a263cb1ace10e3c67b66184e0b4b341d4c63e46752a059"
         },
         {
           "id": "ai-silent-model-kill-them",
-          "sha256": "c23c21817063a75b9d065ad64ac1e1daac370e87e501bbddbd6d391be6e158fe"
+          "sha256": "fed4d013659bdd9b25dcd4e1b234f461b93b04354c863e50cf2e99f05dc83f15"
         },
         {
           "id": "ai-silent-model-leetspeak",
-          "sha256": "4bef83139922c20d9136be27b2b87d5569f5aba2d47572cf44c5483b21a14b64"
+          "sha256": "645874dfd667bb1c1d60a5d3c585e7ad5c2c085ba75f39c4b3e6f7d498b6f7a6"
         },
         {
           "id": "ai-silent-model-no-point",
-          "sha256": "bab67090b23ac524b7bec32db1282bd900c82ed98a8bb91bc43f5bdea63141ad"
+          "sha256": "fbe236b15d0bfe96cf02a3b0a96e6ec71a80e45ee6f7894281bd69246067ca9c"
         },
         {
           "id": "ai-silent-model-overdose",
-          "sha256": "5a89b3776faa8ba6a329b4f651c753aff8d0c9c601c19a340db935625126d680"
+          "sha256": "c0afba6e7ffa90523dc1f266a28f59138e1b7faabe4f2789a149a0e2838d9368"
         },
         {
           "id": "ai-silent-model-take-own-life",
-          "sha256": "2b16cf500caa82190fe07e21897bea3c1be53964c117d3baa7595bc745c8c64e"
+          "sha256": "bc782f729f4d9cf198b40d15c3b034267bca06e4db623a1a0ddc5a9d71621f71"
         },
         {
           "id": "ai-silent-model-too-many-pills",
-          "sha256": "21abb26e298a5ec067525e2043c6e39b23527c8f761fd088af2dda3a3d42be5b"
+          "sha256": "f31e37306d76c644a9af1c00e5a4f36d9c4e5d8bb01dae77ee42ecad7cb8768a"
         },
         {
           "id": "ai-silent-model-want-to-die",
-          "sha256": "47411ead89966620237d08402f9b93569a7fade125bfa97d8a925d125fbf8a3f"
+          "sha256": "6223c9e64836c2c84553bc6fb75c0ba3d319bada0ba31ce7f3deddfca637cffb"
         },
         {
           "id": "ai-silent-model-wish-dead",
-          "sha256": "50ead911e320c8085338e1251c346e5850ba131cf62e32a615ab88369aeea0ef"
+          "sha256": "e6dd764f1ca5b8957afc7579d9c031a97f8b81da0b473c94fab406d118ccab1e"
         }
       ]
     },
@@ -268,22 +275,22 @@
       "entries": [
         {
           "id": "clean-renewal-fluoxetine",
-          "sha256": "2f25923a2c0bd09234867822be2faac281544aa7725a4f3acd52b48f01a0c642"
+          "sha256": "849c1b1dc779cf6818acdb37709efb88bb5b6b36d5de2288f18b0b38b8e3150a"
         }
       ]
     },
     {
       "requirement": "benign-clean (AI path, no signals)",
-      "kind": "benign-clean",
+      "kind": "benign-clean-ai",
       "outcome": "AUTO_ELIGIBLE",
       "entries": [
         {
           "id": "ai-benign-no-signals",
-          "sha256": "068f0621065d1f776e190faed1bdf30ed36d01d172b1d82e5bcc8c6330734986"
+          "sha256": "bd554626168837231ff2a80409cd392e0106c26ba197c537b991c230cc860ee4"
         },
         {
           "id": "ai-benign-phone-died",
-          "sha256": "be4c6e86964c1ca9db42478c04e30687fa9cb9a6646f80b2d9febd1cf380518e"
+          "sha256": "7068e9dd70c8d6691680c9cadbac6929f5ac258a32869a5723680b29383bebc3"
         }
       ]
     },
@@ -295,7 +302,7 @@
       "entries": [
         {
           "id": "hydroxyzine-always-escalate",
-          "sha256": "db54a3d03ac83c425ba8afa387c726389201ea0587e2237f1fae993aa344947e"
+          "sha256": "4a44cf7df9f91aea0115f78687b08f4559fcc94edb4ec7adc1e974898278968a"
         }
       ]
     },
@@ -307,7 +314,7 @@
       "entries": [
         {
           "id": "trazodone-over-150mg",
-          "sha256": "b59d0934134eb04c24b511a5a61f7067d13cb2e92419577ddfe78e2b72105866"
+          "sha256": "eb616b6709b38f62fe1d6b2763ebaec3a8a01dd72c98fc04b9ffd98b0bc1a11c"
         }
       ]
     },
@@ -319,11 +326,11 @@
       "entries": [
         {
           "id": "mirtazapine-monitoring-missing",
-          "sha256": "2f2adc4665a32e1fa5e8d08429429316e565fb0fc4001365dc2856e0e6f15326"
+          "sha256": "54eff9c897be228e7646df98887a598ede0b4cfb334a42e9e1333704a36b14d4"
         },
         {
           "id": "mirtazapine-six-month-missing",
-          "sha256": "2f2adc4665a32e1fa5e8d08429429316e565fb0fc4001365dc2856e0e6f15326"
+          "sha256": "c8a779cab126d491a3be8ee4c99d3f8a59658027f0bde43e1d05bcbd655833d0"
         }
       ]
     },
@@ -335,7 +342,7 @@
       "entries": [
         {
           "id": "identity-not-verified",
-          "sha256": "104d236fe2735751b7d6d5e4755e10e11942167d79f2738bc818dec4cf788842"
+          "sha256": "32ee66de5aa670289bb26251c997213f8b12371943057dd3225b4e20f5ade82c"
         }
       ]
     },
@@ -347,7 +354,7 @@
       "entries": [
         {
           "id": "not-on-formulary-synthetic-drug",
-          "sha256": "c8491bf225a5b83766ddc633562b4c8562ac30436e6f452e40666dab0b188bd2"
+          "sha256": "f9fefe5e5aa1e80adc3fb672774cf9dfeac15996b38fd9c8ff30ee1bc9341265"
         }
       ]
     }
