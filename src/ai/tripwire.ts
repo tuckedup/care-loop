@@ -13,7 +13,13 @@
 // original text, a signal covering the whole (capped) field is emitted instead. Text beyond
 // SCAN_LIMIT is not scanned; a fallback signal over the field start is emitted for it.
 import { FREE_TEXT_MAX } from "@/domain/events";
-import { collapseSpacedLetters, normalizeWithMap, type NormalizedText } from "./normalize";
+import {
+  collapseSpacedLetters,
+  collapseSpacedLettersLegacy,
+  lettersOnly,
+  normalizeWithMap,
+  type NormalizedText,
+} from "./normalize";
 import { MAX_QUOTE_LENGTH, SOURCE_FIELDS, type RiskTextInput, type SignalType } from "./types";
 import type { VerifiedSignal } from "./verify-quotes";
 
@@ -83,26 +89,65 @@ export const TRIPWIRE_LEXICON: readonly LexiconEntry[] = [
 
 const BS = String.fromCharCode(92) + "b"; // the regex word-boundary token, written as text
 
-const derive = (dropSpaces: boolean): readonly LexiconEntry[] =>
+const derive = (dropBoundaries: boolean, dropSpaces: boolean): readonly LexiconEntry[] =>
   TRIPWIRE_LEXICON.map(({ type, re }) => {
-    let src = re.source.split(BS).join("");
+    let src = dropBoundaries ? re.source.split(BS).join("") : re.source;
     if (dropSpaces) src = src.replace(/ \?/g, "").replace(/ /g, "");
     return { type, re: new RegExp(src, re.flags) };
   });
 
 /**
- * Variants used ONLY on collapsed text (letter-spaced words), and only for matches that overlap a
- * collapsed run: without word boundaries (run edges glue onto neighbours: "I k i l l ...") and
- * with spaces kept (partly spaced phrases) or dropped (fully spaced phrases). Plain text keeps its
- * word-boundary patterns, so these looser forms cannot cause false positives outside runs.
+ * RUN-TOGETHER variants (word boundaries kept, spaces removed: "killmyself", "betteroffdead").
+ * Applied to ALL normalised text, plain or collapsed, exactly as the ce058db tripwire did, so
+ * run-together phrases never regress. Trade-off inherited from ce058db: a whole-word token such
+ * as "killme" fires; the \b edges keep it from firing inside longer words.
  */
-const COLLAPSED_LEXICON: readonly LexiconEntry[] = [
-  ...TRIPWIRE_LEXICON,
-  ...derive(false),
-  ...derive(true),
+const RUN_TOGETHER: readonly LexiconEntry[] = [...TRIPWIRE_LEXICON, ...derive(false, true)];
+
+/**
+ * Looser variants, used ONLY on collapsed text (letter-spaced words) and only for matches that
+ * touch a collapsed run: no word boundaries (run edges glue onto neighbours: "I k i l l ..."),
+ * spaces kept (partly spaced phrases) or dropped (fully spaced phrases).
+ */
+const COLLAPSED_LOOSE: readonly LexiconEntry[] = [...derive(true, false), ...derive(true, true)];
+
+/**
+ * SQUEEZED scan: for LONG phrases only (8+ letters once spaces are removed), irregularly spaced
+ * text ("s uicide", "k ill myself", "suic i d e", "sui cide") is caught by dropping every
+ * non-letter between letters and matching without boundaries. The match must start at the start
+ * of a word and end at the end of a word of the normalised text, which stops "friend my life" from
+ * matching "endmylife". Short words (die, kms, dead, unalive) are deliberately NOT squeezed, to
+ * avoid "audience"-type false positives.
+ */
+const SQUEEZE_LEXICON: readonly LexiconEntry[] = [
+  { type: "suicidal_ideation", re: /suicid(?:e|al)/g },
+  { type: "suicidal_ideation", re: /kill(?:ing)?myself/g },
+  { type: "suicidal_ideation", re: /betteroffdead/g },
+  { type: "suicidal_ideation", re: /wish(?:ed|ing)?(?:that)?i(?:was|were|couldbe)dead/g },
+  { type: "suicidal_ideation", re: /end(?:ing)?my(?:own)?life/g },
+  { type: "suicidal_ideation", re: /tak(?:e|ing)my(?:own)?life/g },
+  { type: "suicidal_ideation", re: /noreasontolive/g },
+  { type: "suicidal_ideation", re: /nopoint(?:in|to)(?:living|life|goingon|anything)/g },
+  { type: "suicidal_ideation", re: /(?:not|n'?t)worthliving/g },
+  { type: "suicidal_ideation", re: /(?:don'?t|donot|dont)(?:wantto|wanna)(?:live|bealive)/g },
+  { type: "suicidal_ideation", re: /(?:don'?t|donot|dont)(?:wantto|wanna)wakeup/g },
+  { type: "self_harm", re: /selfharm(?:ing)?/g },
+  {
+    type: "self_harm",
+    re: /(?:hurt|hurting|harm|harming|cut|cutting|hang|hanging|shoot|shooting|stab|stabbing|drown|drowning|poison|poisoning|burn|burning)myself/g,
+  },
+  { type: "self_harm", re: /overdos(?:e|ed|es|ing)/g },
+  { type: "self_harm", re: /toomany(?:pills|tablets|meds|medications)/g },
+  { type: "self_harm", re: /sl(?:it|itting)(?:my)?(?:wrists?|throat)/g },
+  { type: "self_harm", re: /jump(?:ing)?off(?:a|the|my|this)/g },
+  {
+    type: "harm_to_others",
+    re: /kill(?:ing)?(?:themselves|themself|himself|herself|someone|somebody|everyone|people|my(?:husband|wife|boss|kids?|children))/g,
+  },
+  { type: "harm_to_others", re: /(?:hurt|hurting|harm|harming)(?:someone|somebody|otherpeople|others)/g },
 ];
 
-const MAX_PER_FIELD = 20;
+const MAX_PER_FIELD = 40;
 /** Characters scanned per field. The AI layer rejects longer text before calling this. */
 export const SCAN_LIMIT = FREE_TEXT_MAX * 4;
 
@@ -143,16 +188,24 @@ export function detectTripwire(input: RiskTextInput): VerifiedSignal[] {
     }
     const A = normalizeWithMap(original, { leet: true });
     const B = normalizeWithMap(original, { leet: true, blanksAsSpace: true });
-    const variants: { n: NormalizedText; lex: readonly LexiconEntry[]; collapsed?: boolean[] }[] = [
-      { n: A, lex: TRIPWIRE_LEXICON },
-      { ...(() => { const c = collapseSpacedLetters(A); return { n: c as NormalizedText, collapsed: c.inRun }; })(), lex: COLLAPSED_LEXICON },
+    type Variant = { n: NormalizedText; lex: readonly LexiconEntry[]; collapsed?: boolean[] };
+    const looseCollapsed = (n: NormalizedText): Variant[] => {
+      const c = collapseSpacedLetters(n);
+      return [{ n: c, lex: COLLAPSED_LOOSE, collapsed: c.inRun }];
+    };
+    // Order matters under the per-field cap: the ce058db behaviour comes first.
+    const variants: Variant[] = [
+      { n: A, lex: RUN_TOGETHER },
+      { n: collapseSpacedLettersLegacy(A), lex: RUN_TOGETHER },
+      ...(B.text !== A.text
+        ? [
+            { n: B, lex: RUN_TOGETHER },
+            { n: collapseSpacedLettersLegacy(B), lex: RUN_TOGETHER },
+          ]
+        : []),
+      ...looseCollapsed(A),
+      ...(B.text !== A.text ? looseCollapsed(B) : []),
     ];
-    if (B.text !== A.text) {
-      variants.push(
-        { n: B, lex: TRIPWIRE_LEXICON },
-        { ...(() => { const c = collapseSpacedLetters(B); return { n: c as NormalizedText, collapsed: c.inRun }; })(), lex: COLLAPSED_LEXICON },
-      );
-    }
     let count = 0;
     for (const { n: norm, lex, collapsed } of variants) {
       for (const { type, re } of lex) {
@@ -178,6 +231,31 @@ export function detectTripwire(input: RiskTextInput): VerifiedSignal[] {
               ? push(type, 0, Math.min(original.length, MAX_QUOTE_LENGTH))
               : push(type, s, e);
           if (added) count++;
+        }
+      }
+    }
+
+    // Squeezed scan (long phrases only), see SQUEEZE_LEXICON.
+    const sq = lettersOnly(A);
+    const isLetterAt = (k: number) => /^[a-z]$/.test(A.text[k] ?? "");
+    for (const { type, re } of SQUEEZE_LEXICON) {
+      re.lastIndex = 0;
+      for (const m of sq.text.matchAll(re)) {
+        const a0 = m.index ?? 0;
+        const b0 = a0 + m[0].length;
+        const first = sq.idx[a0];
+        const last = sq.idx[b0 - 1];
+        if (first === undefined || last === undefined) {
+          push(type, 0, Math.min(original.length, MAX_QUOTE_LENGTH)); // never drop silently
+          continue;
+        }
+        if (isLetterAt(first - 1) || isLetterAt(last + 1)) continue; // must be whole words
+        const s0 = A.start[first];
+        const e0 = A.end[last];
+        if (s0 === undefined || e0 === undefined || e0 <= s0) {
+          push(type, 0, Math.min(original.length, MAX_QUOTE_LENGTH));
+        } else {
+          push(type, s0, e0);
         }
       }
     }

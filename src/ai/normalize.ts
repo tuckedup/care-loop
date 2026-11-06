@@ -214,3 +214,62 @@ export function collapseSpacedLetters(n: NormalizedText): CollapsedText {
   }
   return { text: chars.join(""), start, end, inRun };
 }
+
+/**
+ * LEGACY collapse (the ce058db algorithm), kept unchanged so recall can never regress against it:
+ * tokens are letters bounded by spaces, only single narrow spaces join a run, and a run needs two
+ * or more tokens. The newer, broader `collapseSpacedLetters` runs in addition to this one.
+ */
+export function collapseSpacedLettersLegacy(n: NormalizedText): NormalizedText {
+  const t = n.text;
+  const keep: boolean[] = new Array<boolean>(t.length).fill(true);
+  let i = 0;
+  while (i < t.length) {
+    const isTok = (j: number) =>
+      LETTER.test(t[j] ?? "") &&
+      (j === 0 || t[j - 1] === " ") &&
+      (j + 1 === t.length || t[j + 1] === " ");
+    if (!isTok(i)) {
+      i += 1;
+      continue;
+    }
+    const spaces: number[] = [];
+    let j = i;
+    let count = 1;
+    const narrow = (sp: number) => (n.end[sp] ?? 0) - (n.start[sp] ?? 0) === 1;
+    while (j + 2 < t.length && t[j + 1] === " " && narrow(j + 1) && isTok(j + 2)) {
+      spaces.push(j + 1);
+      j += 2;
+      count += 1;
+    }
+    if (count >= 2) for (const sp of spaces) keep[sp] = false;
+    i = j + 1;
+  }
+  const chars: string[] = [];
+  const start: number[] = [];
+  const end: number[] = [];
+  for (let k = 0; k < t.length; k++) {
+    if (!keep[k]) {
+      if (end.length > 0) end[end.length - 1] = n.end[k] ?? (end[end.length - 1] as number);
+      continue;
+    }
+    chars.push(t[k] as string);
+    start.push(n.start[k] as number);
+    end.push(n.end[k] as number);
+  }
+  return { text: chars.join(""), start, end };
+}
+
+/** Letters only (a-z) of a normalised text, with the index of each letter in that text. */
+export function lettersOnly(n: NormalizedText): { text: string; idx: number[] } {
+  const chars: string[] = [];
+  const idx: number[] = [];
+  for (let k = 0; k < n.text.length; k++) {
+    const c = n.text[k] as string;
+    if (LETTER.test(c)) {
+      chars.push(c);
+      idx.push(k);
+    }
+  }
+  return { text: chars.join(""), idx };
+}

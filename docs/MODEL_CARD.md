@@ -34,17 +34,29 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 - The model can miss risk. A model that returns no signals for risky text is only caught if a
   tripwire phrase happens to match; a structured check-in answer is the other safeguard.
-- What the tripwire normalisation DOES handle: case, accents, many Cyrillic/Greek/Latin look-alikes
-  (dotless i, small capitals), digit look-alikes ("k1ll"), invisible/blank characters (Hangul
-  fillers, Braille blank, zero-width), and letter-spaced words, i.e. two or more single letters
-  separated by whitespace of any width, also with trailing punctuation, brackets, preceding
-  one-letter words or whole-sentence spacing ("s u i c i d e.", "(k i l l  m y s e l f)",
-  "I w a n t t o d i e"). Matches on spaced text must touch the spaced run; plain text keeps its
-  stricter word-boundary patterns.
+- What the tripwire DOES handle (all heuristic, escalation-only, not clinically validated):
+  case, accents, many Cyrillic/Greek/Latin look-alikes (dotless i, small capitals), digit
+  look-alikes ("k1ll"), invisible/blank characters (Hangul fillers, Braille blank, zero-width);
+  run-together phrases ("killmyself", "I will killmyself", "betteroffdead", "nopointinliving"),
+  which the original ce058db tripwire already caught and which a differential test now guarantees
+  cannot regress (see below); letter-spaced words, i.e. two or more single letters separated by
+  whitespace of any width, also with trailing punctuation, brackets, preceding one-letter words or
+  whole-sentence spacing ("s u i c i d e.", "(k i l l  m y s e l f)", "I w a n t t o d i e"); and
+  irregular spacing INSIDE LONG phrases of 8+ letters ("s uicide", "k ill myself", "suic i d e",
+  "no point in liv ing"), via a "squeezed" scan that must start and end on word boundaries.
+- Recall invariant: the current tripwire flags a SUPERSET of what ce058db flagged. A frozen copy
+  of that version (`src/ai/__fixtures__/tripwire-ce058db.ts`, a regression oracle) is compared
+  against the current code on a lexicon-by-noise corpus and 5,000 seeded random strings. The
+  run-together patterns keep ce058db's trade-off: whole-word tokens such as "killme" fire.
+  A 200-sentence benign corpus (deterministic cross product of ordinary check-in sentences and
+  tricky look-alike words such as "audience", "diet", "friend my life") gains no false positives
+  relative to ce058db.
 - What it still does NOT handle (known misses, non-exhaustive):
+  - irregular spacing of SHORT words and phrases (under 8 letters once spaces are removed), e.g.
+    "d ie", "di e", "d e a d", "k m s", "u n a l i v e" written with gaps in odd places; short
+    words are deliberately not squeezed because it would make "audience"-type false positives;
   - letter-spacing with punctuation or other separators ("s.u.i.c.i.d.e", "s-u-i-c-i-d-e",
-    "s_u_i_c_i_d_e"), or spacing broken by a stray character or a zero-width character
-    between letters;
+    "s_u_i_c_i_d_e"), or a zero-width/blank character between letters of a spaced word;
   - spaced phrases that contain an apostrophe or hyphen ("c a n ' t g o o n", "s e l f - h a r m");
   - look-alikes outside the small mapped set (most other scripts), reversed or encoded text
     (rot13, base64, leetspeak beyond simple digits), abbreviations other than "kms";
@@ -52,7 +64,8 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
     would miss me less"); methods not listed; deliberate misspellings beyond the substitutions
     above; risk expressed only through context.
   - Over-escalation: the lists also fire on innocent uses of their words (e.g. "die", "overdose"
-    asked about as a safety question) and on spaced single letters that happen to spell a phrase.
+    asked about as a safety question), on whole-word tokens like "killme", and on spaced single
+    letters or squeezed word sequences that happen to spell a phrase.
 - The tripwire lexicons are small, English-only and not exhaustive; they will miss many phrasings
   and over-escalate on some innocent uses of the same words. Not clinically validated.
 - Offsets from a live model are often wrong, which makes real signals unverifiable (they still
@@ -97,7 +110,9 @@ Every file in `evals/fixtures/` is a canned model response WRITTEN BY HAND by th
 show that the pipeline handles those responses correctly, not how any real model behaves.
 `pnpm eval:live` runs the same cases against the real API (needs `ANTHROPIC_API_KEY` and
 `ANTHROPIC_MODEL`); it is implemented but has NOT been run or tested in this repo.
-Fixture-only cases (simulated failures, fooled-model outputs) are skipped in live mode.
+In live mode, fixture-only cases (simulated failures, fooled-model outputs) are skipped, but
+cases whose medication is blocked from the AI path always run, because they make no model call and
+the gate requires at least two of them.
 Rules-only cases (no `aiFixture`) assume an "ok, no signals" AI result.
 
 `evals/results/latest.json` carries `fixtureKind: "synthetic-handwritten"` and `liveModelRun: false`

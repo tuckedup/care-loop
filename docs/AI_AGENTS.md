@@ -68,3 +68,12 @@ cannot be mistaken for a live-model result.
 
 Cases in `evals/cases/*.json` are labeled by a human from the SPEC rules, never from model or code
 output, and must not be weakened to make a run pass. Commit `evals/results/latest.json` with the change.
+
+## Tripwire recall guard
+
+The local tripwire (`src/ai/tripwire.ts`) may only ADD signals, and its recall may not regress:
+`src/ai/tripwire-differential.test.ts` asserts that every span flagged by the frozen ce058db
+version (`src/ai/__fixtures__/tripwire-ce058db.ts`, a regression oracle that must not be edited) is
+also covered by the current tripwire. Do not weaken that test to land a lexicon change. The
+`scripts/eval-gate.test.ts` subprocess tests use asynchronous `spawn`, not `spawnSync`, because a
+blocking child process starves vitest's worker RPC channel and the run exits non-zero.

@@ -1,6 +1,6 @@
 // Proves the eval gate fails closed: zero cases, invalid cases, recall < 1, no AI cases, and
 // unchecked or invalid citations all fail `pnpm eval`.
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
   cpSync,
@@ -54,34 +54,43 @@ function cleanEnv(): NodeJS.ProcessEnv {
   return e;
 }
 
+/**
+ * Runs a child process WITHOUT blocking the event loop (spawnSync would starve vitest's worker RPC
+ * channel and make the run exit non-zero with "Timeout calling onTaskUpdate").
+ */
+function runNode(
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolveP, reject) => {
+    const child = spawn(process.execPath, args, { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (d: string) => (stdout += d));
+    child.stderr.setEncoding("utf8").on("data", (d: string) => (stderr += d));
+    child.on("error", reject);
+    child.on("close", (status) => resolveP({ status, stdout, stderr }));
+  });
+}
+
 /** Runs the real eval suite (same config as `pnpm eval`) against a case dir. */
-function runEval(
+async function runEval(
   casesDir: string,
   fixturesDir?: string,
   extraEnv: Record<string, string> = {},
 ) {
   const results = join(mk(), "latest.json");
-  const r = spawnSync(
-    process.execPath,
-    [
-      join(root, "node_modules", "vitest", "vitest.mjs"),
-      "run",
-      "--config",
-      "vitest.eval.config.ts",
-    ],
+  const r = await runNode(
+    [join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"],
     {
-      cwd: root,
-      encoding: "utf8",
-      env: {
-        ...cleanEnv(),
-        EVAL_ALLOW_OVERRIDES: "1",
-        NODE_ENV: "test",
-        ...nonceEnv(),
-        EVAL_CASES_DIR: casesDir,
-        EVAL_RESULTS_PATH: results,
-        ...(fixturesDir ? { EVAL_FIXTURES_DIR: fixturesDir } : {}),
-        ...extraEnv,
-      },
+      ...cleanEnv(),
+      EVAL_ALLOW_OVERRIDES: "1",
+      NODE_ENV: "test",
+      ...nonceEnv(),
+      EVAL_CASES_DIR: casesDir,
+      EVAL_RESULTS_PATH: results,
+      ...(fixturesDir ? { EVAL_FIXTURES_DIR: fixturesDir } : {}),
+      ...extraEnv,
     },
   );
   return { status: r.status, out: `${r.stdout}\n${r.stderr}`, results };
@@ -221,40 +230,40 @@ describe("eval gate (unit)", () => {
 });
 
 describe("pnpm eval process exit code", () => {
-  it("fails (non-zero) on an empty case directory", () => {
-    const r = runEval(mk());
+  it("fails (non-zero) on an empty case directory", async () => {
+    const r = await runEval(mk());
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/zero cases/);
   }, 120_000);
 
-  it("fails (non-zero) when a mislabelled case makes recall < 1", () => {
+  it("fails (non-zero) when a mislabelled case makes recall < 1", async () => {
     const d = mk();
     // Clean renewal labeled ESCALATE: the system says AUTO_ELIGIBLE, so recall is 0.
     const c = readCase("clean-renewal-fluoxetine");
     c.expected = { outcome: "ESCALATE", reasonCodes: ["PHQ9_ITEM9_POSITIVE"] };
     writeFileSync(join(d, "clean-renewal-fluoxetine.json"), JSON.stringify(c));
-    const r = runEval(d);
+    const r = await runEval(d);
     expect(r.status).not.toBe(0);
     const written = readResults(r.results);
     expect(written.escalationRecall).toBe(0);
     expect(written.gate).toBe("fail");
   }, 120_000);
 
-  it("fails when all AI cases are deleted (only rules-only cases remain)", () => {
+  it("fails when all AI cases are deleted (only rules-only cases remain)", async () => {
     const rulesOnly = readdirSync(casesSrc)
       .filter((f) => f.endsWith(".json"))
       .map((f) => f.replace(/\.json$/, ""))
       .filter((id) => readCase(id).aiFixture === undefined);
     expect(rulesOnly.length).toBeGreaterThan(8);
     const s = stage(rulesOnly);
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     const written = readResults(r.results);
     expect(written.aiCases).toBe(0);
     expect(written.gate).toBe("fail");
   }, 120_000);
 
-  it("fails when citation validity < 1 (model quote not in the text)", () => {
+  it("fails when citation validity < 1 (model quote not in the text)", async () => {
     const bad = JSON.stringify({
       signals: [
         { type: "self_harm", quote: "never said this", sourceField: "freeText", start: 0, end: 15 },
@@ -263,17 +272,17 @@ describe("pnpm eval process exit code", () => {
     const s = stage(["ai-buried-suicidal-ideation"], {
       "ai-buried-suicidal-ideation": fixtureWith(bad),
     });
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     const written = readResults(r.results);
     expect(written.citationValidity).toBe(0);
     expect(written.gate).toBe("fail");
   }, 120_000);
 
-  it("fails when AI cases exist but no model signal was citation-checked", () => {
+  it("fails when AI cases exist but no model signal was citation-checked", async () => {
     // Only a tripwire-caught case with a silent model: outcome is right, but nothing was checked.
     const s = stage(["ai-silent-model-want-to-die"]);
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     const written = readResults(r.results);
     expect(written.aiCases).toBe(1);
@@ -282,8 +291,8 @@ describe("pnpm eval process exit code", () => {
     expect(r.out).toMatch(/citation-checked/);
   }, 120_000);
 
-  it("passes on the committed cases and labels the results as non-live", () => {
-    const r = runEval(casesSrc, fixturesSrc);
+  it("passes on the committed cases and labels the results as non-live", async () => {
+    const r = await runEval(casesSrc, fixturesSrc);
     expect(r.status).toBe(0);
     const written = readResults(r.results);
     expect(written.escalationRecall).toBe(1);
@@ -328,33 +337,33 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(gateFailures(calls).join()).toMatch(/LLM call/);
   });
 
-  it("deleting the controlled-substance AI case fails the gate", () => {
+  it("deleting the controlled-substance AI case fails the gate", async () => {
     const ids = committed().filter((id) => id !== "ai-controlled-never-called");
     const s = stage(ids);
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/required case missing: ai-controlled-never-called/);
   }, 120_000);
 
-  it("deleting a tripwire silent-model case fails the gate", () => {
+  it("deleting a tripwire silent-model case fails the gate", async () => {
     const ids = committed().filter((id) => id !== "ai-silent-model-want-to-die");
     const s = stage(ids);
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/required case missing: ai-silent-model-want-to-die/);
   }, 120_000);
 
-  it("deleting any single case drops below the floor", () => {
+  it("deleting any single case drops below the floor", async () => {
     const ids = committed();
     const s = stage(ids.filter((id) => id !== "phq9-total-15"));
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/manifest requires at least/);
   }, 120_000);
 
-  it("path overrides under CI fail the gate (and write nothing)", () => {
+  it("path overrides under CI fail the gate (and write nothing)", async () => {
     const resultsFile = join(mk(), "ci-latest.json");
-    const r = runEval(casesSrc, fixturesSrc, { CI: "1", EVAL_RESULTS_PATH: resultsFile });
+    const r = await runEval(casesSrc, fixturesSrc, { CI: "1", EVAL_RESULTS_PATH: resultsFile });
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/overrides set but not permitted/);
     expect(existsSync(resultsFile)).toBe(false);
@@ -369,17 +378,13 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(envGuardFailures({})).toEqual([]);
   });
 
-  it("EVAL_LIVE=1 without credentials fails before running and leaves latest.json untouched", () => {
+  it("EVAL_LIVE=1 without credentials fails before running and leaves latest.json untouched", async () => {
     const latest = join(root, "evals", "results", "latest.json");
     const live = join(root, "evals", "results", "live-latest.json");
     const before = readFileSync(latest, "utf8");
     const liveBefore = existsSync(live) ? readFileSync(live, "utf8") : null;
     // No overrides here: the real default paths are in play.
-    const r = spawnSync(
-      process.execPath,
-      [join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"],
-      { cwd: root, encoding: "utf8", env: { ...cleanEnv(), EVAL_LIVE: "1" } },
-    );
+    const r = await runNode([join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"], { ...cleanEnv(), EVAL_LIVE: "1" });
     expect(r.status).not.toBe(0);
     expect(`${r.stdout}${r.stderr}`).toMatch(/EVAL_LIVE=1 requires ANTHROPIC_API_KEY/);
     expect(readFileSync(latest, "utf8")).toBe(before);
@@ -401,13 +406,13 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     return s;
   };
 
-  it("REPRO: editing the emoji-prefix tripwire case to harmless text with AUTO_ELIGIBLE fails the gate", () => {
+  it("REPRO: editing the emoji-prefix tripwire case to harmless text with AUTO_ELIGIBLE fails the gate", async () => {
     const s = stageEdited((cases) => {
       const c = cases.get("ai-silent-model-emoji-prefix")!;
       c.input.freeText = "hello";
       c.expected = { outcome: "AUTO_ELIGIBLE", reasonCodes: [] };
     });
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/edited without a manifest update: ai-silent-model-emoji-prefix/);
     expect(r.out).toMatch(/label is not ESCALATE/);
@@ -415,42 +420,42 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(readResults(r.results).gate).toBe("fail");
   }, 120_000);
 
-  it("editing only a label (same text) is caught by the pin", () => {
+  it("editing only a label (same text) is caught by the pin", async () => {
     const s = stageEdited((cases) => {
       cases.get("item9-positive")!.expected.reasonCodes = ["PHQ9_ITEM9_POSITIVE", "PHQ9_TOTAL_HIGH"];
     });
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/edited without a manifest update: item9-positive/);
   }, 120_000);
 
-  it("a tripwire case where the model DOES return a signal no longer demonstrates the tripwire", () => {
+  it("a tripwire case where the model DOES return a signal no longer demonstrates the tripwire", async () => {
     const model = JSON.stringify({
       signals: [{ type: "suicidal_ideation", quote: "die", sourceField: "freeText", start: 0, end: 3 }],
     });
     const fx = { ...readFx("ai-silent-model-want-to-die"), response: { type: "text", text: model } };
     const s = stageEdited(() => ({ "ai-silent-model-want-to-die": fx }));
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/does not demonstrate \W*silent model/);
   }, 120_000);
 
-  it("a controlled case whose medication is no longer blocked fails the gate", () => {
+  it("a controlled case whose medication is no longer blocked fails the gate", async () => {
     const s = stageEdited((cases) => {
       const c = cases.get("ai-controlled-never-called")!;
       c.med = { rxcui: "4493", name: "fluoxetine", doseMg: 20, frequency: "daily", controlledSchedule: null, formularyId: "fluoxetine" };
       c.history.activeOrder = { status: "active", intent: "order", rxcui: "4493" };
       c.expected = { outcome: "ESCALATE", reasonCodes: ["LLM_RISK_SIGNAL"] };
     });
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/edited without a manifest update: ai-controlled-never-called/);
   }, 120_000);
 
-  it("an llm-failure case that no longer fails is caught (fixture now returns valid JSON)", () => {
+  it("an llm-failure case that no longer fails is caught (fixture now returns valid JSON)", async () => {
     const fx = { ...readFx("ai-malformed-json"), response: { type: "text", text: '{"signals":[]}' } };
     const s = stageEdited(() => ({ "ai-malformed-json": fx }));
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/ai-malformed-json/);
   }, 120_000);
@@ -498,22 +503,14 @@ describe("coverage floor, environment guard and live mode (process level)", () =
   });
 
   // ---- Override marker and latest.json protection ----
-  it("EVAL_ALLOW_OVERRIDES=1 alone (no test nonce) cannot run on foreign directories", () => {
-    const r = spawnSync(
-      process.execPath,
-      [join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"],
-      {
-        cwd: root,
-        encoding: "utf8",
-        env: {
+  it("EVAL_ALLOW_OVERRIDES=1 alone (no test nonce) cannot run on foreign directories", async () => {
+    const r = await runNode([join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"], {
           ...cleanEnv(),
           NODE_ENV: "test",
           EVAL_ALLOW_OVERRIDES: "1",
           EVAL_CASES_DIR: mk(),
           EVAL_RESULTS_PATH: join(mk(), "x.json"),
-        },
-      },
-    );
+        });
     expect(r.status).not.toBe(0);
     expect(`${r.stdout}${r.stderr}`).toMatch(/overrides set but not permitted/);
   }, 120_000);
@@ -530,11 +527,11 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(overridesAllowed({ ...base, EVAL_GATE_TEST_SUBPROCESS: "a".repeat(32), CI: "1" })).toBe(false);
   });
 
-  it("an overridden run stamps its directories and never writes the committed latest.json", () => {
+  it("an overridden run stamps its directories and never writes the committed latest.json", async () => {
     const latest = join(root, "evals", "results", "latest.json");
     const before = readFileSync(latest, "utf8");
     const s = stage(committed());
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).toBe(0);
     const written = readResults(r.results);
     expect(written.casesDir).not.toBe("default");
@@ -544,19 +541,11 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(JSON.parse(before).fixturesDir).toBe("default");
   }, 120_000);
 
-  it("overrides without EVAL_RESULTS_PATH refuse to write latest.json", () => {
+  it("overrides without EVAL_RESULTS_PATH refuse to write latest.json", async () => {
     const latest = join(root, "evals", "results", "latest.json");
     const before = readFileSync(latest, "utf8");
     const s = stage(committed());
-    const r = spawnSync(
-      process.execPath,
-      [join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"],
-      {
-        cwd: root,
-        encoding: "utf8",
-        env: { ...cleanEnv(), EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "test", ...nonceEnv(), EVAL_CASES_DIR: s.cases, EVAL_FIXTURES_DIR: s.fixtures },
-      },
-    );
+    const r = await runNode([join(root, "node_modules", "vitest", "vitest.mjs"), "run", "--config", "vitest.eval.config.ts"], { ...cleanEnv(), EVAL_ALLOW_OVERRIDES: "1", NODE_ENV: "test", ...nonceEnv(), EVAL_CASES_DIR: s.cases, EVAL_FIXTURES_DIR: s.fixtures });
     expect(r.status).not.toBe(0);
     expect(`${r.stdout}${r.stderr}`).toMatch(/refusing to write evals\/results\/latest.json/);
     expect(readFileSync(latest, "utf8")).toBe(before);
@@ -575,31 +564,31 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(() => computePins(bad, loadCases(casesSrc))).toThrow(/unknown case/);
   });
 
-  it("removing aiFixture from a benign AI case fails the gate", () => {
+  it("removing aiFixture from a benign AI case fails the gate", async () => {
     const s = stageEdited((cases) => {
       delete cases.get("ai-benign-no-signals")!.aiFixture;
     });
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/edited without a manifest update: ai-benign-no-signals/);
     expect(r.out).toMatch(/does not demonstrate \W*an exercised AI path/);
   }, 120_000);
 
-  it("editing history or an unrelated input field of a required case fails the pin", () => {
+  it("editing history or an unrelated input field of a required case fails the pin", async () => {
     const s = stageEdited((cases) => {
       cases.get("clean-renewal-fluoxetine")!.history.refillLimit = 5;
       cases.get("item9-positive")!.input.sideEffects = "edited";
     });
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/edited without a manifest update: clean-renewal-fluoxetine/);
     expect(r.out).toMatch(/edited without a manifest update: item9-positive/);
   }, 120_000);
 
-  it("editing an AI fixture of a required case fails the pin", () => {
+  it("editing an AI fixture of a required case fails the pin", async () => {
     const fx = { ...readFx("ai-benign-no-signals"), header: { ...readFx("ai-benign-no-signals").header, description: "changed" } };
     const s = stageEdited(() => ({ "ai-benign-no-signals": fx }));
-    const r = runEval(s.cases, s.fixtures);
+    const r = await runEval(s.cases, s.fixtures);
     expect(r.status).not.toBe(0);
     expect(r.out).toMatch(/edited without a manifest update: ai-benign-no-signals/);
   }, 120_000);
