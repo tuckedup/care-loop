@@ -204,7 +204,7 @@
       "pnpm test src/infra/auth/session.test.ts",
       "pnpm e2e e2e/auth-rbac.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F015",
