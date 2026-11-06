@@ -91,7 +91,9 @@ export function decidePharmacyResponse(
   const { renewalId } = input;
   const out: DomainEvent[] = [];
   const { messages, invalid } = parsePharmacyBody(input.body);
-  const queued = history.some((e) => e.type === "RxRenewalQueued");
+  const queuedEvent = history.find((e) => e.type === "RxRenewalQueued");
+  const queued = queuedEvent !== undefined;
+  const queuedRx = queuedEvent?.type === "RxRenewalQueued" ? queuedEvent.data.prescriptionId : null;
   let cancelled = history.some((e) => e.type === "RxCancelAcknowledged");
   const seen = seenIds(history);
   const accepted = input.httpStatus >= 200 && input.httpStatus < 300;
@@ -129,7 +131,13 @@ export function decidePharmacyResponse(
         break;
       case "RxFill":
         // A fill only means something for a renewal we queued, and never after a cancel.
-        if (queued && !cancelled) {
+        // ...and only if it names this renewal and prescription (no cross-attribution).
+        if (
+          queued &&
+          !cancelled &&
+          (m.renewalId === undefined || m.renewalId === renewalId) &&
+          (m.prescriptionId === undefined || m.prescriptionId === queuedRx)
+        ) {
           out.push({ type: "RxFillReceived", data: { v: 1, renewalId, messageId: m.messageId } });
         }
         break;

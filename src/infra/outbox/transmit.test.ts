@@ -299,6 +299,22 @@ describe("defence in depth: the handler refuses to transmit", () => {
     await expectRefused(r, /REFUSED: renewal was rejected by the rules/);
   });
 
+  it("another renewal of the same prescription already in flight", async () => {
+    const a = await approvedRenewal(db.sql);
+    await db.sql.unsafe(`DELETE FROM outbox`);
+    const b = await approvedRenewal(db.sql);
+    // Make b look like a second renewal of a's prescription.
+    await db.sql.unsafe(
+      `UPDATE outbox SET payload = jsonb_set(payload, '{prescriptionId}', to_jsonb($1::text))`,
+      [a.prescriptionId],
+    );
+    void b;
+    const pharmacy = fakePharmacy();
+    const stats = await work(pharmacy.fetch);
+    expect(stats).toMatchObject({ claimed: 1 });
+    expect(pharmacy.calls).toHaveLength(0);
+  });
+
   it("a pharmacy the patient never confirmed", async () => {
     const r = await approvedRenewal(db.sql);
     // Replace the pending row with one for a different pharmacy id.

@@ -102,6 +102,14 @@ describe("decidePharmacyResponse (pure)", () => {
     );
   });
 
+  it("an RxFill naming another renewal or prescription is not attributed to this renewal", () => {
+    const other = { ...fill, messageId: "m1:f2", renewalId: "other" };
+    const wrongRx = { ...fill, messageId: "m1:f3", prescriptionId: "rx-other" };
+    expect(
+      types(decidePharmacyResponse([queued], input(200, [status, other, wrongRx]))),
+    ).not.toContain("RxFillReceived");
+  });
+
   it("CancelRx acknowledgement and pharmacist escalation become events", () => {
     const r = decidePharmacyResponse(
       [queued],
@@ -151,8 +159,8 @@ const ok = (r: string): ScriptedAnswer => ({
   status: 200,
   messages: [
     { type: "Status", messageId: `${r}:status`, status: "OK" },
-    { type: "RxFill", messageId: `${r}:fill`, renewalId: r, prescriptionId: "rx" },
-    { type: "RxFill", messageId: `${r}:fill`, renewalId: r, prescriptionId: "rx" },
+    { type: "RxFill", messageId: `${r}:fill`, renewalId: r },
+    { type: "RxFill", messageId: `${r}:fill`, renewalId: r },
   ],
 });
 

@@ -64,6 +64,19 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
     ]);
     if (known.length === 0) throw new NonRetryableError("REFUSED: unknown pharmacy");
 
+    // Another renewal of the same prescription already in flight => never send a second one.
+    const inFlight = await deps.sql.unsafe(
+      `SELECT q.stream_id FROM events q
+       WHERE q.type = 'RxRenewalQueued' AND q.data->>'prescriptionId' = $1 AND q.stream_id <> $2
+         AND NOT EXISTS (SELECT 1 FROM events d WHERE d.stream_id = q.stream_id
+                         AND (d.type IN ('RxFillReceived', 'RxCancelAcknowledged')
+                              OR (d.type = 'PharmacyErrorReceived' AND d.data->>'retryable' = 'false')))`,
+      [facts.prescriptionId, renewalStreamId(facts.renewalId)],
+    );
+    if (inFlight.length > 0) {
+      throw new NonRetryableError("REFUSED: another renewal of this prescription is in flight");
+    }
+
     // A redelivery after the pharmacy already settled the message must not call out again.
     if (isSettled(renewal, facts.idempotencyKey)) return;
 
@@ -113,7 +126,14 @@ export function isSettled(events: readonly DomainEvent[], idempotencyKey: string
     (e) => e.type === "RxRenewalTransmitted" && e.data.idempotencyKey === idempotencyKey,
   );
   if (!transmitted) {
-    return events.some((e) => e.type === "PharmacyErrorReceived" && !e.data.retryable);
+    // A fill or cancel acknowledgement also settles it, even if the same answer carried a
+    // retryable error: never send again after the pharmacy has filled or cancelled.
+    return events.some(
+      (e) =>
+        e.type === "RxFillReceived" ||
+        e.type === "RxCancelAcknowledged" ||
+        (e.type === "PharmacyErrorReceived" && !e.data.retryable),
+    );
   }
   return true;
 }
