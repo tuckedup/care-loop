@@ -52,3 +52,13 @@ export const auditChainHead = pgTable(
   },
   (t) => [check("audit_chain_head_single_row", sql`${t.id} = 1`)],
 );
+
+// Projection runner state: one row per projection, advanced in the same transaction as the
+// projection's own writes.
+export const projectionCheckpoints = pgTable("projection_checkpoints", {
+  name: text("name").primaryKey(),
+  lastPosition: bigint("last_position", { mode: "bigint" })
+    .notNull()
+    .default(sql`0`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
