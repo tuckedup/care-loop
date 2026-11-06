@@ -136,3 +136,19 @@ Flags passing: 29/70 (F001-F020s except below, see feature_list.json). NOT yet f
   evals to 60+ cases, docs, deploy). Also the dose-in-name vs doseMg follow-up from the rules review.
 - Full `pnpm test` had load-dependent timeouts (audit-log scan test 5s default); raise its timeout.
 - v0.1 is complete; tagging v0.1.0 is up to the user.
+
+## 2026-11-06 — Outbox / worker / mock pharmacy verified (F044-F046)
+
+Verifier PASS (full suite 903 tests green at that point). F038 fixed after a failed safety review
+(e0dd76f), third review pending; F047 partial; AI layer round-3 review pending.
+Follow-ups from the verifier's review (not blocking):
+
+- Worker leases a whole batch of 10 for 60s but runs handlers sequentially: a late message's lease
+  can expire mid-batch (duplicate delivery, guarded by outcome checks). Claim smaller batches or
+  extend the lease per handler.
+- Outbox claim/retry bookkeeping writes no audit entry (done/dead/reap are audited).
+- /api/mock-pharmacy reads the whole body before the 16 KiB check and only echoes
+  Idempotency-Key (doc comment says must send): enforce size via Content-Length and the header.
+- renewal_queue deliberately re-opens a renewal completed by a non-clinician if a late escalation
+  arrives (flagged ESCALATED_AFTER_NON_CLINICIAN_DECISION). Fail-safe direction; confirm intended.
+- Bare `pnpm outbox:work` polls forever (use `-- --once` for verification).

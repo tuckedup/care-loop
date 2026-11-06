@@ -656,7 +656,7 @@
     "verification": [
       "pnpm test src/infra/outbox/outbox-tx.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F045",
@@ -671,7 +671,7 @@
       "pnpm test src/infra/outbox/worker.test.ts",
       "pnpm outbox:work"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F046",
@@ -686,7 +686,7 @@
     "verification": [
       "pnpm test src/app/api/mock-pharmacy/route.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F047",
