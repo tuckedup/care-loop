@@ -168,3 +168,24 @@ row completes only via a clinician decision with matching ClinicianReviewStarted
 aggregate (F042) MUST emit ClinicianReviewStarted before approve/deny, and reject forged clinician
 ids at command time. Only the first reviewer can resolve a row (no reassignment event yet).
 Run `pnpm projections:rebuild` after migrations 0009-0011 (0011 self-heals by truncation).
+
+## 2026-11-06 — AI layer + eval gate (F030-F035) passing after six safety reviews
+
+Reviews 1-5 FAILED on real issues: controlled-drug blocklist at the AI entry (-> positive allow-list),
+eval gate passing with nothing checked (-> required-case manifest with sha256 pins, semantic kinds,
+signalTypes, override nonce), CRITICAL UTF-16 offset bug (emoji before risk text silenced the tripwire),
+recall regression vs ce058db (-> frozen oracle + differential superset test), red vitest exit
+(spawnSync -> async spawn). Review 6 PASS (60k independent old-vs-new comparisons, exact offsets,
+all suites exit 0). All F030-F035 verification re-run by the orchestrator: green.
+
+Known / follow-ups (non-blocking):
+
+- Squeezed tripwire scan is uncapped and not counted in MAX_PER_FIELD: repeated phrase padding can
+  yield ~1000 signals per field (payload-size concern only; cannot lower recall). Cap it, and add a
+  max length to the RiskSignalsExtracted signals array in events.ts.
+- Fixtures are hand-written canned model responses (synthetic-handwritten); eval:live, the real
+  Anthropic client and Langfuse have NEVER run against real services. Langfuse ingestion is a legacy
+  endpoint; exact schema unverified.
+- Tripwire lexicon is a non-validated heuristic (TODO clinical review). Eval total is 46 cases; SPEC
+  target of 60+ (>=25 risk) is still open (F064-F066).
+- Implementer choices needing confirmation are in docs/DECISIONS.md (REJECT outranks ESCALATE).

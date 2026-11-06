@@ -446,7 +446,7 @@
       "pnpm eval",
       "pnpm test scripts/eval-gate.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F031",
@@ -461,7 +461,7 @@
     "verification": [
       "pnpm test src/ai/extract-risk-signals.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F032",
@@ -476,7 +476,7 @@
     "verification": [
       "pnpm test src/ai/verify-quotes.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F033",
@@ -491,7 +491,7 @@
     "verification": [
       "pnpm test src/ai/fail-closed.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F034",
@@ -506,7 +506,7 @@
     "verification": [
       "pnpm test src/ai/injection.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F035",
@@ -521,7 +521,7 @@
     "verification": [
       "pnpm test src/ai/tracing.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F036",
