@@ -1,0 +1,61 @@
+{
+  "id": "severe-side-effect",
+  "scenario": "Severe side effect reported",
+  "category": "side-effects",
+  "labeledFrom": "R10 (severe side effect escalates)",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "Severe agitation since last week.",
+    "severeSideEffect": true,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "SEVERE_SIDE_EFFECT"
+    ]
+  }
+}

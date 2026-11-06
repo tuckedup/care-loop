@@ -1,0 +1,61 @@
+{
+  "id": "hydroxyzine-always-escalate",
+  "scenario": "Hydroxyzine HCl, otherwise clean",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2 (escalate hydroxyzine until limits are sourced)",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "154987",
+    "name": "hydroxyzine HCl",
+    "doseMg": 25,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "hydroxyzine_hcl"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "154987"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "HYDROXYZINE_ALWAYS_ESCALATE"
+    ]
+  }
+}

@@ -9,7 +9,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["evals/**/*.eval.ts"],
-    passWithNoTests: true,
     testTimeout: 120_000,
   },
 });

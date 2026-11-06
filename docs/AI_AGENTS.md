@@ -20,3 +20,13 @@
 
 Fail closed. The model never approves. Humans label eval expectations from the spec, never from
 model output. Never weaken a test to make it pass.
+
+## AI eval gate (F030)
+
+AI renewal features (F031 onward, anything in `src/ai` or the AI decision path) may not be marked
+`passes: true` while the eval gate is red or empty. The gate is `pnpm eval`: it fails on zero
+cases, on any schema-invalid case, on escalation recall below 1.0, on any unsafe auto-approval
+(a case labeled non-AUTO_ELIGIBLE that the system auto-approves), and on any case that does not
+match its hand-written label. Cases in `evals/cases/*.json` are labeled by a human from the SPEC
+rules, never from model or code output, and must not be weakened to make a run pass.
+`pnpm eval` writes `evals/results/latest.json`; commit it with the change.

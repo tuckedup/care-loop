@@ -1,0 +1,62 @@
+{
+  "id": "controlled-lisdexamfetamine",
+  "scenario": "Controlled medication (lisdexamfetamine, schedule II), clean check-in",
+  "category": "controlled-substance",
+  "labeledFrom": "R02 + R03",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "700810",
+    "name": "lisdexamfetamine",
+    "doseMg": 30,
+    "frequency": "daily",
+    "controlledSchedule": "II",
+    "formularyId": "lisdexamfetamine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "700810"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "REJECT",
+    "reasonCodes": [
+      "NOT_ON_FORMULARY",
+      "CONTROLLED_SUBSTANCE"
+    ]
+  }
+}

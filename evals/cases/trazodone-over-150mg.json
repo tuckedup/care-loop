@@ -1,0 +1,61 @@
+{
+  "id": "trazodone-over-150mg",
+  "scenario": "Trazodone 200 mg nightly",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2 (trazodone <= 150 mg nightly)",
+  "input": {
+    "phq9": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "gad7": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "10737",
+    "name": "trazodone",
+    "doseMg": 200,
+    "frequency": "nightly",
+    "controlledSchedule": null,
+    "formularyId": "trazodone"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "10737"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": [
+      "TRAZODONE_LIMIT_EXCEEDED"
+    ]
+  }
+}
