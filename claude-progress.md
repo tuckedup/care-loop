@@ -25,3 +25,33 @@ Notes for future sessions:
 - DB tests need Postgres: `docker compose up -d db` (port 54329) or set DATABASE_URL.
 - Zod is v4, Vitest v3, TypeScript 5.9, ESLint 9 (flat config via FlatCompat), Next ~15.5.
 - Hooks block `.env*` edits; init.sh never writes .env (falls back to .env.example values).
+
+## 2026-11-06 — Bootstrap fixes + F001 (events table)
+
+Done:
+
+- Applied review findings to feature_list.json (now 70 features): hash-chained audit_log moved to
+  F004 (right after the event store) so no persisted write ever uses a no-op auditor; old F053
+  became an audit-coverage test. Added F030 "Eval gate": pnpm eval must fail on zero cases and
+  recall < 1.0 before any AI feature (F031+) may pass. Admin eval page merged into the dashboard.
+- git init on main; bootstrap commit 741c679. Added .gitattributes (LF) and ignored
+  .claude/scheduled_tasks.lock.
+- F001: Drizzle `events` table (src/infra/db/schema.ts), generated migration
+  drizzle/0000_create_events.sql, shared runMigrations (src/infra/db/migrate.ts, journal kept in
+  the migrated schema), db:migrate script, isolated-schema Postgres test helper
+  (src/test/db.ts), tests in src/infra/db/schema.test.ts.
+- Verified: `pnpm db:migrate` (twice, idempotent), `pnpm test src/infra/db/schema.test.ts`
+  (5/5), typecheck, lint, format:check, full `pnpm test` (9/9). verifier subagent: PASS.
+  F001 set to passes:true.
+
+Notes:
+
+- Postgres runs via `docker compose up -d --wait db` (port 54329); Docker Desktop had to be
+  started manually. DATABASE_URL for scripts: `set -a; . ./.env.example; set +a`. The test helper
+  falls back to the same local URL.
+- postgres.js: `sql.json()` failed with untyped params under vitest; tests use
+  `JSON.stringify(x)::jsonb`. timestamptz came back as a string in tests (don't assert Date).
+- pnpm 12 reads build approvals from `allowBuilds` in pnpm-workspace.yaml.
+- pnpm eval still passes with zero cases (passWithNoTests) until F030 removes it.
+
+Next session: F002 (append-only enforcement on events).

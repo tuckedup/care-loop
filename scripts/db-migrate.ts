@@ -1,23 +1,22 @@
 import { existsSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import postgres from "postgres";
+import { MIGRATIONS_FOLDER, runMigrations } from "../src/infra/db/migrate";
 
-// Scaffold stub: applies Drizzle migrations once any exist. Real implementation lands with F001.
 async function main() {
-  const dir = resolve(process.cwd(), "drizzle");
-  const hasMigrations = existsSync(dir) && readdirSync(dir).some((f) => f.endsWith(".sql"));
+  const hasMigrations =
+    existsSync(MIGRATIONS_FOLDER) && readdirSync(MIGRATIONS_FOLDER).some((f) => f.endsWith(".sql"));
   if (!hasMigrations) {
-    console.log("db:migrate: no migrations yet (scaffold), nothing to do.");
+    console.log("db:migrate: no migrations yet, nothing to do.");
     return;
   }
-  if (!process.env.DATABASE_URL) {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
     throw new Error("db:migrate: DATABASE_URL is required when migrations exist.");
   }
-  const { drizzle } = await import("drizzle-orm/postgres-js");
-  const { migrate } = await import("drizzle-orm/postgres-js/migrator");
-  const postgres = (await import("postgres")).default;
-  const client = postgres(process.env.DATABASE_URL, { max: 1 });
+  // prepare:false keeps this compatible with Supabase's transaction-mode pooler.
+  const client = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
   try {
-    await migrate(drizzle(client), { migrationsFolder: dir });
+    await runMigrations(client);
     console.log("db:migrate: done.");
   } finally {
     await client.end();

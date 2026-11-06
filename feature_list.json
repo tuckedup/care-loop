@@ -13,7 +13,7 @@
       "pnpm db:migrate",
       "pnpm test src/infra/db/schema.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F002",
