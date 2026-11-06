@@ -9,6 +9,8 @@ import { createAnthropicClient, type RiskLlmClient } from "./client";
 import { loadAiConfig } from "./config";
 import { extractRiskSignals } from "./extract-risk-signals";
 import { detectInjection } from "./injection";
+import { PROMPT_VERSION } from "./prompt";
+import { tracerFromEnv, type Tracer } from "./tracing";
 import {
   RiskExtractionError,
   SOURCE_FIELDS,
@@ -27,6 +29,8 @@ export interface RunRiskDeps {
   client: RiskLlmClient | null | undefined;
   model: string | undefined;
   timeoutMs?: number;
+  /** Optional tracer (no-op unless Langfuse env is set; see tracing.ts). */
+  tracer?: Tracer;
 }
 
 const failed = (reason: FailureReason): RiskExtractionResult => ({ status: "failed", reason });
@@ -44,6 +48,38 @@ export async function runRiskExtraction(
   ruleInput: RuleInput,
   text: RiskTextInput,
   deps: RunRiskDeps,
+): Promise<RiskExtractionResult> {
+  const state = { modelCalled: false };
+  const started = Date.now();
+  const result = await execute(ruleInput, text, deps, state);
+  if (state.modelCalled && deps.tracer) {
+    // Tracing is best effort: it can never change or delay-fail the result.
+    try {
+      await deps.tracer.record({
+        name: "extractRiskSignals",
+        model: deps.model ?? "unset",
+        promptVersion: PROMPT_VERSION,
+        latencyMs: Date.now() - started,
+        status: result.status,
+        ...(result.status === "failed" ? { failureReason: result.reason } : {}),
+        signalCount: result.status === "ok" ? result.signals.length : 0,
+        unverifiedSignalCount:
+          result.status === "ok" ? result.signals.filter((s) => !s.verified).length : 0,
+        signalTypes: result.status === "ok" ? result.signals.map((s) => s.type) : [],
+        input: { freeText: text.freeText, sideEffects: text.sideEffects },
+      });
+    } catch {
+      /* swallowed */
+    }
+  }
+  return result;
+}
+
+async function execute(
+  ruleInput: RuleInput,
+  text: RiskTextInput,
+  deps: RunRiskDeps,
+  state: { modelCalled: boolean },
 ): Promise<RiskExtractionResult> {
   try {
     // 1. Controlled substances (or unknown schedule) never reach the LLM.
@@ -68,6 +104,7 @@ export async function runRiskExtraction(
       }, timeoutMs);
     });
     try {
+      state.modelCalled = true;
       const output = await Promise.race([
         extractRiskSignals(text, {
           client: deps.client,
@@ -108,6 +145,7 @@ export function riskDepsFromEnv(
   return {
     client: cfg.apiKey ? createAnthropicClient({ apiKey: cfg.apiKey }) : null,
     model: cfg.model,
+    tracer: tracerFromEnv(env),
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
   };
 }

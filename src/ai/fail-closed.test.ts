@@ -107,7 +107,7 @@ describe("fail-closed wrapper", () => {
     expect(await run(null)).toEqual({ status: "failed", reason: "api_key_missing" });
     expect(client.calls).toHaveLength(0);
     const deps = riskDepsFromEnv({ ANTHROPIC_API_KEY: "", ANTHROPIC_MODEL: "" });
-    expect(deps).toEqual({ client: null, model: undefined });
+    expect(deps).toMatchObject({ client: null, model: undefined });
     const r = await runRiskExtraction(baseInput(), text, deps);
     expect(r.status).toBe("failed");
   });
