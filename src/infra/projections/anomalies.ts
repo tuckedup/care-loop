@@ -1,6 +1,6 @@
 import type { Db, StoredEvent } from "@/infra/event-store/types";
 
-export type AnomalyCode = "INVALID_EVENT" | "STREAM_RENEWAL_MISMATCH";
+export type AnomalyCode = "INVALID_EVENT" | "STREAM_RENEWAL_MISMATCH" | "AUDIT_ENTRY_MISSING";
 
 /**
  * Record an event a projection refused to apply. Runs in the projection's transaction, so it

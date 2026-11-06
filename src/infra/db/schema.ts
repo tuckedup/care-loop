@@ -33,17 +33,22 @@ export const events = pgTable(
 
 // Hash-chained audit log (docs/SPEC.md section 8). Append-only (trigger in migration).
 // hash = sha256(prev_hash + canonical JSON of the entry); `at` is hashed as an ISO-8601 UTC string.
-export const auditLog = pgTable("audit_log", {
-  seq: bigint("seq", { mode: "bigint" }).primaryKey(),
-  actor: text("actor").notNull(),
-  role: text("role").notNull(),
-  action: text("action").notNull(),
-  entity: text("entity").notNull(),
-  detail: jsonb("detail").notNull().default({}),
-  at: timestamp("at", { withTimezone: true }).notNull(),
-  prevHash: text("prev_hash").notNull(),
-  hash: text("hash").notNull().unique(),
-});
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    seq: bigint("seq", { mode: "bigint" }).primaryKey(),
+    actor: text("actor").notNull(),
+    role: text("role").notNull(),
+    action: text("action").notNull(),
+    entity: text("entity").notNull(),
+    detail: jsonb("detail").notNull().default({}),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+    prevHash: text("prev_hash").notNull(),
+    hash: text("hash").notNull().unique(),
+  },
+  // Lets the audit_view projection find the entry that recorded an event (entity = stream id).
+  (t) => [index("audit_log_entity_idx").on(t.entity)],
+);
 
 // Single-row table whose row lock serializes every audited write, so the chain cannot fork
 // and events get global positions in commit order. Seeded with the genesis row (seq 0).
@@ -328,4 +333,25 @@ export const followUpTasks = pgTable(
     index("follow_up_tasks_visit_idx").on(t.visitId),
     check("follow_up_tasks_status_check", sql`${t.status} in ('requested')`),
   ],
+);
+
+// Projection audit_view (F057): a read model of audit_log for the admin page. One row per audit
+// entry (copied, never edited); populated while replaying events, so it can be dropped and rebuilt
+// from position 0. The hash chain itself stays in audit_log and is checked by verifyAuditChain.
+export const auditView = pgTable(
+  "audit_view",
+  {
+    auditSeq: bigint("audit_seq", { mode: "bigint" }).primaryKey(),
+    recorded: timestamp("recorded", { withTimezone: true }).notNull(),
+    actor: text("actor").notNull(),
+    role: text("role").notNull(),
+    action: text("action").notNull(),
+    entity: text("entity").notNull(),
+    // FHIR AuditEvent.outcome: "success" maps to code 0.
+    outcome: text("outcome").notNull().default("success"),
+    eventTypes: jsonb("event_types").notNull().default([]),
+    detail: jsonb("detail").notNull().default({}),
+    entryHash: text("entry_hash").notNull(),
+  },
+  (t) => [index("audit_view_recorded_idx").on(t.recorded)],
 );

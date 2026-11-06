@@ -16,6 +16,7 @@
 // Runtime half: a scenario spanning patient, clinician, decision pipeline (system) and outbox
 // worker (system) writes; every event has an audit entry with an actor and a valid role.
 import fs from "node:fs";
+import { seedConfirmedRenewal } from "@/domain/visit/testing";
 import path from "node:path";
 import ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -488,7 +489,7 @@ describe("audit coverage: every event written by a real scenario has an audit en
     const NOW = new Date("2026-11-06T12:00:00Z");
     const clinician = { role: "clinician" as const, id: SCHEDULING_CLINICIAN_ID };
     // patient + admin seeding, then the system decision pipeline
-    const a = await seedRenewal(db.sql);
+    const a = await seedConfirmedRenewal(db.sql);
     await evaluateRenewal(db.sql, a.renewalId, {
       ai: aiDepsFor(spyClient()),
       now: () => NOW,

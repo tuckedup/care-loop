@@ -2,6 +2,7 @@
 // FollowUpTaskCreated (task-* stream), idempotent on retry, only the booking's clinician may sign,
 // and signing resets renewals-since-last-visit (proved with the real R06 path end to end).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { seedConfirmedRenewal } from "./testing";
 import { readStream } from "@/infra/event-store";
 import { registerAllProjections } from "@/infra/projections/all";
 import { rebuildProjections } from "@/infra/projections/rebuild";
@@ -258,7 +259,7 @@ describe("signing resets the renewals-since-visit counter (R06 end to end)", () 
   it("after signing, a renewal at the former limit no longer needs follow-up", async () => {
     const LIMIT = 1;
     // Renewal A: evaluated, reviewed and approved by a clinician => counts toward the limit.
-    const a = await seedRenewal(db.sql);
+    const a = await seedConfirmedRenewal(db.sql);
     await evaluate(a.renewalId, LIMIT);
     const doc = { role: "clinician" as const, id: SCHEDULING_CLINICIAN_ID };
     await startReview(db.sql, doc, { renewalId: a.renewalId });
@@ -266,7 +267,7 @@ describe("signing resets the renewals-since-visit counter (R06 end to end)", () 
     expect(await types(renewalStreamId(a.renewalId))).toContain("RenewalApproved");
 
     const again = (renewalPatient = a) =>
-      seedRenewal(db.sql, {
+      seedConfirmedRenewal(db.sql, {
         patientId: renewalPatient.patientId,
         prescriptionId: a.prescriptionId,
       });

@@ -1,3 +1,4 @@
+import { auditViewProjection } from "./audit-view";
 import { patientMedListProjection } from "./patient-med-list";
 import { pharmacyAlertsProjection } from "./pharmacy-alerts";
 import { phq9TrendProjection } from "./phq9-trend";
@@ -17,7 +18,8 @@ export function registerAllProjections() {
       .register(renewalQueueProjection)
       .register(phq9TrendProjection)
       .register(pharmacyAlertsProjection)
-      .register(visitScheduleProjection);
+      .register(visitScheduleProjection)
+      .register(auditViewProjection);
     done = true;
   }
   return projectionRegistry;

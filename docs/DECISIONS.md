@@ -294,3 +294,67 @@ monitoring.
 - **Known gaps.** The patient result page maps cancelled to the same "problem sending" copy. A dead
   letter for a renewal that is escalated but not yet decided is not possible (nothing is queued
   before approval).
+
+## ADR: Follow-up visits, audit coverage, verification and the audit view (F051-F057)
+
+Status: accepted for the demo. Data is synthetic. Wording: "HIPAA-aligned design, synthetic data";
+the audit chain is tamper-EVIDENT, not a compliance certification.
+
+- **Booking never approves.** When R06 yields FOLLOW_UP_REQUIRED the pipeline appends
+  FollowUpRequired (ESCALATE still outranks it, so a renewal with any safety signal is escalated,
+  not parked as a follow-up). The patient books a visit with `bookFollowUpVisit`, which appends
+  VisitBooked to the `visit-fu-<renewalId>` stream and touches nothing on the renewal stream. Approve
+  stays refused for follow-up renewals (APPROVAL_OF_FOLLOW_UP / ALREADY_DECIDED); a test proves a
+  clinician still cannot approve after a booking.
+- **One visit per renewal, no double booking, race-safe.** The stream id is derived from the
+  renewal (one booking per renewal). The synthetic slot grid is weekday 30-minute slots 09:00-17:00
+  UTC for the one synthetic scheduling clinician, up to 28 days out (placeholders, TODO: real
+  availability; not clinical thresholds). Slot validity (future, on the grid, exactly 30 minutes)
+  is checked in the pure aggregate with an injected clock; overlap with the clinician's other
+  VisitBooked events is checked INSIDE the append transaction, after the audit chain-head row lock
+  that already serialises every audited write, so two concurrent bookings of one slot cannot both
+  win (tested). The slot end is derived server-side, never taken from the form. A clinician-booked
+  visit (renewal BookVisit, which lands in the renewal stream) is also counted by the overlap and
+  per-renewal checks, but the clinician command does not look at patient bookings (known gap: it
+  could add a second visit).
+- **Note signing.** `signVisitNote` is allowed only for the clinician the visit was booked with
+  (the VisitBooked.clinicianId); a booking without a clinician fails closed. It appends
+  VisitNoteSigned + CalendarSlotCreated{slotId,start,end} in one append (visit stream), then
+  FollowUpTaskCreated in `task-fu-<noteId>` (a second append: one stream per append). Every call
+  converges, so a retry after a crash between the two appends still ends with exactly one task and
+  one slot. The follow-up slot is the visit slot shifted by 28 days (synthetic placeholder). The note
+  text is not stored in this demo; the note id is derived from the visit id so a double submit is
+  the same note. FHIR Task status is "requested" (visit_schedule projection; no event carries it).
+- **Counter reset.** Nothing new was needed in the rules: renewals-since-last-visit is derived from
+  events and a VisitNoteSigned on a visit booked for the patient resets it. An end-to-end test
+  proves it with the real R06 path: held at the limit, still held after booking alone, released
+  after signing, held again one approval later.
+- **e2e and the AI step.** With no API key the AI step fails closed (R13 LLM_FAILURE), which
+  outranks R06, so a UI run would always escalate. `RISK_FIXTURE=synthetic-handwritten` (honoured
+  only when NODE_ENV is exactly development or test, same gate as SUMMARY_FIXTURE) swaps in a
+  hand-written client that returns no signals. It cannot approve anything: local tripwire and
+  injection scans and every rule still run, and production ignores it (tested).
+- **Audit coverage (F055).** An AST test discovers every function taking an AuditContext (not a
+  hand list), forbids optional contexts, and checks every call site passes an object literal with
+  actor/role/action, a forwarded AuditContext, or a helper that provably returns one (no casts, no
+  undefined; a user role may not hard-code the actor). The set of files that call
+  appendToStream/auditedTransaction directly is pinned, so a new writer fails until reviewed.
+  Entry points under src/app that reach a writer must call an auth guard. A runtime scenario shows
+  every event has an audit entry naming its position, with system actors (decision pipeline,
+  outbox worker) recorded. Limits: name-based call resolution (a same-named function elsewhere is
+  over-approximated, not missed); it proves a context is passed, not that the actor value is
+  correct for a given code path (that is what the per-feature actor tests assert).
+- **`pnpm audit:verify` (F056).** Recomputes the chain from DATABASE_URL, prints the first broken
+  seq and exits 1 on tamper (2 if it cannot verify, never 0 on error). The append-only triggers
+  stop the application role; a database superuser or table owner can disable them, which is exactly
+  what the tests do on a privileged raw connection in an isolated schema. Editing, deleting a
+  middle or the last entry, or forging an entry hash are all detected. NOT detected: a superuser who
+  rewrites the whole chain from some point forward AND resets audit_chain_head. Closing that needs
+  the head hash anchored outside the database (TODO).
+- **audit_view and /admin/audit (F057).** audit_view is a projection driven by events: replaying an
+  event locates its audit entry and copies every not-yet-copied entry up to it, so it is
+  deterministic and rebuildable (0015 adds the table plus an index on audit_log(entity); the index
+  does not alter rows). Entries after the newest event appear when the next event is replayed;
+  non-event bookkeeping before it (outbox done/dead) is included. The page is admin only, shows
+  FHIR AuditEvent-shaped JSON (not a conformant FHIR server, no terminology URIs) and a chain badge
+  from verifyAuditChain, which reads the whole log on every load (fine for a demo).
