@@ -44,3 +44,37 @@ export function generatePharmacies(next: () => number, count: number): Pharmacy[
   }
   return out;
 }
+
+// ---- Confirm-before-send helpers (SPEC section 7) -------------------------------------------
+// The patient must see name, address and phone of the chosen pharmacy before a renewal is queued.
+
+export type PharmacySelection =
+  { ok: true; pharmacy: Pharmacy } | { ok: false; error: "INVALID_ID" | "NOT_FOUND" };
+
+/** Resolve a pharmacy id (untrusted input) against the known list. Never guesses or defaults. */
+export function selectPharmacy(pharmacies: readonly Pharmacy[], rawId: unknown): PharmacySelection {
+  const parsed = PharmacySchema.shape.id.safeParse(rawId);
+  if (!parsed.success) return { ok: false, error: "INVALID_ID" };
+  const pharmacy = pharmacies.find((p) => p.id === parsed.data);
+  return pharmacy ? { ok: true, pharmacy } : { ok: false, error: "NOT_FOUND" };
+}
+
+export interface PharmacyConfirmation {
+  pharmacyId: string;
+  name: string;
+  address: string;
+  phone: string;
+  /** One line the confirm step renders, containing all three details. */
+  summary: string;
+}
+
+/** What the confirm step shows (and what an event should snapshot): id, name, address, phone. */
+export function toPharmacyConfirmation(p: Pharmacy): PharmacyConfirmation {
+  return {
+    pharmacyId: p.id,
+    name: p.name,
+    address: p.address,
+    phone: p.phone,
+    summary: `${p.name}, ${p.address}, ${p.phone}`,
+  };
+}
