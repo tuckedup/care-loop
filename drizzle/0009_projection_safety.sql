@@ -1,3 +1,5 @@
+-- NOTE: run `pnpm projections:rebuild` after applying this migration (and 0010):
+-- request_position defaults to 0 for rows that already exist and phq9_trend is re-keyed.
 CREATE TABLE "projection_anomalies" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"projection" text NOT NULL,

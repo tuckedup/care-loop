@@ -165,6 +165,8 @@ export const renewalQueue = pgTable(
     // approved / denied / follow_up_required once status = completed.
     decision: text("decision"),
     decidedBy: text("decided_by"),
+    // The clinician a completed approval/denial is attributed to (NULL for system decisions).
+    decisionClinicianId: text("decision_clinician_id"),
     requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     lastPosition: bigint("last_position", { mode: "bigint" }).notNull(),

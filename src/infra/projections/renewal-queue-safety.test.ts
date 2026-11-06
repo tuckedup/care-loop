@@ -10,6 +10,7 @@ import { ProjectionRegistry, runAllProjections } from "./registry";
 import {
   listRenewalQueue,
   QUEUE_ANOMALY,
+  reduceInvalidEvent,
   reduceRenewalQueue,
   renewalQueueProjection,
   type RenewalQueueRow,
@@ -81,11 +82,9 @@ describe("renewal_queue safety rules (pure)", () => {
         clinicianId: "c9",
       }),
     ]);
-    expect(withEventId).toMatchObject({
-      status: "completed",
-      decision: "approved",
-      clinicianId: "c9",
-    });
+    // An escalated renewal must have been reviewed: an event-only clinician id is not enough.
+    expect(withEventId.status).toBe("requested");
+    expect(withEventId.anomalies).toEqual([QUEUE_ANOMALY.CLINICIAN_DECISION_WITHOUT_REVIEW_START]);
     const fromReview = fold([
       requested,
       escalated(["R08"]),
@@ -96,6 +95,7 @@ describe("renewal_queue safety rules (pure)", () => {
       status: "completed",
       decision: "approved",
       clinicianId: "c1",
+      decisionClinicianId: "c1",
     });
   });
 
@@ -118,17 +118,116 @@ describe("renewal_queue safety rules (pure)", () => {
     expect(good).toMatchObject({ status: "completed", decision: "denied", decidedBy: "clinician" });
   });
 
-  it("follow-up on an escalated renewal completes but keeps escalation and reason codes visible", () => {
-    const row = fold([
-      requested,
-      escalated(["R08", "R02"]),
-      ev("FollowUpRequired", { v: 1, renewalId: "r1", patientId: "p1", reason: "limit" }),
-    ]);
-    expect(row).toMatchObject({
-      status: "completed",
-      decision: "follow_up_required",
+  it("follow-up never completes an escalated renewal, before or after the escalation", () => {
+    const followUp = ev("FollowUpRequired", {
+      v: 1,
+      renewalId: "r1",
+      patientId: "p1",
+      reason: "limit",
+    });
+    const after = fold([requested, escalated(["R08", "R02"]), followUp]);
+    expect(after).toMatchObject({
+      status: "requested",
+      decision: null,
       escalated: true,
       reasonCodes: ["R08", "R02"],
+    });
+    expect(after.anomalies).toEqual([QUEUE_ANOMALY.FOLLOW_UP_ON_ESCALATED_WITHOUT_CLINICIAN]);
+    const before = fold([requested, followUp]);
+    expect(before).toMatchObject({ status: "completed", decision: "follow_up_required" });
+    const reopened = fold([requested, followUp, escalated(["R08"])]);
+    expect(reopened).toMatchObject({
+      status: "requested",
+      decision: null,
+      escalated: true,
+      reasonCodes: ["R08"],
+    });
+    expect(reopened.anomalies).toEqual([QUEUE_ANOMALY.FOLLOW_UP_ON_ESCALATED_WITHOUT_CLINICIAN]);
+  });
+
+  it("a clinician approval with no clinician id anywhere never completes ANY row", () => {
+    const noId = ev("RenewalApproved", {
+      v: 1,
+      renewalId: "r1",
+      by: "clinician",
+      autonomyMode: "SHADOW",
+    });
+    const plain = fold([requested, noId]);
+    expect(plain.status).toBe("requested");
+    expect(plain.anomalies).toEqual([QUEUE_ANOMALY.APPROVAL_WITHOUT_CLINICIAN_ID]);
+    const later = fold([requested, noId, escalated(["R07"])]);
+    expect(later).toMatchObject({ status: "requested", decision: null, escalated: true });
+  });
+
+  it("a clinician id that differs from the review-start clinician is refused", () => {
+    const row = fold([
+      requested,
+      escalated(["R08"]),
+      started("c1"),
+      ev("RenewalApproved", {
+        v: 1,
+        renewalId: "r1",
+        by: "clinician",
+        autonomyMode: "SHADOW",
+        clinicianId: "forged",
+      }),
+    ]);
+    expect(row.status).toBe("in-progress");
+    expect(row.anomalies).toEqual([QUEUE_ANOMALY.CLINICIAN_ID_MISMATCH]);
+  });
+
+  it("late escalation re-opens a clinician approval that lacked a review start", () => {
+    const row = fold([
+      requested,
+      ev("RenewalApproved", {
+        v: 1,
+        renewalId: "r1",
+        by: "clinician",
+        autonomyMode: "SHADOW",
+        clinicianId: "c9",
+      }),
+      escalated(["R07"]),
+    ]);
+    expect(row).toMatchObject({ status: "requested", decision: null, escalated: true });
+  });
+
+  it("derives reason codes from failed rule results when only EligibilityEvaluated arrives", () => {
+    const results = [
+      { ruleId: "R07", passed: false, detail: "" },
+      { ruleId: "R01", passed: true, detail: "" },
+      { ruleId: "R08", passed: false, detail: "" },
+    ];
+    const esc = fold([
+      requested,
+      ev("EligibilityEvaluated", { v: 1, renewalId: "r1", results, outcome: "ESCALATE" }),
+    ]);
+    expect(esc).toMatchObject({ escalated: true, reasonCodes: ["R07", "R08"] });
+    const merged = fold([
+      requested,
+      escalated(["R08", "R99"]),
+      ev("EligibilityEvaluated", { v: 1, renewalId: "r1", results, outcome: "ESCALATE" }),
+    ]);
+    expect(merged.reasonCodes).toEqual(["R08", "R99", "R07"]);
+    const rej = fold([
+      requested,
+      ev("EligibilityEvaluated", { v: 1, renewalId: "r1", results, outcome: "REJECT" }),
+    ]);
+    expect(rej).toMatchObject({ escalated: false, reasonCodes: ["R07", "R08"] });
+  });
+
+  it("reduceInvalidEvent fails closed: flags the row, escalates for escalation types, re-opens", () => {
+    const m = meta(9);
+    expect(reduceInvalidEvent(null, "RenewalEscalated", m)).toBeNull();
+    const base = fold([requested]);
+    expect(reduceInvalidEvent(base, "RenewalEscalated", m)).toMatchObject({
+      escalated: true,
+      anomalies: [QUEUE_ANOMALY.INVALID_EVENT_FOR_RENEWAL],
+    });
+    expect(reduceInvalidEvent(base, "RiskSignalsExtracted", m)!.escalated).toBe(false);
+    const approved = fold([requested, approvedBySystem]);
+    expect(reduceInvalidEvent(approved, "RiskSignalsExtracted", m)).toMatchObject({
+      status: "requested",
+      decision: null,
     });
   });
 
@@ -269,11 +368,15 @@ describe("projection safety (database)", () => {
       makeEvent("FollowUpRequired", { v: 1, renewalId: "s1", patientId: "p1", reason: "x" }),
     ]);
     expect(await row("s1")).toMatchObject({
-      status: "completed",
-      decision: "follow_up_required",
+      status: "requested",
+      decision: null,
       escalated: true,
       reasonCodes: ["R08"],
     });
+    expect((await row("s1")).anomalies).toEqual([
+      "SYSTEM_APPROVAL_ON_ESCALATED",
+      "FOLLOW_UP_ON_ESCALATED_WITHOUT_CLINICIAN",
+    ]);
     await expectRebuildEqualsIncremental();
   });
 
@@ -364,6 +467,95 @@ describe("projection safety (database)", () => {
     );
     const [max] = await db.sql.unsafe(`SELECT max(global_position) AS m FROM events`);
     expect(cp!.last_position).toBe(max!.m);
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("clinician approval without id, then late escalation, stays open; rebuild equals incremental", async () => {
+    await append("renewal-n1", [
+      req("n1"),
+      makeEvent("RenewalApproved", {
+        v: 1,
+        renewalId: "n1",
+        by: "clinician",
+        autonomyMode: "SHADOW",
+      }),
+    ]);
+    await append("renewal-n1", [
+      makeEvent("RenewalEscalated", { v: 1, renewalId: "n1", reasonCodes: ["R07"] }),
+    ]);
+    expect(await row("n1")).toMatchObject({ status: "requested", decision: null, escalated: true });
+    expect((await row("n1")).anomalies).toEqual(["APPROVAL_WITHOUT_CLINICIAN_ID"]);
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("follow-up then late escalation reopens; forged and unreviewed clinician ids hold; rebuild equals incremental", async () => {
+    await append("renewal-f1", [
+      req("f1"),
+      makeEvent("FollowUpRequired", { v: 1, renewalId: "f1", patientId: "p1", reason: "x" }),
+    ]);
+    expect((await row("f1")).status).toBe("completed");
+    await append("renewal-f1", [
+      makeEvent("RenewalEscalated", { v: 1, renewalId: "f1", reasonCodes: ["R01"] }),
+    ]);
+    expect(await row("f1")).toMatchObject({ status: "requested", decision: null });
+
+    await append("renewal-f2", [
+      req("f2"),
+      makeEvent("RenewalEscalated", { v: 1, renewalId: "f2", reasonCodes: ["R08"] }),
+      makeEvent("ClinicianReviewStarted", { v: 1, renewalId: "f2", clinicianId: "c1" }),
+      makeEvent("RenewalApproved", {
+        v: 1,
+        renewalId: "f2",
+        by: "clinician",
+        autonomyMode: "SHADOW",
+        clinicianId: "forged",
+      }),
+    ]);
+    expect(await row("f2")).toMatchObject({ status: "in-progress", decision: null });
+    expect((await row("f2")).anomalies).toEqual(["CLINICIAN_ID_MISMATCH"]);
+    await append("renewal-f3", [
+      req("f3"),
+      makeEvent("RenewalEscalated", { v: 1, renewalId: "f3", reasonCodes: ["R08"] }),
+      makeEvent("RenewalApproved", {
+        v: 1,
+        renewalId: "f3",
+        by: "clinician",
+        autonomyMode: "SHADOW",
+        clinicianId: "c9",
+      }),
+    ]);
+    expect((await row("f3")).anomalies).toEqual(["CLINICIAN_DECISION_WITHOUT_REVIEW_START"]);
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("an invalid RenewalEscalated holds the row open against a later system approval", async () => {
+    await append("renewal-v1", [req("v1")]);
+    await append("renewal-v1", [
+      { type: "RenewalEscalated", data: { v: 1, renewalId: "v1", reasonCodes: [] } },
+    ]);
+    await append("renewal-v1", [
+      makeEvent("RenewalApproved", { v: 1, renewalId: "v1", by: "system", autonomyMode: "RETRO" }),
+    ]);
+    const r = await row("v1");
+    expect(r).toMatchObject({ status: "requested", decision: null, escalated: true });
+    expect(r.anomalies).toEqual(["INVALID_EVENT_FOR_RENEWAL", "SYSTEM_APPROVAL_ON_ESCALATED"]);
+    await expectRebuildEqualsIncremental();
+  });
+
+  it("a RenewalRequested whose body renewalId differs from the stream is not used for the patient", async () => {
+    await append("renewal-w1", [
+      makeEvent("RenewalRequested", {
+        v: 1,
+        renewalId: "someone-else",
+        patientId: "pw",
+        prescriptionId: "rx",
+      }),
+      checkIn("w1", 1),
+    ]);
+    const [o] = await db.sql.unsafe(
+      "SELECT patient_id, orphan FROM phq9_trend WHERE renewal_id = 'w1'",
+    );
+    expect(o).toMatchObject({ patient_id: null, orphan: true });
     await expectRebuildEqualsIncremental();
   });
 

@@ -58,9 +58,9 @@ export const phq9TrendProjection: Projection = {
     }
     const d = event.data;
     const [req] = await tx.unsafe<{ data: { patientId?: string } }[]>(
-      `SELECT data FROM events WHERE stream_id = $1 AND type = 'RenewalRequested'
+      `SELECT data FROM events WHERE stream_id = $1 AND type = 'RenewalRequested' AND data->>'renewalId' = $2
        ORDER BY stream_version ASC LIMIT 1`,
-      [stored.streamId],
+      [stored.streamId, renewalId],
     );
     const patientId = typeof req?.data?.patientId === "string" ? req.data.patientId : null;
     await tx.unsafe(
