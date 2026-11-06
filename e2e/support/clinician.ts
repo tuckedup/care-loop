@@ -2,6 +2,8 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import postgres from "postgres";
+import { makeEvent } from "../../src/domain/events";
+import { appendToStream } from "../../src/infra/audit";
 import { SESSION_COOKIE, signSession, type Role } from "../../src/infra/auth/session";
 import { fillCheckIn } from "./checkin";
 import { confirmPharmacy } from "./pharmacy";
@@ -61,4 +63,40 @@ export function e2eSql() {
     throw new Error("e2e: DATABASE_URL must point at a *_e2e database");
   }
   return postgres(url, { max: 2, prepare: false, onnotice: () => {} });
+}
+
+/**
+ * Seeded "prior" renewals that were never decided are in flight, and a patient cannot start a new
+ * renewal of the same prescription meanwhile. Specs that need to start one settle those first
+ * with a system denial (test setup only; this goes through the audited append path).
+ */
+export async function settleSeededRenewals(patientId: string) {
+  const sql = e2eSql();
+  try {
+    const rows = await sql<{ renewal_id: string }[]>`
+      SELECT renewal_id FROM rx_status WHERE patient_id = ${patientId}
+        AND status NOT IN ('approved', 'denied', 'follow_up_required', 'filled', 'cancelled')`;
+    for (const r of rows) {
+      const stream = `renewal-${r.renewal_id}`;
+      const [v] = await sql<
+        { n: string }[]
+      >`SELECT count(*) AS n FROM events WHERE stream_id = ${stream}`;
+      await appendToStream(
+        sql,
+        stream,
+        Number(v!.n),
+        [
+          makeEvent("RenewalDenied", {
+            v: 1,
+            renewalId: r.renewal_id,
+            reason: "e2e setup: settle seeded renewal",
+            by: "system",
+          }),
+        ],
+        { actor: "e2e-setup", role: "system", action: "e2e:settle-seeded-renewal" },
+      );
+    }
+  } finally {
+    await sql.end();
+  }
 }

@@ -68,6 +68,23 @@ export async function listPatientMedsForRenewal(
  */
 const RESUMABLE = new Set(["requested", "identity_verified"]);
 
+/**
+ * Statuses after which nothing more is in flight for the pharmacy or the care team, so a NEW
+ * renewal of the same prescription may start. "approved" (not "queued") means the approval never
+ * produced a transmission. Anything unknown counts as in flight (fail closed).
+ */
+const TERMINAL = new Set(["approved", "denied", "follow_up_required", "filled", "cancelled"]);
+
+export function isRenewalInFlight(r: { status: string; pharmacyStatus: string | null }): boolean {
+  if (RESUMABLE.has(r.status)) return false; // handled by resume, not a block
+  if (TERMINAL.has(r.status)) return false;
+  // A pharmacy error is final only when it is explicitly not retryable.
+  if (r.status === "pharmacy_error") {
+    return !(r.pharmacyStatus?.startsWith("ERROR:") && !r.pharmacyStatus.endsWith(":retryable"));
+  }
+  return true;
+}
+
 export type NextStep = "verify" | "check-in" | "result";
 
 export function nextStepFor(status: string): NextStep {
@@ -180,11 +197,19 @@ export async function startRenewal(
     );
   }
 
-  const existing = (await listOwnedRenewals(sql, patientId)).find(
-    (r) => r.prescriptionId === prescriptionId && RESUMABLE.has(r.status),
+  const sameRx = (await listOwnedRenewals(sql, patientId)).filter(
+    (r) => r.prescriptionId === prescriptionId,
   );
+  const existing = sameRx.find((r) => RESUMABLE.has(r.status));
   if (existing) {
     return { renewalId: existing.renewalId, next: nextStepFor(existing.status), resumed: true };
+  }
+  // Never a second renewal of the same prescription while another is still in flight.
+  if (sameRx.some(isRenewalInFlight)) {
+    throw new PatientInputError(
+      "ALREADY_IN_PROGRESS",
+      "A renewal for this medication is already in progress.",
+    );
   }
 
   const renewalId = randomUUID();

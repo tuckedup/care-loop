@@ -11,6 +11,8 @@ const ERRORS: Record<string, string> = {
     "Controlled medications cannot be renewed here. Please contact your clinician.",
   NOT_RENEWABLE: "That medication cannot be renewed here. Please contact your clinician.",
   NOT_FOUND: "We could not find that medication or renewal.",
+  ALREADY_IN_PROGRESS:
+    "A renewal for this medication is already in progress. See its progress under Renewal status.",
   INVALID_INPUT: "Please choose a medication.",
 };
 

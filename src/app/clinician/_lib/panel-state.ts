@@ -49,9 +49,15 @@ export function panelState(
   let bookReason = decisionReason;
   if (followUpOnly) bookReason = bookedAlready ? "A visit is already booked." : null;
 
+  // Approving without a patient-confirmed pharmacy would record an approval that can never be
+  // sent, so Approve is disabled with a reason instead of silently stranding the renewal.
+  const hasPharmacy = data.events.some((e) => e.event.type === "PharmacySelected");
   const approveReason =
     decisionReason === null
-      ? approvalBlock({ outcome, reasonCodes: row.reasonCodes, failedRuleIds })
+      ? (approvalBlock({ outcome, reasonCodes: row.reasonCodes, failedRuleIds }) ??
+        (hasPharmacy
+          ? null
+          : "No confirmed pharmacy: the patient has not confirmed one, so an approval could not be sent."))
       : null;
   return {
     renewalId: row.renewalId,

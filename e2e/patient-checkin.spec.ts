@@ -3,6 +3,7 @@ import { buildSeedPlan } from "../src/domain/seed";
 import { loginAsPatient } from "./support/auth";
 import { fillCheckIn } from "./support/checkin";
 import { E2E_SEED, resetAndSeedDb } from "./support/db";
+import { settleSeededRenewals } from "./support/clinician";
 import { confirmPharmacy } from "./support/pharmacy";
 
 // Seeded patient with a prior PHQ-9 on file (escitalopram). Identity comes from the seed plan so
@@ -15,6 +16,7 @@ let context: BrowserContext;
 let page: Page;
 test.beforeAll(async ({ browser, baseURL }) => {
   await resetAndSeedDb();
+  await settleSeededRenewals(patient.patientId);
   context = await browser.newContext({ baseURL: baseURL! });
   page = await context.newPage();
   await loginAsPatient(context, patient.patientId);

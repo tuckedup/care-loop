@@ -4,7 +4,7 @@ import { prescribeMedication } from "../src/domain/patient/handlers";
 import { getFormularyEntry } from "../src/domain/formulary";
 import { DEMO_SUBJECTS } from "../src/infra/auth/session";
 import { resetAndSeedDb } from "./support/db";
-import { e2eSql, loginAs, submitRenewalAsPatient } from "./support/clinician";
+import { e2eSql, loginAs, settleSeededRenewals, submitRenewalAsPatient } from "./support/clinician";
 
 test.describe.configure({ mode: "serial" });
 
@@ -19,6 +19,7 @@ let bookId = "";
 
 test.beforeAll(async () => {
   await resetAndSeedDb();
+  await settleSeededRenewals("patient-prior-phq9");
   // Dose change: a new sertraline prescription supersedes the old one (old = stopped).
   const sql = e2eSql();
   try {
@@ -185,7 +186,7 @@ test("a second clinician cannot decide a renewal another clinician is reviewing"
 }) => {
   const id = await submitRenewalAsPatient(page, context, {
     ...demo,
-    prescriptionId: "rx-demo-buspirone",
+    prescriptionId: "rx-demo-sertraline-150",
     score: 0,
   });
   await loginAs(context, "clinician", DEMO_SUBJECTS.clinician);

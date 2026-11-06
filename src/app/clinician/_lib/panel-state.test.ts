@@ -24,7 +24,8 @@ const row = (over: Partial<RenewalQueueRow> = {}): RenewalQueueRow => ({
   requestPosition: 1n,
   ...over,
 });
-const data = (r: RenewalQueueRow, events: VisitData["events"] = []) =>
+const withPharmacy = [{ event: { type: "PharmacySelected" } }] as unknown as VisitData["events"];
+const data = (r: RenewalQueueRow, events: VisitData["events"] = withPharmacy) =>
   ({ row: r, events }) as VisitData;
 const state = (
   r: RenewalQueueRow,
@@ -48,6 +49,21 @@ describe("panelState: RBAC", () => {
     expect(s.reviewState).toBe("other_reviewer");
     expect(s.decisionReason).toMatch(/c-other/);
     expect(s.startReason).not.toBeNull();
+  });
+});
+
+describe("panelState: no confirmed pharmacy", () => {
+  it("Approve is disabled with an explanation when the patient never confirmed a pharmacy", () => {
+    const mine = row({ status: "in-progress", clinicianId: "c1", escalated: false });
+    const s = panelState(data(mine, []), "clinician", "c1", false, [], "AUTO_ELIGIBLE");
+    expect(s.approveReason).toMatch(/No confirmed pharmacy/);
+    expect(s.decisionReason).toBeNull(); // deny / book visit stay available
+  });
+  it("is enabled once a pharmacy is on the stream", () => {
+    const mine = row({ status: "in-progress", clinicianId: "c1", escalated: false });
+    expect(
+      panelState(data(mine), "clinician", "c1", false, [], "AUTO_ELIGIBLE").approveReason,
+    ).toBeNull();
   });
 });
 

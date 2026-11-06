@@ -267,6 +267,32 @@ describe("pharmacy responses through the worker", () => {
     ).toMatchObject({ kind: "cancel", status: "open" });
   });
 
+  it("a fill delivered in the same answer as a retryable error does not re-send", async () => {
+    const r = await approvedRenewal(db.sql);
+    const pharmacy = scriptedFetch([
+      {
+        status: 200,
+        messages: [
+          { type: "RxFill", messageId: `${r.renewalId}:fill` },
+          { ...err(true), messageId: `${r.renewalId}:err` },
+        ],
+      },
+    ]);
+    hour += 1;
+    let stats = await work(pharmacy.fetch);
+    expect(stats).toMatchObject({ claimed: 1, retried: 1 });
+    expect(pharmacy.calls).toHaveLength(1);
+    expect(await streamTypes(db.sql, r.renewalId)).toContain("RxFillReceived");
+    // The retry comes due; the handler sees the fill and does not call the pharmacy again.
+    hour += 1;
+    stats = await work(pharmacy.fetch);
+    expect(stats).toMatchObject({ claimed: 1, done: 1 });
+    expect(pharmacy.calls).toHaveLength(1);
+    expect(
+      (await streamTypes(db.sql, r.renewalId)).filter((t) => t === "RxFillReceived"),
+    ).toHaveLength(1);
+  });
+
   it("rx_status and pharmacy_alerts rebuilt from position 0 equal the incremental result", async () => {
     await sync();
     const snap = async () =>

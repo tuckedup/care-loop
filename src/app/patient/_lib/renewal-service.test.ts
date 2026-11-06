@@ -1,15 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runSeed } from "../../../../scripts/db-seed-lib";
 import { DEMO_PATIENT_ID, DEMO_PATIENT_IDENTITY } from "@/domain/seed";
+import { makeEvent } from "@/domain/events";
+import { appendToStream } from "@/infra/audit";
+import { readStream } from "@/infra/event-store";
 import { createTestDb, type TestDb } from "@/test/db";
 import {
   checkInFromFormData,
   getOwnedRenewal,
+  isRenewalInFlight,
   listPatientMedsForRenewal,
   nextStepFor,
   PatientInputError,
   resultStateFor,
   startRenewal,
+  syncProjections,
   submitPatientCheckIn,
   verifyPatientIdentity,
 } from "./renewal-service";
@@ -180,5 +185,65 @@ describe("renew -> verify -> check-in", () => {
       checkInFromFormData(validAnswers()),
     );
     expect(again).toMatchObject({ ok: false, formError: expect.any(String) });
+  });
+});
+
+describe("no second renewal while one is in flight", () => {
+  it("isRenewalInFlight: terminal vs in flight, unknown fails closed", () => {
+    const r = (status: string, pharmacyStatus: string | null = null) =>
+      isRenewalInFlight({ status, pharmacyStatus });
+    for (const s of ["approved", "denied", "follow_up_required", "filled", "cancelled"]) {
+      expect(r(s)).toBe(false);
+    }
+    for (const s of [
+      "checked_in",
+      "evaluated",
+      "escalated",
+      "in_review",
+      "queued",
+      "transmitted",
+      "pharmacy_status",
+      "something_new",
+    ]) {
+      expect(r(s)).toBe(true);
+    }
+    expect(r("pharmacy_error", "ERROR:UNKNOWN_PRESCRIPTION")).toBe(false); // fatal: settled
+    expect(r("pharmacy_error", "ERROR:PHARMACY_BUSY:retryable")).toBe(true);
+    expect(r("pharmacy_error", null)).toBe(true); // unknown => in flight
+  });
+
+  it("a checked-in renewal blocks a new one for the same prescription (other meds are unaffected)", async () => {
+    // The previous describe left a checked-in sertraline renewal.
+    await expect(startRenewal(db.sql, DEMO_PATIENT_ID, "rx-demo-sertraline")).rejects.toMatchObject(
+      {
+        code: "ALREADY_IN_PROGRESS",
+      },
+    );
+    const other = await startRenewal(db.sql, DEMO_PATIENT_ID, "rx-demo-buspirone");
+    expect(other.resumed).toBe(false);
+  });
+
+  it("once the renewal is denied (terminal), a new one can start", async () => {
+    const [row] = await db.sql.unsafe<{ renewal_id: string }[]>(
+      `SELECT renewal_id FROM rx_status WHERE prescription_id = 'rx-demo-sertraline' AND status = 'checked_in'`,
+    );
+    await appendToStream(
+      db.sql,
+      `renewal-${row!.renewal_id}`,
+      (await readStream(db.sql, `renewal-${row!.renewal_id}`)).length,
+      [
+        makeEvent("RenewalDenied", {
+          v: 1,
+          renewalId: row!.renewal_id,
+          reason: "test",
+          by: "system",
+        }),
+      ],
+      { actor: "t", role: "system", action: "t" },
+    );
+    await syncProjections(db.sql);
+    const next = await startRenewal(db.sql, DEMO_PATIENT_ID, "rx-demo-sertraline");
+    expect(next.resumed).toBe(false);
+    expect(next.renewalId).not.toBe(row!.renewal_id);
   });
 });
