@@ -435,7 +435,7 @@ describe("coverage floor, environment guard and live mode (process level)", () =
 
   it("a controlled case whose medication is no longer blocked fails the gate", () => {
     const s = stageEdited((cases) => {
-      const c = cases.get("ai-controlled-never-called");
+      const c = cases.get("ai-controlled-never-called")!;
       c.med = { rxcui: "4493", name: "fluoxetine", doseMg: 20, frequency: "daily", controlledSchedule: null, formularyId: "fluoxetine" };
       c.history.activeOrder = { status: "active", intent: "order", rxcui: "4493" };
       c.expected = { outcome: "ESCALATE", reasonCodes: ["LLM_RISK_SIGNAL"] };
