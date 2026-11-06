@@ -17,6 +17,7 @@ const LABELS: Record<string, string> = {
   pharmacy_status: "Pharmacy is processing",
   pharmacy_error: "Pharmacy problem: your care team is working on it",
   filled: "Filled",
+  cancelled: "Cancelled by the pharmacy: your care team will contact you",
   follow_up_required: "Follow-up visit needed",
 };
 

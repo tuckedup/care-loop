@@ -119,3 +119,29 @@ export async function approvedRenewal(sql: Sql, o: ScenarioOptions = {}) {
 export async function streamTypes(sql: Sql, renewalId: string): Promise<string[]> {
   return (await readStream(sql, `renewal-${renewalId}`)).map((e) => e.type);
 }
+
+export interface ScriptedAnswer {
+  status: number;
+  messages?: unknown[];
+  /** Replace the whole body (e.g. garbage). */
+  body?: unknown;
+}
+
+/** fetch stand-in answering from a script (the last answer repeats); records every call. */
+export function scriptedFetch(script: Array<ScriptedAnswer | Error>) {
+  const calls: { url: string; headers: Record<string, string>; body: Record<string, unknown> }[] =
+    [];
+  const fetchFn = async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({
+      url: String(input),
+      headers: Object.fromEntries(new Headers(init?.headers).entries()),
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    });
+    const a = script[Math.min(calls.length - 1, script.length - 1)]!;
+    if (a instanceof Error) throw a;
+    return new Response(JSON.stringify(a.body ?? { messages: a.messages ?? [] }), {
+      status: a.status,
+    });
+  };
+  return { calls, fetch: fetchFn as unknown as typeof fetch };
+}

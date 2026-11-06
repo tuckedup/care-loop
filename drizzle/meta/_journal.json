@@ -85,6 +85,13 @@
       "when": 1793961629578,
       "tag": "0011_queue_placeholder_selfheal",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793997462090,
+      "tag": "0012_pharmacy_alerts",
+      "breakpoints": true
     }
   ]
 }

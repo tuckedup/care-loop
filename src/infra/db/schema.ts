@@ -248,3 +248,30 @@ export const outbox = pgTable(
     check("outbox_attempts_check", sql`${t.attempts} >= 0`),
   ],
 );
+
+// Projection: pharmacy alerts for people (F054): pharmacist escalations, non-retryable pharmacy
+// errors and cancel acknowledgements, keyed by the pharmacy's messageId. Rebuildable from events.
+export const pharmacyAlerts = pgTable(
+  "pharmacy_alerts",
+  {
+    messageId: text("message_id").primaryKey(),
+    renewalId: text("renewal_id").notNull(),
+    patientId: text("patient_id"),
+    // escalation | error | cancel
+    kind: text("kind").notNull(),
+    code: text("code"),
+    message: text("message").notNull(),
+    raisedAt: timestamp("raised_at", { withTimezone: true }).notNull(),
+    raisedPosition: bigint("raised_position", { mode: "bigint" }).notNull(),
+    // open | acknowledged
+    status: text("status").notNull().default("open"),
+    acknowledgedBy: text("acknowledged_by"),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("pharmacy_alerts_status_idx").on(t.status, t.raisedPosition),
+    index("pharmacy_alerts_renewal_idx").on(t.renewalId),
+    check("pharmacy_alerts_kind_check", sql`${t.kind} in ('escalation', 'error', 'cancel')`),
+    check("pharmacy_alerts_status_check", sql`${t.status} in ('open', 'acknowledged')`),
+  ],
+);

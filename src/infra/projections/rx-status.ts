@@ -17,6 +17,7 @@ export type RxStatusValue =
   | "pharmacy_status"
   | "pharmacy_error"
   | "filled"
+  | "cancelled"
   | "follow_up_required";
 
 export interface RxStatusRow {
@@ -41,6 +42,7 @@ const STICKY: ReadonlySet<RxStatusValue> = new Set([
   "pharmacy_status",
   "pharmacy_error",
   "filled",
+  "cancelled",
 ]);
 
 /**
@@ -74,6 +76,22 @@ export function reduceRxStatus(
       case "EligibilityEvaluated":
       case "ClinicianReviewStarted":
         return current;
+      default:
+    }
+  }
+  // Pharmacy progress: a fill or a cancel acknowledgement ends it. Late or duplicated pharmacy
+  // messages (a delayed Status after the fill) never walk the row backwards, and a fill never
+  // overrides a cancel.
+  if (current !== null && (current.status === "filled" || current.status === "cancelled")) {
+    switch (event.type) {
+      case "RxRenewalQueued":
+      case "RxRenewalTransmitted":
+      case "PharmacyStatusReceived":
+      case "PharmacyErrorReceived":
+        return current;
+      case "RxFillReceived":
+        if (current.status === "cancelled") return current;
+        break;
       default:
     }
   }
@@ -115,6 +133,8 @@ export function reduceRxStatus(
       });
     case "RxFillReceived":
       return base("filled");
+    case "RxCancelAcknowledged":
+      return base("cancelled");
     case "FollowUpRequired":
       return base("follow_up_required");
     default:

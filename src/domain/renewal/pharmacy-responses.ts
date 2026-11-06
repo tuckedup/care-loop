@@ -92,21 +92,13 @@ export function decidePharmacyResponse(
   const out: DomainEvent[] = [];
   const { messages, invalid } = parsePharmacyBody(input.body);
   const queued = history.some((e) => e.type === "RxRenewalQueued");
-  const cancelled = history.some((e) => e.type === "RxCancelAcknowledged");
+  let cancelled = history.some((e) => e.type === "RxCancelAcknowledged");
   const seen = seenIds(history);
   const accepted = input.httpStatus >= 200 && input.httpStatus < 300;
 
-  // Accepted by the pharmacy: the transmission happened (once per idempotency key).
   const alreadyTransmitted = history.some(
     (e) => e.type === "RxRenewalTransmitted" && e.data.idempotencyKey === input.idempotencyKey,
   );
-  if (accepted && queued && !alreadyTransmitted) {
-    out.push({
-      type: "RxRenewalTransmitted",
-      data: { v: 1, renewalId, messageId: input.messageId, idempotencyKey: input.idempotencyKey },
-    });
-  }
-
   let retryable: string | null = null;
   let fatal: string | null = null;
   for (const m of messages) {
@@ -142,6 +134,7 @@ export function decidePharmacyResponse(
         }
         break;
       case "CancelRx":
+        cancelled = true;
         out.push({
           type: "RxCancelAcknowledged",
           data: { v: 1, renewalId, messageId: m.messageId },
@@ -173,6 +166,15 @@ export function decidePharmacyResponse(
       events: out.length,
     };
   } else {
+    outcome = { kind: "ok", events: out.length };
+  }
+  // Accepted by the pharmacy (a clean, non-error answer): the transmission happened, once per
+  // idempotency key. A garbled or error answer is NOT a transmission, so its retry still sends.
+  if (outcome.kind === "ok" && accepted && queued && !alreadyTransmitted) {
+    out.unshift({
+      type: "RxRenewalTransmitted",
+      data: { v: 1, renewalId, messageId: input.messageId, idempotencyKey: input.idempotencyKey },
+    });
     outcome = { kind: "ok", events: out.length };
   }
   return { events: out, outcome };
