@@ -129,3 +129,22 @@ which includes the patient's free text and side-effect text, is sent to the trac
 the trace contain only signal types and counts, not quotes. Failures to reach Langfuse are
 swallowed. The request format was written from the author's understanding of the Langfuse batch
 ingestion API and has not been verified against a live Langfuse instance.
+
+## Cited visit summary (F041)
+
+`src/ai/summarize.ts` produces a short, display-only summary for the clinician visit view. It is not
+an input to any rule, escalation, approval or event. Each line must carry a `sourceId` that is one
+of the ids the server supplied: an event id of that renewal (`evt-<global position>`), a visit
+event of the same patient, or a visit-note id. The server drops any line that is uncited, cites an
+unknown id, is malformed or is a duplicate, and shows how many lines were removed. It fails closed:
+no client, no model, a timeout, an error, non-JSON or schema-invalid output, or no valid cited line
+left all yield "Summary unavailable" with no summary text, and the clinician actions are never
+blocked. The same positive AI gate as the decision pipeline runs first, so controlled or
+unidentified medications never reach the model (tested with a spy client). Patient free text is
+placed inside the prompt as delimited data and cannot forge the delimiter.
+
+Known limits: the summary has not been run against a live model; its quality is not evaluated (no
+CREOLA-style labelling yet, see SPEC section 11); the call carries no idempotency key (it is a
+read-only generation); successful summaries are cached in process memory for five minutes. Test
+fixtures are hand-written (synthetic-handwritten). `SUMMARY_FIXTURE=synthetic-handwritten` enables a
+hand-written fixture model outside production only, for e2e.

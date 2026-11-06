@@ -77,3 +77,13 @@ version (`src/ai/__fixtures__/tripwire-ce058db.ts`, a regression oracle that mus
 also covered by the current tripwire. Do not weaken that test to land a lexicon change. The
 `scripts/eval-gate.test.ts` subprocess tests use asynchronous `spawn`, not `spawnSync`, because a
 blocking child process starves vitest's worker RPC channel and the run exits non-zero.
+
+## Visit summary agent (F041)
+
+`summarizeRenewal` (`src/ai/summarize.ts`) uses the same injectable `RiskLlmClient` as risk
+extraction and the same fail-closed discipline, but it is display-only. Rules for changes: it must
+never feed a decision, an escalation or an event; every shown line must cite a server-supplied
+source id and the server must drop the rest; any failure shows "Summary unavailable" and no text;
+it must run behind `isAiPathAllowed` and `isAiPathPermitted` (controlled or unidentified
+medications make zero client calls). The visit view renders each citation as an anchor to the
+source event on the same page.
