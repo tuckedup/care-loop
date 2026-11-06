@@ -33,22 +33,87 @@ export function formularyIdFor(order: Pick<PrescribedOrder, "rxcui" | "drugName"
   return null;
 }
 
-const NUMBER = /\d+(?:[.,]\d+)?/g;
+/** Units a dose in a name may use. Only mass units convert; anything else is a mismatch. */
+const MASS_TO_MG: Readonly<Record<string, number>> = {
+  mg: 1,
+  g: 1000,
+  mcg: 0.001,
+  ug: 0.001,
+  µg: 0.001, // micro sign
+  μg: 0.001, // Greek mu
+};
+const UNIT_WORDS = /^(mcg|mg|ug|µg|μg|kg|ml|meq|iu|units?|g|l|%)(?![a-z])/;
+const NUMBER_WORDS =
+  /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|half|quarter)\b/;
 
 /**
- * If the order's name text carries a number (a dose written into the name), it must equal the
- * structured dose. Any other number disagrees and is reported. Fullwidth and other compatibility
- * digits are folded first (NFKC); non-ASCII leftovers are M01's job.
+ * Parses one numeric token. Returns the value, or null when the separators are ambiguous
+ * ("1,5", "1.000", "1.000,5"): ambiguity never resolves in the patient's favour.
+ */
+export function parseAmbiguousNumber(t: string): number | null {
+  if (/^\d+$/.test(t)) return Number(t);
+  const hasComma = t.includes(",");
+  const hasDot = t.includes(".");
+  const groups = (sep: string) => t.split(sep);
+  const thousands = (sep: string) => {
+    const g = groups(sep);
+    return g[0]!.length >= 1 && g[0]!.length <= 3 && g.slice(1).every((x) => /^\d{3}$/.test(x));
+  };
+  if (hasComma && !hasDot) {
+    return thousands(",") ? Number(t.replaceAll(",", "")) : null;
+  }
+  if (hasDot && !hasComma) {
+    const g = groups(".");
+    if (g.length !== 2 || g[1] === "" || g[1]!.length === 3) return null; // "1.000" is ambiguous
+    return Number(t);
+  }
+  // Both separators: only "1,234.5" (commas as thousands, one trailing dot) is unambiguous.
+  const lastComma = t.lastIndexOf(",");
+  const lastDot = t.lastIndexOf(".");
+  if (lastComma > lastDot) return null;
+  const [intPart, frac, ...rest] = t.split(".");
+  if (rest.length > 0 || !frac || !intPart) return null;
+  const g = intPart.split(",");
+  if (!(g[0]!.length >= 1 && g[0]!.length <= 3 && g.slice(1).every((x) => /^\d{3}$/.test(x)))) {
+    return null;
+  }
+  return Number(`${g.join("")}.${frac}`);
+}
+
+/**
+ * A dose written into the order's name text must equal the structured dose in mg. Reported as a
+ * problem (=> escalate): any non-ASCII digit, any number word, an unparseable or ambiguous
+ * number, a non-mass unit, or a different amount. Mass units convert exactly (1 g = 1000 mg,
+ * 1000 mcg = 1 mg). A bare number is read as mg.
  */
 export function doseInNameProblems(drugName: string, doseMg: number): string[] {
-  const folded = drugName.normalize("NFKC");
-  const found = folded.match(NUMBER) ?? [];
-  const bad = found.filter((t) => Number(t.replace(",", ".")) !== doseMg);
-  return bad.length > 0
-    ? [
-        `order name "${drugName}" contains ${bad.join(", ")} but the structured dose is ${doseMg} mg`,
-      ]
-    : [];
+  const problems: string[] = [];
+  const text = drugName.toLowerCase();
+  if (/[^\x00-\x7f]/.test(text) && /\p{N}/u.test(text.replace(/[0-9]/g, ""))) {
+    problems.push("name contains non-ASCII digits or numerals");
+  }
+  if (NUMBER_WORDS.test(text)) problems.push("name contains a number written as a word");
+  const re = /\d[\d.,]*\d|\d/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const token = m[0];
+    const amount = parseAmbiguousNumber(token);
+    const rest = text.slice(m.index + token.length).replace(/^\s*/, "");
+    const unit = UNIT_WORDS.exec(rest)?.[1];
+    if (amount === null) {
+      problems.push(`name has an ambiguous number "${token}"`);
+    } else if (unit !== undefined && MASS_TO_MG[unit] === undefined) {
+      problems.push(`name has a non-mass unit "${token} ${unit}"`);
+    } else {
+      const inMg = amount * (unit === undefined ? 1 : MASS_TO_MG[unit]!);
+      if (Math.abs(inMg - doseMg) > 1e-9) {
+        problems.push(
+          `name has ${token}${unit ? ` ${unit}` : ""} but the structured dose is ${doseMg} mg`,
+        );
+      }
+    }
+  }
+  return problems;
 }
 
 export interface OrderIntegrity {
@@ -107,6 +172,14 @@ export interface HistoryFacts {
   approvals: PositionedEvent<EventData<"RenewalApproved">>[];
   visitsBooked: PositionedEvent<EventData<"VisitBooked">>[];
   notesSigned: PositionedEvent<EventData<"VisitNoteSigned">>[];
+  /** Check-ins and denials of the patient's renewals (in-flight counting). Optional for tests. */
+  checkIns?: PositionedEvent<{ renewalId: string }>[];
+  denials?: PositionedEvent<{ renewalId: string }>[];
+  /**
+   * Non-empty when the patient's history held schema-invalid events of the kinds the counter
+   * reads. The counter is then UNKNOWN (P02): never trust or under-count it.
+   */
+  unreliable?: string[];
 }
 
 /**
@@ -137,7 +210,28 @@ export function countRenewalsSinceLastVisit(
       )
       .map((r) => r.data.renewalId),
   );
-  return facts.approvals.filter((a) => mine.has(a.data.renewalId) && a.position > lastVisit).length;
+  const approved = new Set(
+    facts.approvals.filter((a) => mine.has(a.data.renewalId)).map((a) => a.data.renewalId),
+  );
+  const denied = new Set((facts.denials ?? []).map((d) => d.data.renewalId));
+  const counted = facts.approvals.filter(
+    (a) => mine.has(a.data.renewalId) && a.position > lastVisit,
+  ).length;
+  // Conservative in-flight rule: another renewal of the same prescription with a check-in after
+  // the last visit that is neither approved (already counted) nor denied counts as one. Two
+  // concurrent renewals therefore each see the other and can never both pass below the limit.
+  const inFlight = new Set(
+    (facts.checkIns ?? [])
+      .filter(
+        (c) =>
+          mine.has(c.data.renewalId) &&
+          c.position > lastVisit &&
+          !approved.has(c.data.renewalId) &&
+          !denied.has(c.data.renewalId),
+      )
+      .map((c) => c.data.renewalId),
+  );
+  return counted + inFlight.size;
 }
 
 /** Last PHQ-9 total from the patient's earlier check-ins (before the current one), or null. */
@@ -204,6 +298,18 @@ export function buildRuleInput(src: RuleInputSources): RuleInput {
     checkIn: checkInInput,
     priorPhq9Total: src.priorPhq9Total,
     monitoring: monitoringFrom(order, src.now),
+  };
+}
+
+export const COUNTER_CHECK = "P02";
+
+/** P02: the refill counter must be knowable. Unknown history is never treated as zero. */
+export function counterResult(facts: Pick<HistoryFacts, "unreliable">): RuleResult {
+  const bad = facts.unreliable ?? [];
+  return {
+    ruleId: COUNTER_CHECK as RuleResult["ruleId"],
+    passed: bad.length === 0,
+    detail: bad.length === 0 ? "renewal history readable" : `unreadable history: ${bad.join("; ")}`,
   };
 }
 

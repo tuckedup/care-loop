@@ -48,14 +48,21 @@ export const AiRecordSchema = z.discriminatedUnion("status", [
     latencyMs: z.number().int().min(0),
   }),
   /** The AI gate said no (controlled or unidentified medication): no LLM call happened. */
-  z.object({ status: z.literal("not_attempted"), reason: z.string().min(1).max(100) }),
+  z.object({
+    status: z.literal("not_attempted"),
+    reason: z.string().min(1).max(100),
+    /** Local tripwire signals (pure code, not an LLM); they only ADD escalation. */
+    signals: z.array(RiskSignalSchema).default([]),
+  }),
 ]);
-export type AiRecord = z.infer<typeof AiRecordSchema>;
+export type AiRecord = z.input<typeof AiRecordSchema>;
 
 export const RecordEvaluationSchema = z.object({
   renewalId: id,
   patientId: id,
   ai: AiRecordSchema,
+  /** Extra reasons that force an escalation (e.g. a failed local safety scan). */
+  extraEscalationCodes: z.array(ReasonCodeStr).default([]),
   evaluation: z.object({
     outcome: OutcomeTypeSchema,
     results: eventSchemas.EligibilityEvaluated.shape.results,
@@ -65,7 +72,7 @@ export const RecordEvaluationSchema = z.object({
     reason: z.string().min(1).max(500).optional(),
   }),
 });
-export type RecordEvaluation = { type: "RecordEvaluation" } & z.infer<
+export type RecordEvaluation = { type: "RecordEvaluation" } & z.input<
   typeof RecordEvaluationSchema
 >;
 
@@ -92,7 +99,10 @@ export type Approve = { type: "Approve" } & z.input<typeof ApproveSchema>;
 export type Deny = { type: "Deny" } & z.input<typeof DenySchema>;
 export type BookVisit = { type: "BookVisit" } & z.input<typeof BookVisitSchema>;
 
-export type ReviewCommand = RecordEvaluation | StartReview | Approve | Deny | BookVisit;
+export type EscalatePipelineError = { type: "EscalatePipelineError"; renewalId: string };
+
+export type ReviewCommand =
+  EscalatePipelineError | RecordEvaluation | StartReview | Approve | Deny | BookVisit;
 
 // ---------------------------------------------------------------------------------------------
 // State
@@ -111,6 +121,8 @@ export interface ReviewState {
   /** Reason codes seen on RenewalEscalated / failed rules (used to spot controlled substances). */
   reasonCodes: string[];
   controlled: boolean;
+  /** R01 / R02 / R03 failed: the renewal can be denied or followed up, never approved. */
+  blocked: boolean;
   /** Clinician from the FIRST ClinicianReviewStarted (never reassigned, like the queue). */
   reviewerId: string | null;
   decision: Decision | null;
@@ -128,6 +140,7 @@ export const reviewInitialState: ReviewState = {
   escalated: false,
   reasonCodes: [],
   controlled: false,
+  blocked: false,
   reviewerId: null,
   decision: null,
   decidedBy: null,
@@ -157,6 +170,7 @@ export function evolveReview(state: ReviewState, event: DomainEvent): ReviewStat
         escalated: state.escalated || event.data.outcome === "ESCALATE",
         // R03 failing at all marks the renewal controlled (hard block on any approval).
         controlled: state.controlled || failed.includes("R03"),
+        blocked: state.blocked || failed.some((r) => HARD_BLOCK_RULES.includes(r)),
       };
     }
     case "RenewalEscalated":
@@ -215,6 +229,11 @@ function parse<S extends z.ZodType>(schema: S, command: unknown): z.output<S> {
 /** Reason codes that make the rules' REJECT unsafe to apply without a human. */
 const unique = (xs: readonly string[]) => [...new Set(xs)];
 
+/** Failed rules that make approval impossible (identity, formulary, controlled substance). */
+const HARD_BLOCK_RULES: readonly string[] = ["R01", "R02", "R03"];
+/** Failures that are purely administrative: the only ones a system denial may rest on. */
+const ADMIN_RULES: readonly string[] = ["R01", "R02"];
+
 function decideRecordEvaluation(state: ReviewState, cmd: RecordEvaluation): DomainEvent[] {
   const c = parse(RecordEvaluationSchema, cmd);
   if (!state.requested)
@@ -231,15 +250,20 @@ function decideRecordEvaluation(state: ReviewState, cmd: RecordEvaluation): Doma
   const { renewalId, patientId, ai, evaluation } = c;
   const events: DomainEvent[] = [];
 
-  if (ai.status !== "not_attempted" && (ai.status === "ok" || ai.signals.length > 0)) {
+  if (ai.status === "ok" || ai.signals.length > 0) {
     events.push({
       type: "RiskSignalsExtracted",
       data: {
         v: 1,
         renewalId,
         signals: ai.signals,
-        model: ai.status === "ok" ? ai.model : `unavailable:${ai.reason}`,
-        latencyMs: ai.latencyMs,
+        model:
+          ai.status === "ok"
+            ? ai.model
+            : ai.status === "failed"
+              ? `unavailable:${ai.reason}`
+              : `local-tripwire:${ai.reason}`,
+        latencyMs: ai.status === "not_attempted" ? 0 : ai.latencyMs,
       },
     });
   }
@@ -248,18 +272,35 @@ function decideRecordEvaluation(state: ReviewState, cmd: RecordEvaluation): Doma
     data: { v: 1, renewalId, results: evaluation.results, outcome: evaluation.outcome },
   });
 
-  const aiSignals = ai.status === "not_attempted" ? 0 : ai.signals.length;
+  const aiSignals = ai.signals.length;
   const aiFailed = ai.status === "failed";
-  const ruleFailed = (ruleId: string) =>
-    evaluation.results.some((r) => r.ruleId === ruleId && !r.passed);
-  const controlled = ruleFailed("R03") || evaluation.reasonCodes.includes("CONTROLLED_SUBSTANCE");
+  const failedIds = evaluation.results.filter((r) => !r.passed).map((r) => r.ruleId);
+  const controlled =
+    failedIds.includes("R03") || evaluation.reasonCodes.includes("CONTROLLED_SUBSTANCE");
+  const forced = c.extraEscalationCodes.length > 0;
+  // R13 fails merely because the AI gate blocked the path; that is not a safety signal.
+  const benignR13 = ai.status === "not_attempted" && aiSignals === 0;
+  const safetyFailure = failedIds.some(
+    (id) => !ADMIN_RULES.includes(id) && !(id === "R13" && benignR13),
+  );
+  // A system denial rests ONLY on purely administrative failures (R01/R02) with no safety rule,
+  // integrity check, tripwire hit or AI signal anywhere. Anything else is seen by a person.
+  const administrativeReject =
+    evaluation.outcome === "REJECT" && !safetyFailure && aiSignals === 0 && !aiFailed && !forced;
 
-  // Escalation is emitted for ESCALATE, any AI signal, any AI failure (it can only ADD), and for
-  // a controlled-substance REJECT: a person, not a silent auto-denial, handles those.
-  const escalate = evaluation.outcome === "ESCALATE" || aiSignals > 0 || aiFailed || controlled;
+  // Escalation only ever ADDS: it is emitted for ESCALATE, any AI/tripwire signal, any AI failure,
+  // a controlled substance, and for every REJECT that is not purely administrative.
+  const escalate =
+    evaluation.outcome === "ESCALATE" ||
+    aiSignals > 0 ||
+    aiFailed ||
+    controlled ||
+    forced ||
+    (evaluation.outcome === "REJECT" && !administrativeReject);
   if (escalate) {
     const codes = unique([
       ...evaluation.reasonCodes,
+      ...c.extraEscalationCodes,
       ...(aiSignals > 0 ? ["LLM_RISK_SIGNAL"] : []),
       ...(aiFailed ? ["LLM_FAILURE"] : []),
       ...(controlled ? ["CONTROLLED_SUBSTANCE"] : []),
@@ -330,6 +371,19 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
   switch (command.type) {
     case "RecordEvaluation":
       return decideRecordEvaluation(state, command);
+    case "EscalatePipelineError": {
+      // System-only fail-closed marker: only ever ADDS an escalation, never decides.
+      if (!state.requested) {
+        throw new DomainError("RENEWAL_NOT_REQUESTED", "renewal has not been requested");
+      }
+      if (state.escalated || state.decision !== null) return [];
+      return [
+        {
+          type: "RenewalEscalated",
+          data: { v: 1, renewalId: command.renewalId, reasonCodes: ["PIPELINE_ERROR"] },
+        },
+      ];
+    }
     case "StartReview": {
       const c = parse(StartReviewSchema, command);
       requireClinician(c.actorRole, c.clinicianId);
@@ -352,17 +406,17 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
       const c = parse(ApproveSchema, command);
       requireClinician(c.actorRole, c.clinicianId);
       requireOpen(state);
-      if (state.outcome === "REJECT") {
-        throw new DomainError("APPROVAL_OF_REJECTED", "a rejected renewal cannot be approved");
-      }
-      if (state.outcome === "FOLLOW_UP_REQUIRED") {
-        throw new DomainError("APPROVAL_OF_FOLLOW_UP", "a follow-up visit is required first");
-      }
       if (state.controlled) {
         throw new DomainError(
           "CONTROLLED_NOT_APPROVABLE",
           "controlled substances are not approvable here",
         );
+      }
+      if (state.outcome === "REJECT" || state.blocked) {
+        throw new DomainError("APPROVAL_OF_REJECTED", "a rejected renewal cannot be approved");
+      }
+      if (state.outcome === "FOLLOW_UP_REQUIRED") {
+        throw new DomainError("APPROVAL_OF_FOLLOW_UP", "a follow-up visit is required first");
       }
       if (state.escalated) {
         requireSameReviewer(state, c.clinicianId);

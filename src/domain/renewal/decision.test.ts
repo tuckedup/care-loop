@@ -468,7 +468,7 @@ describe("process manager against Postgres (F036)", () => {
       ai: aiDepsFor(spyClient()),
       now: () => NOW,
     });
-    expect(r).toMatchObject({ status: "evaluated", outcome: "ESCALATE" });
+    expect(r).toMatchObject({ status: "evaluated", outcome: "REJECT" });
     const esc = (await readStream(db.sql, renewalStreamId(ghost.renewalId))).at(-1)!;
     expect((esc.data as { reasonCodes: string[] }).reasonCodes).toContain("ORDER_NOT_FOUND");
   });
@@ -618,7 +618,10 @@ describe("process manager against Postgres (F036)", () => {
     const pending = await findPendingRenewals(db.sql, 500);
     expect(pending).not.toContain(a.renewalId);
     expect(pending).not.toContain(b.renewalId);
-    expect(await runPendingEvaluations(db.sql, deps, 500)).toEqual({ processed: 0, failed: 0 });
+    expect(await runPendingEvaluations(db.sql, deps, 500)).toMatchObject({
+      processed: 0,
+      failed: 0,
+    });
   });
 
   it("never appends RenewalApproved and keeps the audit chain valid", async () => {

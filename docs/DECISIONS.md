@@ -196,3 +196,34 @@ monitoring.
   (`/api/cron/decisions`); the patient check-in action should call it (outside this feature's files).
 - Verified/unverified quote flags and signal origin are not persisted (`RiskSignalsExtracted` has no
   field for them).
+
+### Amendments after the independent safety review (F036/F037/F042)
+
+- A system denial (`RenewalDenied` by system) rests ONLY on purely administrative failures (R01/R02).
+  If any safety rule (R04-R12, drug-specific, R00), an integrity check (P01/P02), a local tripwire hit
+  or any AI signal/failure exists, a clinician sees the renewal: `RenewalEscalated` carries the union of
+  every failed rule's reason codes plus `LLM_RISK_SIGNAL` / `LLM_FAILURE` where they apply. A blocked AI
+  path is reported as `AI_PATH_BLOCKED`, not as an LLM failure.
+- The local tripwire (`detectTripwire`, pure deterministic code, not an LLM) runs even when the AI path
+  is blocked; its signals are stored in `RiskSignalsExtracted` with model `local-tripwire:<reason>`.
+- The rules' outcome is never overwritten: a REJECT stays REJECT and escalation is a separate fact.
+  Approve is refused when the outcome is REJECT or any of R01/R02/R03 failed (controlled substances give
+  `CONTROLLED_NOT_APPROVABLE`); the clinician may still deny or book a visit.
+- P01 (order integrity) compares only mass units (mg, g, mcg/ug/micro-g, converted exactly), reads a bare
+  number as mg, and treats other units, ambiguous separators ("1,5", "1.000"), non-ASCII digits and
+  number words as mismatches. P01 failing also blocks the LLM call.
+- P02 (refill counter integrity): a schema-invalid RenewalRequested / RenewalApproved / RenewalDenied /
+  CheckInSubmitted / VisitBooked / VisitNoteSigned in the patient's history makes the counter unknown
+  and forces an escalation (`REFILL_COUNT_UNKNOWN`). The counter counts approvals since the last signed
+  visit PLUS in-flight renewals of the same prescription (a check-in after the last visit, neither
+  approved nor denied, not the current one), so concurrent renewals each see the others and cannot all
+  slip under the limit. This over-counts stuck, unresolved renewals until a visit resets it: intended.
+- The catch-up runner isolates each renewal, pages past failures with a cursor, and escalates a failing
+  renewal with `RenewalEscalated{PIPELINE_ERROR}` (best effort); failure counts and opaque renewal ids
+  are returned by the cron route and unmarkable failures are logged with a non-PHI code.
+- ACCEPTED DEVIATION (flag for the owner): the extraction call has no idempotency key because
+  `RiskLlmRequest` has none and `src/ai` is out of scope. The call is read-only inference with no
+  side effects and the aggregate stores one result per renewal, so a duplicate call is wasteful but
+  harmless. This departs from "every external call takes an idempotency key" for read-only LLM inference.
+- Observed outside this scope: the `patient_med_list` projection throws on a schema-invalid
+  `MedicationPrescribed` event, which halts that projection run.

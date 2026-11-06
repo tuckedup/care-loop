@@ -21,7 +21,8 @@ export async function GET(request: Request): Promise<Response> {
       ai: riskDepsFromEnv(),
       refillLimit: loadConfig().REFILL_LIMIT,
     });
-    return Response.json({ ok: true, ...stats });
+    // failedIds are opaque renewal ids (no PHI); failures were escalated or logged, never silent.
+    return Response.json({ ok: stats.failed === 0, ...stats });
   } catch {
     return Response.json({ error: "pipeline_failed" }, { status: 500 });
   }

@@ -185,6 +185,10 @@ describe("Approve", () => {
       .then({ code: "ALREADY_DECIDED" });
     given(reviewAggregate, ...base, evaluated("REJECT", "R03"), escalated, started("c1"))
       .when(cmd.approve("c1"))
+      .then({ code: "CONTROLLED_NOT_APPROVABLE" });
+    // A REJECT with no controlled flag but a failed hard-block rule is refused too.
+    given(reviewAggregate, ...base, evaluated("REJECT", "R02"), escalated, started("c1"))
+      .when(cmd.approve("c1"))
       .then({ code: "APPROVAL_OF_REJECTED" });
   });
   it("rejects approval of a controlled-substance renewal", () => {
