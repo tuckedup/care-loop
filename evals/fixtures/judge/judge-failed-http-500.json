@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned judge response (synthetic-handwritten); no live judge was run. Transport error.",
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "error",
+    "error": "http_500"
+  }
+}

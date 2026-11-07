@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { runAiStage } from "../evals/ai-runner";
+import type { JudgeEvalMetrics } from "../evals/judge-metrics";
 import { computePins, serialize } from "./eval-pins";
 import {
   computeMetrics,
@@ -156,12 +157,37 @@ const result = (o: Partial<CaseResult>): CaseResult => ({
   usedAi: true,
   ...o,
 });
+/** A judge section that satisfies its gate; the judge gate itself is tested in judge.test.ts. */
+const goodJudge: JudgeEvalMetrics = {
+  labelSource: "fixture-judge-synthetic-handwritten",
+  liveJudgeRun: false,
+  promptVersion: "test",
+  cases: 12,
+  judged: 6,
+  judgeFailed: 6,
+  expectedJudgeFailed: 6,
+  unexpectedJudgeFailures: [],
+  labelMismatches: [],
+  linesJudged: 6,
+  linesDroppedUpstream: 1,
+  hallucination: { major: 1, minor: 0 },
+  omission: { major: 1, minor: 0 },
+  cleanCases: 1,
+  casesWithMajorFinding: 2,
+  perCase: [],
+};
 const cm = (
   results: CaseResult[],
   mode: "rules-only" | "fixtures" | "live",
   c?: CitationStats,
   extras: Parameters<typeof computeMetrics>[3] = {},
-) => computeMetrics(results, mode, c, { manifestFailures: [], blockedAiCases: 2, ...extras });
+) =>
+  computeMetrics(results, mode, c, {
+    manifestFailures: [],
+    blockedAiCases: 2,
+    judge: goodJudge,
+    ...extras,
+  });
 const cites = (modelSignals: number, verified: number, tripwire = 0): CitationStats => ({
   modelSignals,
   modelSignalsVerified: verified,

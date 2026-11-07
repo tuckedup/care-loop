@@ -1,0 +1,37 @@
+{
+  "id": "judge-stale-and-uncited-dropped-upstream",
+  "scenario": "One line cites an id that is not a source (stale) and one cites nothing; both are dropped before judging",
+  "labeledFrom": "Hand label from the product contract (SPEC section 5: uncited lines are dropped): 'evt-999' is not among the supplied sources and the last line has no sourceId, so two lines are dropped upstream. The remaining line restates evt-701 exactly.",
+  "sources": [
+    {
+      "id": "evt-701",
+      "text": "PHQ-9 total 4, item 9 = 0."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "PHQ-9 total 4, item 9 = 0.",
+      "sourceId": "evt-701"
+    },
+    {
+      "text": "Patient had a hospital visit last month.",
+      "sourceId": "evt-999"
+    },
+    {
+      "text": "Mood is stable."
+    }
+  ],
+  "escalated": false,
+  "judgeFixture": "judge-stale-and-uncited-dropped-upstream",
+  "expected": {
+    "status": "judged",
+    "droppedUpstream": 2,
+    "lines": [
+      {
+        "verdict": "supported",
+        "severity": null
+      }
+    ],
+    "omissions": []
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "judge-omits-item9",
+  "scenario": "Summary only covers sleep and appetite and leaves out the positive item 9",
+  "labeledFrom": "Hand label from the sources: the only line restates evt-302 exactly (supported); evt-301 records a positive PHQ-9 item 9 (= 2), which is safety-relevant and absent from the summary: MAJOR omission.",
+  "sources": [
+    {
+      "id": "evt-301",
+      "text": "PHQ-9 total 6, item 9 = 2 (positive)."
+    },
+    {
+      "id": "evt-302",
+      "text": "Sleep and appetite items score 1 each."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "Sleep and appetite items each score 1.",
+      "sourceId": "evt-302"
+    }
+  ],
+  "escalated": true,
+  "judgeFixture": "judge-omits-item9",
+  "expected": {
+    "status": "judged",
+    "droppedUpstream": 0,
+    "lines": [
+      {
+        "verdict": "supported",
+        "severity": null
+      }
+    ],
+    "omissions": [
+      {
+        "sourceId": "evt-301",
+        "severity": "major"
+      }
+    ]
+  }
+}

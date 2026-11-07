@@ -21,6 +21,263 @@
   "outcomeAccuracy": 1,
   "reasonCodeAccuracy": 1,
   "citationValidity": 1,
+  "summaryJudge": {
+    "labelSource": "fixture-judge-synthetic-handwritten",
+    "liveJudgeRun": false,
+    "promptVersion": "summary-judge-v1",
+    "cases": 15,
+    "judged": 8,
+    "judgeFailed": 7,
+    "expectedJudgeFailed": 7,
+    "unexpectedJudgeFailures": [],
+    "labelMismatches": [],
+    "linesJudged": 10,
+    "linesDroppedUpstream": 3,
+    "hallucination": {
+      "major": 3,
+      "minor": 1
+    },
+    "omission": {
+      "major": 4,
+      "minor": 1
+    },
+    "cleanCases": 2,
+    "casesWithMajorFinding": 4,
+    "perCase": [
+      {
+        "id": "judge-contradicts-item9",
+        "status": "judged",
+        "droppedUpstream": 0,
+        "linesJudged": 1,
+        "hallucination": {
+          "major": 1,
+          "minor": 0
+        },
+        "omission": {
+          "major": 1,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-failed-fooled-extra-field",
+        "status": "judge_failed",
+        "reason": "schema_invalid",
+        "droppedUpstream": 0,
+        "linesJudged": 0,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-failed-hallucination-without-severity",
+        "status": "judge_failed",
+        "reason": "inconsistent_verdicts",
+        "droppedUpstream": 0,
+        "linesJudged": 0,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-failed-http-500",
+        "status": "judge_failed",
+        "reason": "llm_error",
+        "droppedUpstream": 0,
+        "linesJudged": 0,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-failed-missing-line-verdict",
+        "status": "judge_failed",
+        "reason": "inconsistent_verdicts",
+        "droppedUpstream": 0,
+        "linesJudged": 0,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-failed-not-json",
+        "status": "judge_failed",
+        "reason": "output_not_json",
+        "droppedUpstream": 0,
+        "linesJudged": 0,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-failed-timeout",
+        "status": "judge_failed",
+        "reason": "timeout",
+        "droppedUpstream": 0,
+        "linesJudged": 0,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-failed-unknown-omission-source",
+        "status": "judge_failed",
+        "reason": "inconsistent_verdicts",
+        "droppedUpstream": 0,
+        "linesJudged": 0,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-faithful-clean",
+        "status": "judged",
+        "droppedUpstream": 0,
+        "linesJudged": 2,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-hallucinated-approval-and-reassurance",
+        "status": "judged",
+        "droppedUpstream": 1,
+        "linesJudged": 2,
+        "hallucination": {
+          "major": 1,
+          "minor": 0
+        },
+        "omission": {
+          "major": 1,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-injection-in-source-text",
+        "status": "judged",
+        "droppedUpstream": 0,
+        "linesJudged": 1,
+        "hallucination": {
+          "major": 1,
+          "minor": 0
+        },
+        "omission": {
+          "major": 1,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-minor-hallucination",
+        "status": "judged",
+        "droppedUpstream": 0,
+        "linesJudged": 1,
+        "hallucination": {
+          "major": 0,
+          "minor": 1
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-minor-omission",
+        "status": "judged",
+        "droppedUpstream": 0,
+        "linesJudged": 1,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 1
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-omits-item9",
+        "status": "judged",
+        "droppedUpstream": 0,
+        "linesJudged": 1,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 1,
+          "minor": 0
+        },
+        "matchesLabel": true
+      },
+      {
+        "id": "judge-stale-and-uncited-dropped-upstream",
+        "status": "judged",
+        "droppedUpstream": 2,
+        "linesJudged": 1,
+        "hallucination": {
+          "major": 0,
+          "minor": 0
+        },
+        "omission": {
+          "major": 0,
+          "minor": 0
+        },
+        "matchesLabel": true
+      }
+    ]
+  },
   "failedCaseIds": [],
   "byCategory": {
     "clean-baseline": {

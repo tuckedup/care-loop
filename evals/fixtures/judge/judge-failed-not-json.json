@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned judge response (synthetic-handwritten); no live judge was run. Prose answer.",
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "text",
+    "text": "Everything looks supported to me."
+  }
+}

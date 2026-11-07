@@ -210,3 +210,27 @@ asserted to still fail by `scripts/evals-count.test.ts` so they cannot go stale 
 - Mirtazapine monitoring: SPEC names baseline and six-month monitoring only. The due point
   (>= 6 months since baseline) and the absence of a recurrence interval are implementation
   choices. TODO: source needed.
+
+## CREOLA-style summary judge (F067)
+
+`src/ai/judge.ts` is an EVAL-ONLY judge (a test proves no module under `src/app`, `src/domain`,
+`src/infra` or any other `src/ai` file imports it). It labels each clinician-summary line against the
+text of the source it cites as supported or hallucination, and lists omissions of source content,
+each major or minor. The major/minor definitions are this repo's own simplification in the spirit of
+CREOLA, not a reproduction of a published protocol and not clinically validated. Output is a strict
+Zod schema (unknown keys such as an `approve` field are rejected) cross-checked against the input;
+any failure (no client, timeout, error, non-JSON, schema-invalid, missing or duplicate line verdicts,
+a hallucination without severity, an omission naming an unknown source) yields `judge_failed`,
+which is counted separately and never reported as "no problems found".
+
+The CREOLA-style labels in `evals/results/latest.json` (`summaryJudge`) come from FIXTURE
+JUDGMENTS: hand-written canned judge responses (`evals/fixtures/judge/*`, `synthetic-handwritten`)
+checked against hand labels written from the source texts. `summaryJudge.labelSource` is
+`fixture-judge-synthetic-handwritten` and `liveJudgeRun` is `false`. No live judge has ever run, so
+these numbers measure the pipeline (parsing, fail-closed handling, upstream filtering, metrics),
+not the quality of any real summariser or judge. `pnpm eval:live` runs only the judge against the
+real API on the same hand-written summary lines; it is implemented but UNTESTED. A judge using the
+same model as the summariser may share its blind spots. The judge cases include a summary that
+asserts clearance for an escalated renewal, an omitted positive item 9, a reversed item 9, and lines
+dropped upstream (uncited or stale ids, approval wording). The upstream deny-list is heuristic;
+the judge section's expected labels assume its documented behaviour.

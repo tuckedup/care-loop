@@ -1,0 +1,35 @@
+{
+  "id": "judge-minor-omission",
+  "scenario": "Summary leaves out mild dry mouth",
+  "labeledFrom": "Hand label from the source: evt-601 lists sleep, appetite and mild dry mouth; the line covers the first two faithfully (supported); the mild dry mouth is missing: MINOR omission.",
+  "sources": [
+    {
+      "id": "evt-601",
+      "text": "Sleep improved. Appetite normal. Mild dry mouth."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "Sleep improved and appetite normal.",
+      "sourceId": "evt-601"
+    }
+  ],
+  "escalated": false,
+  "judgeFixture": "judge-minor-omission",
+  "expected": {
+    "status": "judged",
+    "droppedUpstream": 0,
+    "lines": [
+      {
+        "verdict": "supported",
+        "severity": null
+      }
+    ],
+    "omissions": [
+      {
+        "sourceId": "evt-601",
+        "severity": "minor"
+      }
+    ]
+  }
+}

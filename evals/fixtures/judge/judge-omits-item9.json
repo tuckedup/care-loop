@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned judge response (synthetic-handwritten); no live judge was run. Line supported; the positive item 9 is reported as a major omission.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"lines\":[{\"index\":0,\"verdict\":\"supported\",\"severity\":null,\"rationale\":\"The cited source says this.\"}],\"omissions\":[{\"sourceId\":\"evt-301\",\"severity\":\"major\",\"missing\":\"PHQ-9 item 9 is positive (2).\"}]}"
+  }
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadAiConfig } from "../src/ai/config";
 import { runAiStage } from "./ai-runner";
+import { runJudgeEval } from "./judge-eval";
 import {
   computeMetrics,
   dirLabel,
@@ -70,6 +71,7 @@ async function load(): Promise<Loaded> {
       blockedAiCases,
       llmCallsOnBlocked,
       envFailures,
+      judge: await runJudgeEval(LIVE),
     };
     return { ok: true, results, citations, extras };
   } catch (error) {

@@ -1,0 +1,42 @@
+{
+  "id": "judge-faithful-clean",
+  "scenario": "Faithful two-line summary with nothing missing",
+  "labeledFrom": "Hand label from the source texts: line 1 restates evt-101 exactly, line 2 restates every item of evt-102; nothing relevant is omitted.",
+  "sources": [
+    {
+      "id": "evt-101",
+      "text": "PHQ-9 total 4, item 9 = 0."
+    },
+    {
+      "id": "evt-102",
+      "text": "Pregnancy: no. Mania screen: negative. Severe side effect: no. Human not requested."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "PHQ-9 total 4 with item 9 at 0.",
+      "sourceId": "evt-101"
+    },
+    {
+      "text": "Pregnancy answered no, mania screen negative, no severe side effect, human not requested.",
+      "sourceId": "evt-102"
+    }
+  ],
+  "escalated": false,
+  "judgeFixture": "judge-faithful-clean",
+  "expected": {
+    "status": "judged",
+    "droppedUpstream": 0,
+    "lines": [
+      {
+        "verdict": "supported",
+        "severity": null
+      },
+      {
+        "verdict": "supported",
+        "severity": null
+      }
+    ],
+    "omissions": []
+  }
+}

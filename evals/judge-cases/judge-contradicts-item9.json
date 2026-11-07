@@ -1,0 +1,35 @@
+{
+  "id": "judge-contradicts-item9",
+  "scenario": "Summary says item 9 was 0 although the source says 2",
+  "labeledFrom": "Hand label from the source: evt-401 says item 9 = 2 (positive); the line says it was 0, a reversed risk finding: MAJOR hallucination. The positive finding is therefore also absent: MAJOR omission.",
+  "sources": [
+    {
+      "id": "evt-401",
+      "text": "PHQ-9 total 6, item 9 = 2 (positive)."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "PHQ-9 item 9 was 0 at this check-in.",
+      "sourceId": "evt-401"
+    }
+  ],
+  "escalated": true,
+  "judgeFixture": "judge-contradicts-item9",
+  "expected": {
+    "status": "judged",
+    "droppedUpstream": 0,
+    "lines": [
+      {
+        "verdict": "hallucination",
+        "severity": "major"
+      }
+    ],
+    "omissions": [
+      {
+        "sourceId": "evt-401",
+        "severity": "major"
+      }
+    ]
+  }
+}

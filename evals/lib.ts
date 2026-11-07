@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { evaluateEligibility, type RuleInput } from "../src/domain/rules";
+import { judgeGateFailures, type JudgeEvalMetrics } from "./judge-metrics";
 import { EvalCaseSchema, isRiskCategory, type EvalCase } from "./schema";
 
 /** Stamped into results as generatedBy so a results file names the harness that produced it. */
@@ -364,6 +365,8 @@ export interface CoverageExtras {
   /** "default" or a relative override path (stamped into results). */
   casesDirLabel?: string;
   fixturesDirLabel?: string;
+  /** CREOLA-style summary judge section; undefined = not computed => gate fails. */
+  judge?: JudgeEvalMetrics;
 }
 
 export interface Metrics {
@@ -402,6 +405,8 @@ export interface Metrics {
   reasonCodeAccuracy: number;
   /** Valid / all MODEL-produced signals. null = nothing was checked, which fails the gate. */
   citationValidity: number | null;
+  /** CREOLA-style summary-judge metrics (fixture judgments unless liveJudgeRun). */
+  summaryJudge: JudgeEvalMetrics | null;
   failedCaseIds: string[];
   byCategory: Record<
     string,
@@ -482,6 +487,7 @@ export function computeMetrics(
       ? results.filter((r) => r.reasonsMatch).length / results.length
       : 0,
     citationValidity,
+    summaryJudge: extras.judge ?? null,
     failedCaseIds: results.filter((r) => !(r.outcomeMatch && r.reasonsMatch)).map((r) => r.id),
     byCategory,
   };
@@ -508,6 +514,7 @@ export function gateFailures(m: Metrics): string[] {
     f.push("no model signals were citation-checked (citation validity undefined)");
   if (m.citationValidity !== null && m.citationValidity < 1)
     f.push(`citation validity ${m.citationValidity} < 1.0`);
+  f.push(...judgeGateFailures(m.summaryJudge));
   if (m.failedCaseIds.length > 0)
     f.push(`cases not matching labels: ${m.failedCaseIds.join(", ")}`);
   return f;

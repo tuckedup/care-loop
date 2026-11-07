@@ -1,0 +1,32 @@
+{
+  "id": "judge-failed-not-json",
+  "scenario": "Judge answers in prose instead of JSON",
+  "labeledFrom": "Hand label from the judge's fail-closed contract (src/ai/judge.ts): non-JSON output is invalid. A failed judgment must be reported as judge_failed with reason output_not_json, never as 'no problems found'.",
+  "sources": [
+    {
+      "id": "evt-901",
+      "text": "PHQ-9 total 4, item 9 = 0."
+    },
+    {
+      "id": "evt-902",
+      "text": "Sleep improved."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "PHQ-9 total 4, item 9 = 0.",
+      "sourceId": "evt-901"
+    },
+    {
+      "text": "Sleep improved.",
+      "sourceId": "evt-902"
+    }
+  ],
+  "escalated": false,
+  "judgeFixture": "judge-failed-not-json",
+  "expected": {
+    "status": "judge_failed",
+    "droppedUpstream": 0,
+    "reason": "output_not_json"
+  }
+}

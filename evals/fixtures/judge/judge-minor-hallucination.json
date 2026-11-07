@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned judge response (synthetic-handwritten); no live judge was run. The added headache is a minor hallucination.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"lines\":[{\"index\":0,\"verdict\":\"hallucination\",\"severity\":\"minor\",\"rationale\":\"Headache is not in the source.\"}],\"omissions\":[]}"
+  }
+}

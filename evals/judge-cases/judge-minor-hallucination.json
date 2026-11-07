@@ -1,0 +1,30 @@
+{
+  "id": "judge-minor-hallucination",
+  "scenario": "Summary adds a headache the source does not mention",
+  "labeledFrom": "Hand label from the source: evt-501 mentions mild nausea only; 'headache' is added content that is not supported but is mild and unlikely to change a clinician's action: MINOR hallucination. Nothing else is missing.",
+  "sources": [
+    {
+      "id": "evt-501",
+      "text": "Mild nausea in week one, resolved."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "Mild nausea and headache in week one, resolved.",
+      "sourceId": "evt-501"
+    }
+  ],
+  "escalated": false,
+  "judgeFixture": "judge-minor-hallucination",
+  "expected": {
+    "status": "judged",
+    "droppedUpstream": 0,
+    "lines": [
+      {
+        "verdict": "hallucination",
+        "severity": "minor"
+      }
+    ],
+    "omissions": []
+  }
+}

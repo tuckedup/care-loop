@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned judge response (synthetic-handwritten); no live judge was run. Flags the reassurance as a major hallucination and the missing escalation reason as a major omission.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"lines\":[{\"index\":0,\"verdict\":\"supported\",\"severity\":null,\"rationale\":\"The cited source says this.\"},{\"index\":1,\"verdict\":\"hallucination\",\"severity\":\"major\",\"rationale\":\"The source says the renewal was escalated; nothing supports 'fine overall'.\"}],\"omissions\":[{\"sourceId\":\"evt-202\",\"severity\":\"major\",\"missing\":\"The renewal was escalated for pregnancy yes or unsure.\"}]}"
+  }
+}

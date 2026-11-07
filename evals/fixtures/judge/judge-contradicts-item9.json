@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned judge response (synthetic-handwritten); no live judge was run. Reversed risk finding: major hallucination plus major omission.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"lines\":[{\"index\":0,\"verdict\":\"hallucination\",\"severity\":\"major\",\"rationale\":\"The source says item 9 = 2, not 0.\"}],\"omissions\":[{\"sourceId\":\"evt-401\",\"severity\":\"major\",\"missing\":\"Positive PHQ-9 item 9.\"}]}"
+  }
+}

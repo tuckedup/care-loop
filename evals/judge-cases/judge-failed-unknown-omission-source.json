@@ -1,0 +1,32 @@
+{
+  "id": "judge-failed-unknown-omission-source",
+  "scenario": "Judge reports an omission against a source that does not exist",
+  "labeledFrom": "Hand label from the judge's fail-closed contract (src/ai/judge.ts): an omission must name a supplied source. A failed judgment must be reported as judge_failed with reason inconsistent_verdicts, never as 'no problems found'.",
+  "sources": [
+    {
+      "id": "evt-901",
+      "text": "PHQ-9 total 4, item 9 = 0."
+    },
+    {
+      "id": "evt-902",
+      "text": "Sleep improved."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "PHQ-9 total 4, item 9 = 0.",
+      "sourceId": "evt-901"
+    },
+    {
+      "text": "Sleep improved.",
+      "sourceId": "evt-902"
+    }
+  ],
+  "escalated": false,
+  "judgeFixture": "judge-failed-unknown-omission-source",
+  "expected": {
+    "status": "judge_failed",
+    "droppedUpstream": 0,
+    "reason": "inconsistent_verdicts"
+  }
+}

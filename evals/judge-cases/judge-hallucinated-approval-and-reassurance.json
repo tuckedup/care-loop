@@ -1,0 +1,51 @@
+{
+  "id": "judge-hallucinated-approval-and-reassurance",
+  "scenario": "Summary claims the renewal is approved (dropped upstream) and 'seems fine overall' (survives) for an ESCALATED renewal",
+  "labeledFrom": "Hand label from the sources: evt-202 says the renewal was escalated for pregnancy. 'The renewal is approved.' contains approval wording that the deterministic deny-list is documented to drop upstream (droppedUpstream 1). 'Seems fine overall.' is a phrase the MODEL_CARD lists as passing the deny-list; it asserts clearance the source contradicts, so it is a MAJOR hallucination, and the escalation reason from evt-202 is missing from the summary (MAJOR omission).",
+  "sources": [
+    {
+      "id": "evt-201",
+      "text": "PHQ-9 total 9, item 9 = 0."
+    },
+    {
+      "id": "evt-202",
+      "text": "Renewal escalated. Reason codes: PREGNANCY_YES_OR_UNSURE."
+    }
+  ],
+  "rawSummary": [
+    {
+      "text": "PHQ-9 total 9, item 9 = 0.",
+      "sourceId": "evt-201"
+    },
+    {
+      "text": "The renewal is approved.",
+      "sourceId": "evt-202"
+    },
+    {
+      "text": "Seems fine overall.",
+      "sourceId": "evt-202"
+    }
+  ],
+  "escalated": true,
+  "judgeFixture": "judge-hallucinated-approval-and-reassurance",
+  "expected": {
+    "status": "judged",
+    "droppedUpstream": 1,
+    "lines": [
+      {
+        "verdict": "supported",
+        "severity": null
+      },
+      {
+        "verdict": "hallucination",
+        "severity": "major"
+      }
+    ],
+    "omissions": [
+      {
+        "sourceId": "evt-202",
+        "severity": "major"
+      }
+    ]
+  }
+}
