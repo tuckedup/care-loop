@@ -4,7 +4,9 @@
 //   3. runs the fail-closed extraction with an INJECTED client (real client only via env),
 //   4. runs the deterministic rules (evaluateEligibility) plus a pipeline order-integrity check,
 //   5. records the result through the review aggregate (RecordEvaluation) in ONE audited append.
-// It never emits RenewalApproved: AUTO_ELIGIBLE awaits a clinician until autonomy modes (F059).
+// It never approves by itself: AUTO_ELIGIBLE awaits a clinician unless the admin autonomy mode is
+// RETRO / SAMPLED (F059), in which case the review aggregate's AutoApprove command (the only
+// system-approval path, with its own guards) is tried AFTER the evaluation is recorded.
 // The LLM result is data handed to the rules; it can only add escalation signals.
 import type { Sql } from "postgres";
 import { isAiPathPermitted } from "@/ai/ai-path-gate";
@@ -33,6 +35,7 @@ import {
   type PrescribedOrder,
 } from "../renewal/decision";
 import { renewalStreamId } from "../renewal/renewal";
+import { resolveAutonomyDeps, tryAutoApprove, type AutonomyDeps } from "../autonomy/auto-approve";
 import { reviewAggregate, type AiRecord, type RecordEvaluation } from "../renewal/review";
 import { evaluateEligibility, isAiPathAllowed, type AiResult } from "../rules";
 
@@ -47,10 +50,15 @@ export interface PipelineDeps {
   now?: () => Date;
   /** Config REFILL_LIMIT; the rules never read env. */
   refillLimit?: number;
+  /**
+   * Autonomy settings (mode, SEED, SAMPLE_RATE). Absent => read from the settings stream and
+   * config; any problem reads as SHADOW (no auto-approval).
+   */
+  autonomy?: AutonomyDeps;
 }
 
 export type PipelineResult =
-  | { status: "evaluated"; outcome: string; events: string[] }
+  | { status: "evaluated"; outcome: string; events: string[]; autoApproved?: true }
   | { status: "already_evaluated" }
   | { status: "not_ready"; reason: string };
 
@@ -308,7 +316,17 @@ export async function evaluateRenewal(
     },
   });
   if (!handled.appended) return { status: "already_evaluated" };
-  return { status: "evaluated", outcome, events: handled.appended.events.map((e) => e.type) };
+  const events = handled.appended.events.map((e) => e.type);
+  // Only a clean AUTO_ELIGIBLE evaluation (no escalation emitted) is even offered to the autonomy
+  // step; the aggregate re-checks every guard from the stream. It never throws.
+  if (outcome === "AUTO_ELIGIBLE" && !events.includes("RenewalEscalated")) {
+    const autonomy = deps.autonomy ?? (await resolveAutonomyDeps(sql));
+    const auto = await tryAutoApprove(sql, renewalId, autonomy, { now });
+    if (auto.status === "auto_approved") {
+      return { status: "evaluated", outcome, events, autoApproved: true };
+    }
+  }
+  return { status: "evaluated", outcome, events };
 }
 
 export interface PendingRenewal {

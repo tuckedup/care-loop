@@ -235,13 +235,23 @@ const payloads = {
     messageId: id,
     acknowledgedBy: id,
   }),
-  AuditSampleSelected: z.object({ v: v1, renewalId: id }),
+  AuditSampleSelected: z.object({
+    v: v1,
+    renewalId: id,
+    /** Additive (F060): why the auto-approval was queued for retrospective review. */
+    reason: z.string().min(1).max(200).optional(),
+  }),
   RetroReviewRecorded: z.object({
     v: v1,
     renewalId: id,
     reviewerId: id,
     concur: z.boolean(),
   }),
+  /**
+   * Additive (F059): the admin-chosen autonomy mode, on the settings stream. Absent => SHADOW.
+   * `changedBy` is the admin's session subject (never request input).
+   */
+  AutonomyModeChanged: z.object({ v: v1, mode: AutonomyModeSchema, changedBy: id }),
 } as const;
 
 export const eventSchemas = payloads;

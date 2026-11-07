@@ -2,8 +2,11 @@
 // actions. Pure: no I/O, no clocks, no LLM. It folds the SAME renewal stream as renewal.ts.
 //
 // Safety contract (kept in step with the renewal_queue projection, which is the read side):
-//  - RenewalApproved{by:"system"} cannot be emitted by any command here. Approve always emits
-//    by:"clinician" with a named clinician id.
+//  - RenewalApproved{by:"system"} is emitted ONLY by AutoApprove (F059), which refuses unless the
+//    rules' outcome is AUTO_ELIGIBLE with every rule passed, the AI recorded a clean result (no
+//    signals, no failure), nothing is escalated/controlled/blocked, identity is verified and a
+//    pharmacy is confirmed, and the mode is RETRO or SAMPLED (the schema has no SHADOW). Approve
+//    always emits by:"clinician" with a named clinician id.
 //  - An escalated renewal is approved only by the clinician who started its review.
 //  - A clinician denial or visit booking also requires that same clinician's review start, because
 //    the queue attributes a denial only through ClinicianReviewStarted.
@@ -21,6 +24,7 @@ import {
 } from "../events";
 import { invalidCommand } from "../patient/patient";
 import { rxIdempotencyKey, rxMessageId } from "../pharmacy-keys";
+import { sampleReasonFor } from "../autonomy/sampling";
 
 const id = z.string().min(1).max(200);
 
@@ -105,10 +109,36 @@ export type Approve = { type: "Approve" } & z.input<typeof ApproveSchema>;
 export type Deny = { type: "Deny" } & z.input<typeof DenySchema>;
 export type BookVisit = { type: "BookVisit" } & z.input<typeof BookVisitSchema>;
 
+/** F059: SHADOW is deliberately not representable here: it never auto-approves. */
+export const AutoApproveSchema = z.object({
+  renewalId: id,
+  autonomyMode: z.enum(["RETRO", "SAMPLED"]),
+  seed: z.number().int(),
+  sampleRate: z.number().min(0).max(1),
+});
+export type AutoApprove = { type: "AutoApprove" } & z.input<typeof AutoApproveSchema>;
+
+export const RecordRetroReviewSchema = z.object({
+  renewalId: id,
+  clinicianId: id,
+  actorRole: ActorRoleSchema,
+  concur: z.boolean(),
+});
+export type RecordRetroReview = { type: "RecordRetroReview" } & z.input<
+  typeof RecordRetroReviewSchema
+>;
+
 export type EscalatePipelineError = { type: "EscalatePipelineError"; renewalId: string };
 
 export type ReviewCommand =
-  EscalatePipelineError | RecordEvaluation | StartReview | Approve | Deny | BookVisit;
+  | EscalatePipelineError
+  | RecordEvaluation
+  | StartReview
+  | Approve
+  | AutoApprove
+  | RecordRetroReview
+  | Deny
+  | BookVisit;
 
 // ---------------------------------------------------------------------------------------------
 // State
@@ -141,6 +171,14 @@ export interface ReviewState {
   pharmacyId: string | null;
   /** An RxRenewalQueued is already on the stream (never queued twice). */
   queued: boolean;
+  /** Additive (F059): every rule in the recorded evaluation passed. */
+  rulesClean: boolean;
+  /** The AI returned a clean result (RiskSignalsExtracted with no signals and no failure marker). */
+  aiClean: boolean;
+  /** Additive (F060): queued for retrospective review (AuditSampleSelected seen). */
+  sampled: boolean;
+  /** A RetroReviewRecorded is already on the stream (one review per renewal). */
+  retroReviewed: boolean;
 }
 
 export const reviewInitialState: ReviewState = {
@@ -162,6 +200,10 @@ export const reviewInitialState: ReviewState = {
   prescriptionId: null,
   pharmacyId: null,
   queued: false,
+  rulesClean: false,
+  aiClean: false,
+  sampled: false,
+  retroReviewed: false,
 };
 
 export function evolveReview(state: ReviewState, event: DomainEvent): ReviewState {
@@ -185,15 +227,29 @@ export function evolveReview(state: ReviewState, event: DomainEvent): ReviewStat
     case "CheckInSubmitted":
       return { ...state, checkInSubmitted: true };
     case "RiskSignalsExtracted":
-      return event.data.signals.length > 0
-        ? { ...state, escalated: true, reasonCodes: [...state.reasonCodes, "LLM_RISK_SIGNAL"] }
-        : state;
+      if (event.data.signals.length > 0) {
+        return {
+          ...state,
+          escalated: true,
+          aiClean: false,
+          reasonCodes: [...state.reasonCodes, "LLM_RISK_SIGNAL"],
+        };
+      }
+      // Failure / local-tripwire markers (model "unavailable:*", "local-tripwire:*") are not a clean result.
+      return /^(unavailable|local-tripwire):/.test(event.data.model)
+        ? state
+        : { ...state, aiClean: !state.escalated };
+    case "AuditSampleSelected":
+      return { ...state, sampled: true };
+    case "RetroReviewRecorded":
+      return { ...state, retroReviewed: true };
     case "EligibilityEvaluated": {
       const failed = event.data.results.filter((r) => !r.passed).map((r) => r.ruleId);
       return {
         ...state,
         evaluated: true,
         outcome: event.data.outcome,
+        rulesClean: event.data.results.every((r) => r.passed),
         escalated: state.escalated || event.data.outcome === "ESCALATE",
         // R03 failing at all marks the renewal controlled (hard block on any approval).
         controlled: state.controlled || failed.includes("R03"),
@@ -405,6 +461,55 @@ function requireSameReviewer(state: ReviewState, clinicianId: string): void {
   }
 }
 
+/**
+ * F059: the ONLY place a system approval is decided. Every refusal is a DomainError
+ * AUTO_APPROVAL_REFUSED (the caller then leaves the renewal for a clinician: SHADOW behaviour).
+ * Evidence comes from the stream itself, never from the caller.
+ */
+function decideAutoApprove(state: ReviewState, command: AutoApprove): DomainEvent[] {
+  const c = parse(AutoApproveSchema, command);
+  const refuse = (why: string): never => {
+    throw new DomainError("AUTO_APPROVAL_REFUSED", why);
+  };
+  if (!state.requested) refuse("renewal has not been requested");
+  if (!state.evaluated) refuse("renewal has not been evaluated");
+  if (state.decision !== null) refuse("renewal already decided");
+  if (state.outcome !== "AUTO_ELIGIBLE") refuse("rules outcome is not AUTO_ELIGIBLE");
+  if (!state.rulesClean) refuse("a rule did not pass");
+  if (state.escalated || state.pipelineError) refuse("renewal is escalated");
+  if (state.controlled) refuse("controlled substance");
+  if (state.blocked) refuse("blocked by an administrative rule");
+  if (!state.aiClean) refuse("no clean AI result recorded (signal, failure or not attempted)");
+  if (!state.identityVerified) refuse("identity not verified");
+  if (state.reviewerId !== null) refuse("a clinician already started review");
+  if (state.queued) refuse("already queued");
+  if (state.pharmacyId === null || state.prescriptionId === null) refuse("no confirmed pharmacy");
+  const pharmacyId = state.pharmacyId as string;
+  const prescriptionId = state.prescriptionId as string;
+  const events: DomainEvent[] = [
+    {
+      type: "RenewalApproved",
+      data: { v: 1, renewalId: c.renewalId, by: "system", autonomyMode: c.autonomyMode },
+    },
+    {
+      type: "RxRenewalQueued",
+      data: {
+        v: 1,
+        renewalId: c.renewalId,
+        prescriptionId,
+        idempotencyKey: rxIdempotencyKey(c.renewalId),
+        pharmacyId,
+        messageId: rxMessageId(c.renewalId),
+      },
+    },
+  ];
+  const reason = sampleReasonFor(c.autonomyMode, c.seed, c.renewalId, c.sampleRate);
+  if (reason !== null) {
+    events.push({ type: "AuditSampleSelected", data: { v: 1, renewalId: c.renewalId, reason } });
+  }
+  return events;
+}
+
 export function decideReview(state: ReviewState, command: ReviewCommand): DomainEvent[] {
   switch (command.type) {
     case "RecordEvaluation":
@@ -501,6 +606,27 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
         ];
       }
       return [approved];
+    }
+    case "AutoApprove":
+      return decideAutoApprove(state, command);
+    case "RecordRetroReview": {
+      const c = parse(RecordRetroReviewSchema, command);
+      requireClinician(c.actorRole, c.clinicianId);
+      if (state.decision !== "approved" || state.decidedBy !== "system") {
+        throw new DomainError("NOT_AUTO_APPROVED", "only a system auto-approval is reviewed here");
+      }
+      if (!state.sampled) {
+        throw new DomainError("NOT_SAMPLED", "this auto-approval was not queued for review");
+      }
+      if (state.retroReviewed) {
+        throw new DomainError("ALREADY_REVIEWED", "this auto-approval was already reviewed");
+      }
+      return [
+        {
+          type: "RetroReviewRecorded",
+          data: { v: 1, renewalId: c.renewalId, reviewerId: c.clinicianId, concur: c.concur },
+        },
+      ];
     }
     case "Deny": {
       const c = parse(DenySchema, command);

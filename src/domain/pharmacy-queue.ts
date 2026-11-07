@@ -193,6 +193,10 @@ export interface ReviewFacts {
   outcome: string | null;
   escalated: boolean;
   reviewerId: string | null;
+  /** F059: the folded review state's evidence for a SYSTEM approval (absent => refused). */
+  rulesClean?: boolean;
+  aiClean?: boolean;
+  pipelineError?: boolean;
 }
 
 export type TransmitCheck = { ok: true } | { ok: false; reason: string };
@@ -212,13 +216,35 @@ export function checkTransmittable(
   if (!requested || requested.type !== "RenewalRequested") return no("renewal was never requested");
   if (requested.data.prescriptionId !== facts.prescriptionId) return no("prescription mismatch");
 
-  if (review.decision !== "approved" || review.decidedBy !== "clinician") {
-    return no("no clinician approval");
+  if (review.decision !== "approved") return no("no clinician approval");
+  if (review.decidedBy === "system") {
+    // F059: a system approval transmits ONLY for a clean AUTO_ELIGIBLE renewal under RETRO or
+    // SAMPLED, re-derived here from the stream (never from the outbox payload). Anything else,
+    // above all an escalated renewal, is refused.
+    const autoApprovals = renewal.filter(
+      (e) =>
+        e.type === "RenewalApproved" &&
+        e.data.by === "system" &&
+        (e.data.autonomyMode === "RETRO" || e.data.autonomyMode === "SAMPLED"),
+    );
+    if (autoApprovals.length === 0) return no("no valid auto-approval event");
+    if (
+      review.outcome !== "AUTO_ELIGIBLE" ||
+      review.escalated ||
+      review.pipelineError === true ||
+      review.rulesClean !== true ||
+      review.aiClean !== true ||
+      review.reviewerId !== null
+    ) {
+      return no("auto-approval is not backed by a clean AUTO_ELIGIBLE evaluation");
+    }
+  } else {
+    if (review.decidedBy !== "clinician") return no("no clinician approval");
+    const approvals = renewal.filter(
+      (e) => e.type === "RenewalApproved" && e.data.by === "clinician" && !!e.data.clinicianId,
+    );
+    if (approvals.length === 0) return no("no clinician approval event");
   }
-  const approvals = renewal.filter(
-    (e) => e.type === "RenewalApproved" && e.data.by === "clinician" && !!e.data.clinicianId,
-  );
-  if (approvals.length === 0) return no("no clinician approval event");
   if (renewal.some((e) => e.type === "RenewalDenied")) return no("renewal was denied");
   if (review.controlled) return no("controlled substance");
   if (review.blocked || review.outcome === "REJECT" || review.outcome === "FOLLOW_UP_REQUIRED") {

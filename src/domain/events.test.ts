@@ -85,6 +85,7 @@ const valid: Record<EventType, unknown> = {
   PharmacyAlertAcknowledged: { v: 1, renewalId: "r1", messageId: "m5", acknowledgedBy: "pharm1" },
   AuditSampleSelected: { v: 1, renewalId: "r1" },
   RetroReviewRecorded: { v: 1, renewalId: "r1", reviewerId: "c1", concur: true },
+  AutonomyModeChanged: { v: 1, mode: "RETRO", changedBy: "a1" },
 };
 
 describe("event schemas v1 (F005)", () => {
@@ -115,8 +116,13 @@ describe("event schemas v1 (F005)", () => {
       "AuditSampleSelected",
       "RetroReviewRecorded",
     ];
-    // Additive events beyond SPEC section 3 (F047, F049, F054).
-    spec.push("PharmacySelected", "RxCancelAcknowledged", "PharmacyAlertAcknowledged");
+    // Additive events beyond SPEC section 3 (F047, F049, F054, F059).
+    spec.push(
+      "PharmacySelected",
+      "RxCancelAcknowledged",
+      "PharmacyAlertAcknowledged",
+      "AutonomyModeChanged",
+    );
     expect([...EVENT_TYPES].sort()).toEqual([...spec].sort());
     expect(Object.keys(valid).sort()).toEqual([...spec].sort());
   });
