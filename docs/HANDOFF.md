@@ -12,10 +12,15 @@ compliance, EPCS certification, a real e-prescribing network, or achieved clinic
 
 ## 1. Status snapshot
 
-- **56 of 70 features passing** at the last flag flip (commit `4ba1e2f`). v0.1 (event store, patient
+- **62 of 70 features passing** at the last flag flip (commit `1956e4c`; earlier snapshot 56 at `4ba1e2f`). v0.1 (event store, patient
   flow) is complete. v0.2 and v0.3 are functionally built. v1.0 (autonomy, evals, docs) is partly built.
 - Passing: F001-F042 and F044-F057 (F043 is built but unflagged). Check `node -e "const f=require('./feature_list.json');console.log(f.filter(x=>!x.passes).map(x=>x.id).join(' '))"`.
-- **Built and committed, NOT yet flagged passing** (need independent review, see section 6):
+- **Update 2026-11-07:** F043, F058, F059, F060, F061, F062 were verified/reviewed and flagged passing. The
+  remaining unflagged work is F063-F067 (eval review FAILED once: the evals builder was sent fixes: promote 5
+  of the 8 known-limitation probes by escalation-only tripwire additions, `knownLimitations` block in
+  latest.json, injection-detector gaps, judge pinning, ratchet floor, stale docs; a fresh review is needed
+  afterwards), then F068-F070. The paragraphs below are the earlier snapshot.
+- **Built and committed, NOT yet flagged passing** (earlier snapshot) (need independent review, see section 6):
   - F043 (item-9 escalation e2e, v0.2 release prep), F058 (v0.3 integration pass), F061 (admin dashboard and
     eval results page): need a verifier run only.
   - F059 autonomy modes, F060 retrospective review, F062 retro auto-renew e2e: SAFETY-flagged, need a fresh
