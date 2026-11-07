@@ -2,7 +2,8 @@
 // review and approves -> the patient sees the approval (then the pharmacy flow: sent, filled).
 // No fixtures are needed: item 9 escalates by rule, and with no model key the AI path fails closed.
 // The pharmacy leg runs only when the app server has a CRON_SECRET (the worker is driven through
-// the real cron route); the mock pharmacy then answers OK and sends the fill.
+// the real cron route) AND MOCK_PHARMACY_FORCE=retry-then-fill (the default mock pharmacy fills only
+// a random share of messages, so a deterministic Filled needs the scripted scenario).
 import { expect, test } from "@playwright/test";
 import { DEMO_PATIENT_ID, DEMO_PATIENT_IDENTITY } from "../src/domain/seed";
 import { DEMO_SUBJECTS } from "../src/infra/auth/session";
@@ -85,7 +86,10 @@ test("pharmacy flow: the worker transmits and the patient sees Filled", async ({
   context,
   request,
 }) => {
-  test.skip(!process.env.CRON_SECRET, "needs CRON_SECRET on the app server to drive the worker");
+  test.skip(
+    !process.env.CRON_SECRET || process.env.MOCK_PHARMACY_FORCE !== "retry-then-fill",
+    "needs CRON_SECRET and MOCK_PHARMACY_FORCE=retry-then-fill on the app server",
+  );
   const cron = { Authorization: `Bearer ${process.env.CRON_SECRET ?? ""}` };
   await expect
     .poll(
