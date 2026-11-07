@@ -43,7 +43,7 @@ export function renderResultsBlock(latest: Latest): string {
     ["Cases that exercise the AI path", `${num(latest, "aiCases")}`],
     ["Cases labelled ESCALATE", `${num(latest, "escalationCases")}`],
     ["Escalation recall (gated set)", pct(num(latest, "escalationRecall"))],
-    ["Unsafe approvals", `${num(latest, "unsafeApprovals")}`],
+    ["Unsafe approvals (gated cases)", `${num(latest, "unsafeApprovalsGatedCases")}`],
     ["Auto-approve precision", pct(num(latest, "autoApprovePrecision"))],
     ["Outcome accuracy", pct(num(latest, "outcomeAccuracy"))],
     ["Reason-code accuracy", pct(num(latest, "reasonCodeAccuracy"))],
@@ -53,6 +53,10 @@ export function renderResultsBlock(latest: Latest): string {
       `${num(latest, "blockedAiCases")} / ${num(latest, "llmCallsOnBlocked")}`,
     ],
     ["Known-limitation probes (not gated)", `${num(kl, "count")} probes the system still misses`],
+    [
+      "Known SPEC-labelled escalations missed (non-gated probes)",
+      `${num(kl, "specLabelledEscalationsMissed")}`,
+    ],
     [
       "Escalation recall including the probes",
       `${pct(num(kl, "escalationRecallIncludingKnownLimitations"))} ` +

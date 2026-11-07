@@ -123,6 +123,8 @@ HIPAA-aligned design, synthetic data. This is a demo, not a hardened production 
 
 ## Deploying to Vercel (not deployed by this repo)
 
+A checklist with rollback and the list of unverified items is in [docs/DEPLOY.md](docs/DEPLOY.md).
+
 Nothing in this repo deploys itself and no deployment was made. If you deploy it yourself:
 
 1. Create a Postgres database (for example Supabase) and run `pnpm db:migrate` and `pnpm db:seed` against it
@@ -196,25 +198,26 @@ it drifts from `evals/results/latest.json`.
 
 <!-- eval-results:start -->
 
-| Metric                                 | Value                                                                                            |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Run mode                               | fixtures (fixtures: synthetic-handwritten)                                                       |
-| Live model run                         | no                                                                                               |
-| Cases                                  | 153                                                                                              |
-| Risk cases                             | 88                                                                                               |
-| Cases that exercise the AI path        | 98                                                                                               |
-| Cases labelled ESCALATE                | 113                                                                                              |
-| Escalation recall (gated set)          | 100.0%                                                                                           |
-| Unsafe approvals                       | 0                                                                                                |
-| Auto-approve precision                 | 100.0%                                                                                           |
-| Outcome accuracy                       | 100.0%                                                                                           |
-| Reason-code accuracy                   | 100.0%                                                                                           |
-| Citation validity                      | 100.0%                                                                                           |
-| AI-blocked cases / LLM calls on them   | 6 / 0                                                                                            |
-| Known-limitation probes (not gated)    | 3 probes the system still misses                                                                 |
-| Escalation recall including the probes | 97.4% (3 missed of 116 SPEC-labelled escalations)                                                |
-| Summary judge (fixture judgments)      | 15 cases, 8 judged, 7 fail-closed; hallucinations 3 major / 1 minor, omissions 4 major / 1 minor |
-| Gate                                   | pass                                                                                             |
+| Metric                                                    | Value                                                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Run mode                                                  | fixtures (fixtures: synthetic-handwritten)                                                       |
+| Live model run                                            | no                                                                                               |
+| Cases                                                     | 153                                                                                              |
+| Risk cases                                                | 88                                                                                               |
+| Cases that exercise the AI path                           | 98                                                                                               |
+| Cases labelled ESCALATE                                   | 113                                                                                              |
+| Escalation recall (gated set)                             | 100.0%                                                                                           |
+| Unsafe approvals (gated cases)                            | 0                                                                                                |
+| Auto-approve precision                                    | 100.0%                                                                                           |
+| Outcome accuracy                                          | 100.0%                                                                                           |
+| Reason-code accuracy                                      | 100.0%                                                                                           |
+| Citation validity                                         | 100.0%                                                                                           |
+| AI-blocked cases / LLM calls on them                      | 6 / 0                                                                                            |
+| Known-limitation probes (not gated)                       | 3 probes the system still misses                                                                 |
+| Known SPEC-labelled escalations missed (non-gated probes) | 3                                                                                                |
+| Escalation recall including the probes                    | 97.4% (3 missed of 116 SPEC-labelled escalations)                                                |
+| Summary judge (fixture judgments)                         | 15 cases, 8 judged, 7 fail-closed; hallucinations 3 major / 1 minor, omissions 4 major / 1 minor |
+| Gate                                                      | pass                                                                                             |
 
 Source: `evals/results/latest.json` (generated by `evals/run.eval.ts@1.1.0`). These are FIXTURE results: every model answer is a hand-written canned response, no live model or live judge has ever run, so the numbers show how the pipeline handles those responses, not how any real model performs. Recall of 100% is over the gated set only; the probes row is the honest figure.
 <!-- eval-results:end -->
@@ -226,14 +229,15 @@ Source: `evals/results/latest.json` (generated by `evals/run.eval.ts@1.1.0`). Th
   been used. Results demonstrate behaviour and regressions of this pipeline, not model performance.
 - **Eval cases are small, synthetic and hand-labelled** from the SPEC; they are not clinical validation.
   Some labels rest on implementation choices (listed in [docs/MODEL_CARD.md](docs/MODEL_CARD.md)).
-- **Known-limitation probes still fail.** `evals/known-limitations/` holds SPEC-labelled escalations the
-  system misses when the model is silent (free-text mania, severe side effects and admitted dishonest
-  PHQ-9 answers, in wordings the phrase lists do not cover; the count is in the results table). Recall over the gated set is 100%;
+- **Three paraphrase probes still fail.** `evals/known-limitations/` holds three SPEC-labelled escalations the
+  system misses when the model is silent: mania, a severe reaction and an understated PHQ-9, each worded
+  differently from the gated cases. They show the tripwire phrase lists are narrow. Recall over the gated set is 100%;
   the honest figure including the probes is in the results table. In the default SHADOW autonomy mode a
   clinician approves every renewal; in RETRO and SAMPLED modes a model miss on such wording would be sent
   automatically. An owner decision is needed before enabling those modes anywhere real.
 - **The tripwire and the summary deny-list are heuristics**: small English-only lexicons, deliberately
-  over-inclusive, not clinically reviewed, with documented misses.
+  over-inclusive (the phrase-family tripwire over-escalates on innocent uses of its words; the ordinary-text
+  and adversarial near-miss false-positive figures in the model card are different measurements, neither a real-world rate), not clinically reviewed, with documented misses.
 - **Demo auth is a role switcher**, not authentication. The app database role still has UPDATE and
   DELETE on `events` (append-only is enforced by triggers a superuser could disable).
 - **Real gaps stay marked `TODO: source needed`** (hydroxyzine numeric limits, mirtazapine monitoring
@@ -248,6 +252,7 @@ Source: `evals/results/latest.json` (generated by `evals/run.eval.ts@1.1.0`). Th
 - [docs/STANDARDS.md](docs/STANDARDS.md): which public vocabularies are mirrored and how.
 - [docs/MODEL_CARD.md](docs/MODEL_CARD.md): intended use, safety design, evaluation, limitations.
 - [docs/AI_AGENTS.md](docs/AI_AGENTS.md): runtime AI and the development agent harness.
+- [docs/DEPLOY.md](docs/DEPLOY.md): Vercel and Supabase checklist, nothing deployed.
 - [docs/HANDOFF.md](docs/HANDOFF.md): status, run and verification detail, gotchas.
 - [CHANGELOG.md](CHANGELOG.md) and [claude-progress.md](claude-progress.md): release notes and the session log.
 

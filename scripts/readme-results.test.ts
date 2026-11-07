@@ -19,6 +19,24 @@ describe("README eval results block", () => {
     expect(block).toMatch(/Live model run\s+\| no/);
   });
 
+  it("reports gated unsafe approvals and the missed non-gated probes from latest.json", () => {
+    const block = currentBlock(readme) ?? "";
+    const latest = loadLatest() as {
+      unsafeApprovalsGatedCases: number;
+      knownLimitations: { specLabelledEscalationsMissed: number };
+    };
+    expect(block).toMatch(
+      new RegExp(
+        `Unsafe approvals \\(gated cases\\)\\s+\\| ${latest.unsafeApprovalsGatedCases}\\s`,
+      ),
+    );
+    expect(block).toMatch(
+      new RegExp(
+        `missed \\(non-gated probes\\)\\s+\\| ${latest.knownLimitations.specLabelledEscalationsMissed}\\s`,
+      ),
+    );
+  });
+
   it("applyBlock is idempotent and throws without markers", () => {
     const block = renderResultsBlock(loadLatest());
     const once = applyBlock(readme, block);

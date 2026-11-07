@@ -1,8 +1,8 @@
 // Reads the eval results files written by `pnpm eval` / `pnpm eval:live` (F061). Read-only, and
 // every field is validated with Zod: a missing, unreadable or malformed file yields an explicit
 // state for the page, never a crash and never invented numbers.
-// TODO(F069 deploy): on Vercel the evals/results files must be included in the server bundle
-// (outputFileTracingIncludes) or the page shows the "not available" state.
+// On Vercel the evals/results files reach the server bundle through outputFileTracingIncludes in
+// next.config.ts; without that the page would show the "not available" state.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
