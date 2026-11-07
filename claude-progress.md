@@ -318,3 +318,23 @@ RISK_FIXTURE set makes 3 specs (clinician-queue:52, patient-status:22, v0.1-pati
 assume the AI is unavailable (expect 'escalated', get 'evaluated'): run the default suite and the gated specs
 separately, never everything with the fixture env at once.
 Tooling: eslint, tsc, vitest, prettier and git now ignore `.rev-tmp*` (reviewer scratch dirs) and `.next-*`.
+
+## 2026-11-07 — F063-F070 passing; v1.0 release gate
+
+Third independent review of the F063-F067 delta PASS (only a stale-docs finding), F068/F069 independent
+verification PASS, and a fresh whole-surface clinical-safety-reviewer PASS for F070. The reviewer ran the
+suites: unit 103 files / 1762 tests passed; eval 154 passed (`latest.json` gate pass, 153 cases / 88 risk /
+113 escalation / 98 AI, gated recall 1.0, recall including the 3 known-limitation probes 0.974,
+unsafeApprovals 0, citationValidity 1.0). Orchestrator gates: `pnpm build` OK; e2e default 50 passed /
+19 gated skips; gated e2e 21 passed / 1 expected skip (item9, follow-up, pharmacy retry/fill,
+refill-limit, retro auto-renew, summary citations); typecheck, lint and format clean.
+
+Docs/flags: HANDOFF status refreshed (153 cases, 3 remaining paraphrase probes; the earlier 8 were
+promoted), resume prompt updated. `scripts/docs-wording.test.ts` strengthened: bare "certified" and
+"clinical validation" are now caught, and a negation only covers its own clause ("not a clinic and we are
+HIPAA compliant" now fails); one CHANGELOG meta line was reworded because the stricter scanner flagged it.
+CHANGELOG has a v1.0 section and known limits. feature_list.json: 70/70 passing. Owner must tag v1.0.0
+(agents never tag).
+
+Residual non-blocking: evals are fixture-mode (`liveModelRun: false`); the 3 paraphrase probes are still
+missed when the model is silent; RETRO/SAMPLED is opt-in and owner-gated; nothing was deployed.

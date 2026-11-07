@@ -3,9 +3,11 @@
 All notable changes to CareLoop. Format follows Keep a Changelog; versions follow the
 release schedule in docs/SPEC.md. All data is synthetic.
 
-## [Unreleased]
+## v1.0 - evals, autonomy modes, docs, deploy hardening
 
-### Added (toward v1.0)
+All data is synthetic. Tagging `v1.0.0` is the owner's step (agents do not tag).
+
+### Added
 
 - Deploy config and hardening (F069): `vercel.json` crons (daily, Hobby-safe) for the outbox, decisions and
   visits routes, security headers and a CSP in `next.config.ts`, `outputFileTracingIncludes` for
@@ -16,8 +18,8 @@ release schedule in docs/SPEC.md. All data is synthetic.
 - README: what CareLoop is and is not, synthetic-data banner, architecture diagram, run instructions,
   session ritual, commands, verification workflow, known limitations, and an eval results table that
   `scripts/readme-results.ts` regenerates from `evals/results/latest.json` (a test fails on drift).
-- `scripts/docs-wording.test.ts`: forbids compliance/certification/clinical-validation claims (unless
-  negated) and any URL not listed in `docs/sources.md`.
+- `scripts/docs-wording.test.ts`: forbids unsupported compliance, certification and clinical claims
+  (unless negated) and any URL not listed in `docs/sources.md`.
 - STANDARDS status rows and MODEL_CARD numbers brought in line with what exists (fixture results only).
 
 - Autonomy modes SHADOW (default) / RETRO / SAMPLED as an admin setting stored as events
@@ -29,6 +31,21 @@ release schedule in docs/SPEC.md. All data is synthetic.
 - Admin dashboard (`/admin/dashboard`: concurrence with the 98% figure labelled as a TARGET, escalation
   mix, time to decision) and `/admin/evals` (eval results, synthetic labels).
 - E2E: auto-renew in RETRO mode (`e2e/retro-auto-renew.spec.ts`).
+- Eval suite (F063-F067): 153 hand-labelled synthetic cases (88 risk, 113 escalation, 98 AI) run through
+  the real decision pipeline with recorded fixtures, including 6 controlled-substance-AI-blocked cases
+  (zero LLM calls) and 3 paraphrase probes kept as documented known limitations. The gate fails if
+  gated escalation recall, auto-approve precision, citation validity or the required-case/probe pins
+  drift. `evals/results/latest.json` records every number plus `mode: fixtures` and
+  `liveModelRun: false`; a CREOLA-style summary judge runs eval-only with recorded fixtures.
+
+### Known limits
+
+- Evals use synthetic handwritten fixtures, not a live model run. Live mode is `pnpm eval:live` and is
+  not claimed here.
+- Three documented paraphrase probes are still missed when the model is silent: gated escalation recall
+  is 1.0; including known limitations it is 113/116 = 0.974. Default SHADOW mode has a clinician approve
+  every renewal; RETRO/SAMPLED is opt-in and the owner decides before enabling it.
+- Nothing was deployed. Deploy config and hardening are verified by build and tests only.
 
 ## v0.3 - outbox, pharmacy, follow-up, audit
 
@@ -100,9 +117,7 @@ All data is synthetic. Tagging `v0.2.0` is the owner's step (agents do not tag).
   - Playwright patient-flow specs run against a dedicated, reset and seeded `*_e2e` database.
   - Known v0.1 limits: no decision pipeline yet (every check-in stays under review), demo auth only.
 
-## Planned releases
+## Release status
 
-- v0.1: event store + patient flow
-- v0.2: rules + AI + clinician queue
-- v0.3: outbox, pharmacy, follow-up, audit
-- v1.0: evals, autonomy modes, docs
+- v0.1, v0.2, v0.3 and v1.0 are built in this repository. Agents never tag; the owner tags the releases
+  (`v0.1.0`, `v0.2.0`, `v0.3.0`, `v1.0.0`).

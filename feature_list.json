@@ -937,7 +937,7 @@
     "verification": [
       "pnpm eval"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F064",
@@ -952,7 +952,7 @@
       "pnpm eval",
       "pnpm test scripts/evals-count.test.ts -t 'structured >= 20'"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F065",
@@ -968,7 +968,7 @@
       "pnpm eval",
       "pnpm test scripts/evals-count.test.ts -t 'risk categories'"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F066",
@@ -983,7 +983,7 @@
       "pnpm eval",
       "pnpm test scripts/evals-count.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F067",
@@ -999,7 +999,7 @@
       "pnpm eval",
       "pnpm test src/ai/judge.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F068",
@@ -1013,7 +1013,7 @@
     "verification": [
       "pnpm test scripts/docs-wording.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F069",
@@ -1031,7 +1031,7 @@
       "pnpm lint",
       "pnpm test scripts/hardening.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F070",
@@ -1050,6 +1050,6 @@
       "pnpm lint",
       "pnpm build"
     ],
-    "passes": false
+    "passes": true
   }
 ]

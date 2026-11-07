@@ -12,28 +12,20 @@ compliance, EPCS certification, a real e-prescribing network, or achieved clinic
 
 ## 1. Status snapshot
 
-- **62 of 70 features passing** at the last flag flip (commit `1956e4c`; earlier snapshot 56 at `4ba1e2f`). v0.1 (event store, patient
-  flow) is complete. v0.2 and v0.3 are functionally built. v1.0 (autonomy, evals, docs) is partly built.
-- Passing: F001-F042 and F044-F057 (F043 is built but unflagged). Check `node -e "const f=require('./feature_list.json');console.log(f.filter(x=>!x.passes).map(x=>x.id).join(' '))"`.
-- **Update 2026-11-07:** F043, F058, F059, F060, F061, F062 were verified/reviewed and flagged passing. The
-  remaining unflagged work is F063-F067 (eval review FAILED once: the evals builder was sent fixes: promote 5
-  of the 8 known-limitation probes by escalation-only tripwire additions, `knownLimitations` block in
-  latest.json, injection-detector gaps, judge pinning, ratchet floor, stale docs; a fresh review is needed
-  afterwards), then F068-F070. The paragraphs below are the earlier snapshot.
-- **Built and committed, NOT yet flagged passing** (earlier snapshot) (need independent review, see section 6):
-  - F043 (item-9 escalation e2e, v0.2 release prep), F058 (v0.3 integration pass), F061 (admin dashboard and
-    eval results page): need a verifier run only.
-  - F059 autonomy modes, F060 retrospective review, F062 retro auto-renew e2e: SAFETY-flagged, need a fresh
-    `clinical-safety-reviewer`. Highest-risk hunk: the change to `checkTransmittable` in
-    `src/domain/pharmacy-queue.ts` (a system approval stamped RETRO/SAMPLED may now transmit).
-  - F063-F067 (eval harness, 145 cases / 80 risk, CREOLA-style judge: all COMMITTED, last commit `ef395a3`):
-    safety-flagged; need a fresh review including re-deriving a sample of labels from SPEC section 4.
-- **In progress when this was written**: F067 was finished and committed (`ef395a3`); three agents (a safety review
-  of F059/F060/F062, a verifier for F043/F058/F061, the evals builder). Their results will be in the task
-  notifications of the session that spawned them, not in the repo. Re-run anything that is not in `git log`.
-- **Not started**: F068 (README + docs complete), F069 (Vercel config + hardening), F070 (v1.0 release gate).
-- Releases are never tagged by agents. Owner decision: tag `v0.1.0`, `v0.2.0`, `v0.3.0` (CHANGELOG has
-  sections for v0.2 and v0.3; v0.1 is under `[Unreleased]`/earlier notes: check `CHANGELOG.md`).
+- **62 of 70 features passing** at the last flag flip (commit `1956e4c`). v0.1 (event store, patient flow),
+  v0.2 and v0.3 are complete and verified. v1.0 (autonomy, evals, docs, deploy) is built and committed; the
+  remaining work is F063-F070, which need their final review/verification and flag flips.
+- Passing: F001-F042 and F044-F062. Check
+  `node -e "const f=require('./feature_list.json');console.log(f.filter(x=>!x.passes).map(x=>x.id).join(' '))"`.
+- **Update 2026-11-07 (final v1.0 push):** F043, F058-F062 were verified/reviewed and flagged passing earlier.
+  F063-F067 (eval harness, 153 cases / 88 risk, CREOLA-style judge) are committed; the second review's fixes
+  are in `cc801da` and the narrow third review of that delta passed the safety mechanism and gate (one
+  docs-only finding, fixed here). F068 (README + docs) is committed in `d1ce256`/`a43485d`; F069 (Vercel +
+  hardening) is committed in `f9b9e6d`; both were independently verified. F070 is the release gate.
+- **Earlier snapshots below/above are historical.** If a number disagrees with `feature_list.json`,
+  `evals/results/latest.json` or `git log`, the repo wins.
+- Releases are never tagged by agents. Owner decision: tag `v0.1.0`, `v0.2.0`, `v0.3.0`, then `v1.0.0`
+  (CHANGELOG has sections for v0.2, v0.3 and v1.0).
 
 ## 2. Non-negotiable invariants (from CLAUDE.md, enforced by tests)
 
@@ -121,7 +113,7 @@ src/ai/                                    extractRiskSignals, quote verificatio
                                            summarize (cited), tracing, judge (eval-only, uncommitted at handoff)
 src/infra/{event-store,audit,projections,outbox,auth,db}/   store, hash chain, projections, worker, RBAC, Drizzle
 src/app/                                   Next.js App Router: patient, clinician, pharmacist, admin, api/*
-evals/                                     145 cases, fixtures, required-cases.json (pins), results/latest.json
+evals/                                     153 cases, fixtures, required-cases.json (pins), results/latest.json
 e2e/                                       Playwright specs + support helpers
 scripts/                                   db-migrate/seed, projections-rebuild, audit-verify, outbox-work, *.test.ts
 drizzle/                                   generated SQL migrations 0000-0016 (never hand-edit applied ones)
@@ -194,15 +186,18 @@ run but without a further independent safety review of that last delta (recorded
 
 ## 8. Known gaps and owner decisions
 
-- **IMPORTANT RISK (eval finding, unresolved):** 8 non-gated probes in `evals/known-limitations/` are labelled
-  ESCALATE from the SPEC but the system returns AUTO_ELIGIBLE: passive ideation ("hope I just do not wake up"),
-  giving belongings away, mania described only in free text, "two instead of one" dose change with the box left
-  at none, "prenatal vitamins", asking for a human in text with the box unticked, swollen lips/rash with the severe
-  box unticked, admitting to clicking zeros on the PHQ-9. Cause: the canned model is silent and no tripwire phrase
-  or structured answer covers the wording, so only a real model could catch it. SHADOW mode (default) still has a
-  clinician approve every renewal; in RETRO/SAMPLED a model miss on such wording leads to AUTO-SEND. Owner decision
-  needed before enabling RETRO/SAMPLED anywhere: broaden deterministic checks, require a live-model eval, or keep
-  auto-approval off. `evals-count.test.ts` asserts each probe still fails so the list cannot go stale.
+- **Known limitation (eval finding, still open):** 3 non-gated paraphrase probes in
+  `evals/known-limitations/` are labelled ESCALATE from the SPEC but the system returns AUTO_ELIGIBLE:
+  mania described only in free text ("unstoppable … a couple of hours of rest"), a severe side effect
+  described indirectly ("throat … closing … welts"), and admitting to clicking zeros on the PHQ-9. The
+  canned model is silent and no tripwire phrase or structured answer covers these exact paraphrases, so
+  only a real model (or broader deterministic checks) would catch them. This is honest and measured:
+  gated escalation recall is 1.0; including these probes it is 113/116 = 0.974. SHADOW mode (default)
+  still has a clinician approve every renewal; in RETRO/SAMPLED a miss on such wording leads to AUTO-SEND.
+  Owner decision needed before enabling RETRO/SAMPLED anywhere: broaden deterministic checks, require a
+  live-model eval, or keep auto-approval off. The earlier 8 probes were promoted to gated
+  `tripwire-silent-model` cases by escalation-only tripwire additions (`bc6cbf1`, `cc801da`);
+  `evals-count.test.ts` asserts each remaining probe still fails so the list cannot go stale.
 
 - Tagging v0.1.0/v0.2.0/v0.3.0 and the git identity used for commits (local config is `tuckedup` /
   `atulpandey231945@gmail.com`).
@@ -235,5 +230,7 @@ run but without a further independent safety review of that last delta (recorded
 
 > Follow the session ritual in CLAUDE.md. Read docs/HANDOFF.md, claude-progress.md, `git log --oneline -20` and
 > feature_list.json. Start Postgres, run `pnpm test`; fix a red baseline first. Then continue section 7 of the
-> handoff: finish F067, get independent verification/safety reviews for F043, F058-F067, then F068-F070. Never mark a
-> safety-flagged feature passing without a fresh clinical-safety-reviewer PASS; never weaken a test or eval case.
+> handoff: F063-F069 are built, reviewed and verified; finish the F070 release gate (full unit/eval/e2e/typecheck/
+> lint/build plus a fresh clinical-safety-reviewer PASS across rules/ai/escalation/autonomy), update CHANGELOG v1.0,
+> flip the flags that pass, and tell the owner to tag v1.0.0. Never mark a safety-flagged feature passing without a
+> fresh clinical-safety-reviewer PASS; never weaken a test or eval case.
