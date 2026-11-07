@@ -1,6 +1,6 @@
-# Model card (stub)
+# Model card
 
-Structure follows the CHAI applied model card idea. Populated by the AI and eval features.
+Structure follows the CHAI applied model card idea (own layout, not a CHAI-issued label).
 All data is synthetic; nothing here is clinical validation.
 
 ## Intended use
@@ -14,7 +14,7 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 ## Model
 
-- Provider/model: set by env `ANTHROPIC_MODEL` (TODO: record the exact model used for published eval results)
+- Provider/model: set by env `ANTHROPIC_MODEL`. No live model has ever run in this repo, so there is no model to record for the published eval results (they come from hand-written fixtures). TODO: record the exact model and date when the first live run exists.
 - Prompt versions: risk extraction `risk-signals-v1` (src/ai/prompt.ts), visit summary `visit-summary-v2`,
   summary judge `summary-judge-v1` (eval only). Output schemas are the strict Zod schemas in src/ai.
 
@@ -29,6 +29,7 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 - Metrics: escalation recall (must be 1.0), auto-approve precision, citation validity (must be 1.0),
   CREOLA-style summary labels from an LLM judge.
+- Snapshot of `evals/results/latest.json` (fixtures mode, `liveModelRun: false`; the README table is generated from the same file and tested against it): 150 cases, of which 85 are risk cases and 95 exercise the AI path (6 are blocked from it with zero LLM calls). Escalation recall is 1.0 over the GATED set (110 escalation-labelled cases) with 0 unsafe approvals. The three non-gated known-limitation probes are still missed, so recall including them is 110/113 SPEC-labelled escalations, about 0.973 (the `knownLimitations` block carries the exact figure). Citation validity is 1.0 over the 28 model-produced signals checked (69 tripwire signals are counted separately). The summary judge ran 15 hand-written cases (8 judged, 7 fail-closed as labelled). These show the pipeline handles those canned responses, not how any real model behaves; no sensitivity or specificity is claimed.
 - Results: written to `evals/results/latest.json` by `pnpm eval` (synthetic-handwritten fixtures only; see Implementation notes). They show the pipeline handles those canned responses, not how any real model behaves.
 
 ## Known limitations

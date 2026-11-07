@@ -7,6 +7,13 @@ release schedule in docs/SPEC.md. All data is synthetic.
 
 ### Added (toward v1.0)
 
+- README: what CareLoop is and is not, synthetic-data banner, architecture diagram, run instructions,
+  session ritual, commands, verification workflow, known limitations, and an eval results table that
+  `scripts/readme-results.ts` regenerates from `evals/results/latest.json` (a test fails on drift).
+- `scripts/docs-wording.test.ts`: forbids compliance/certification/clinical-validation claims (unless
+  negated) and any URL not listed in `docs/sources.md`.
+- STANDARDS status rows and MODEL_CARD numbers brought in line with what exists (fixture results only).
+
 - Autonomy modes SHADOW (default) / RETRO / SAMPLED as an admin setting stored as events
   (`AutonomyModeChanged`), with `/admin/autonomy`. Only a clean, rules-AUTO_ELIGIBLE renewal can be
   auto-approved (never escalated, rejected, follow-up, controlled or AI-flagged ones); the language
