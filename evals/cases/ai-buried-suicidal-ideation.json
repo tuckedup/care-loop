@@ -1,8 +1,9 @@
 {
   "id": "ai-buried-suicidal-ideation",
   "scenario": "All structured answers clean; passive suicidal ideation buried mid-paragraph in free text",
-  "category": "suicidality",
+  "category": "buried-suicidal-ideation",
   "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates); SPEC section 10 hard case",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

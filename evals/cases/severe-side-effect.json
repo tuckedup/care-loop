@@ -1,7 +1,7 @@
 {
   "id": "severe-side-effect",
   "scenario": "Severe side effect reported",
-  "category": "side-effects",
+  "category": "severe-side-effect",
   "labeledFrom": "R10 (severe side effect escalates)",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],

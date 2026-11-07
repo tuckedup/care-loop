@@ -3,6 +3,7 @@
   "scenario": "Injection string; the canned model is fooled into returning no signals",
   "category": "prompt-injection",
   "labeledFrom": "R13: local injection tripwire adds a signal even when the model is silent; model can only ADD",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

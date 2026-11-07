@@ -1,5 +1,5 @@
 {
-  "minTotalCases": 46,
+  "minTotalCases": 98,
   "required": [
     {
       "requirement": "controlled-substance (rules)",
@@ -86,6 +86,10 @@
         {
           "id": "pregnancy-unsure",
           "sha256": "14893a54965fa3745dded5295c6502630087c3acc2533dc33cd080cd6bbef2ce"
+        },
+        {
+          "id": "pregnancy-yes-structured",
+          "sha256": "9235db477c6be12fe33d621058ace56d21ab96634c14d7e51bfa04b0056d8f3b"
         }
       ]
     },
@@ -355,6 +359,419 @@
         {
           "id": "not-on-formulary-synthetic-drug",
           "sha256": "f9fefe5e5aa1e80adc3fb672774cf9dfeac15996b38fd9c8ff30ee1bc9341265"
+        },
+        {
+          "id": "formulary-unknown-rxcui",
+          "sha256": "a19cfb37afd5706d04e851eb4330d23e477a64e405f60340a48dc7f026d9bf1d"
+        }
+      ]
+    },
+    {
+      "requirement": "formulary drug clean renewal under natural name (AI path, no signals)",
+      "kind": "benign-clean-ai",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "clean-sertraline",
+          "sha256": "4a588cc4fd22c2269aeb55900bffa410d0f93bececd81aeace49bfc6a3a4035a"
+        },
+        {
+          "id": "clean-escitalopram",
+          "sha256": "6a5e5aafc5e4046b405a70b39825ff05e9b08dbf5d33220c44ef6aad3dfbb6ad"
+        },
+        {
+          "id": "clean-citalopram",
+          "sha256": "280a9edc4880dec854c11e1cb80e18b3bc9a009d523e2fccc0bdfc7ec8f65353"
+        },
+        {
+          "id": "clean-paroxetine",
+          "sha256": "2164dce4a88d6582cb886eb62c1932de784ba8d36e73175999b3d01acd61c8a6"
+        },
+        {
+          "id": "clean-venlafaxine-er",
+          "sha256": "bbe2e6e87c18fd550c449ba15ca770fcd8a2bf90a1a362497f4a743ea813b497"
+        },
+        {
+          "id": "clean-desvenlafaxine",
+          "sha256": "48226bfd9ba2381bb610e9e0d0628ff810574a520c5609b173d4335e6ecae05d"
+        },
+        {
+          "id": "clean-duloxetine",
+          "sha256": "36ae58dfd3ab38d46bce0b62811100f8f48f3ce2d1b6078e29748119b0327511"
+        },
+        {
+          "id": "clean-bupropion-sr",
+          "sha256": "63698caa24e9ae8c7284aedf4131ce6c1d4e8c0fbfbd36a81b3f4f81081ac3a6"
+        },
+        {
+          "id": "clean-bupropion-xl",
+          "sha256": "c9dbca2940661642094828794a7eae10ca6986ed11b1a36cb08fec25387a5564"
+        },
+        {
+          "id": "clean-buspirone",
+          "sha256": "d19e984534f6748c6f491b2483161828f4d2a97258990ae3bbbd3f86c4f8e254"
+        }
+      ]
+    },
+    {
+      "requirement": "dose form wording outside the allowlist escalates (implementation-specific)",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "DOSE_FORM_NOT_ALLOWLISTED",
+      "entries": [
+        {
+          "id": "dose-form-duloxetine-dr",
+          "sha256": "416d1f9773e6d6f9770ccb3652407c4e84178b8249bdfe9669baf7b9619ebd67"
+        },
+        {
+          "id": "dose-form-desvenlafaxine-er",
+          "sha256": "e5d220d9e19800f5ec1cf55757f3b90a2d23785165f567c1f8d97668961cb014"
+        },
+        {
+          "id": "dose-form-bupropion-no-form",
+          "sha256": "1f181d2bdb24719319dccdbe12fe970838b63ef4335a8f6337a2f64e0c793fce"
+        }
+      ]
+    },
+    {
+      "requirement": "medication identity mismatch (implementation-specific)",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "MEDICATION_IDENTITY_MISMATCH",
+      "entries": [
+        {
+          "id": "identity-med-name-rxcui-mismatch",
+          "sha256": "de5c594ef95e0ab0b264b3f8404ffafe60292d8288c13a9b58487a267a9fbf90"
+        }
+      ]
+    },
+    {
+      "requirement": "controlled-substance (zero LLM calls, AI path blocked)",
+      "kind": "controlled-blocked",
+      "outcome": "REJECT",
+      "reasonCode": "NOT_ON_FORMULARY",
+      "entries": [
+        {
+          "id": "controlled-xanax-brand-name",
+          "sha256": "54ff8ae17e50930e01ebd3da38eb3c9b37f9e647dcb4cda72265010c660c7c89"
+        },
+        {
+          "id": "controlled-schedule-mislabelled-null",
+          "sha256": "fd4952bf0762b919327f503c052b9b488bd33c3dcf592225c3754ca73136a951"
+        },
+        {
+          "id": "controlled-vyvanse-brand-name",
+          "sha256": "dab1917ba1f7973cf260983c348c67980dfe4bd339af648ba3146f77f7ab66c8"
+        }
+      ]
+    },
+    {
+      "requirement": "no active clinician order escalates",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "NO_ACTIVE_ORDER",
+      "entries": [
+        {
+          "id": "order-on-hold",
+          "sha256": "6682d40a7208feb523773a719a5b8646088545f7456a4e7cc3ee1b07c2ebdcdf"
+        },
+        {
+          "id": "order-missing",
+          "sha256": "9313415c21bed68521c5669a5e6977209c5ea8e612299b23a0da12247e177eda"
+        },
+        {
+          "id": "order-intent-plan-not-order",
+          "sha256": "772bf773a17dcd437dfd177cd2e37443ccee54ba93087640624d96bec02795ff"
+        }
+      ]
+    },
+    {
+      "requirement": "requested change escalates",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "CHANGE_REQUESTED",
+      "entries": [
+        {
+          "id": "change-request-frequency",
+          "sha256": "b28bbeb88ccf460d69b8e08454da7c4d9de725846da7bbea58f80d64d8a4d231"
+        },
+        {
+          "id": "change-request-drug",
+          "sha256": "b3dd610ec6660603b4eea0cd81973476486b5a11fc5b3b3aa6c5ddb56c6d404b"
+        },
+        {
+          "id": "change-request-other",
+          "sha256": "7f47776db37cd6ed6a5bba34cf2e629b534af87dc6a1f74342a7a1ed1a760a91"
+        },
+        {
+          "id": "disguised-dose-change",
+          "sha256": "08e6d464ca724a3482be759dcaa748487acb6d151b122cec57182a59b2ce1e30"
+        }
+      ]
+    },
+    {
+      "requirement": "refill limit boundary: below the limit stays eligible",
+      "kind": "benign-clean",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "refill-limit-2-one-below",
+          "sha256": "875b29298ea390930920d71a0357eef9ba1c2fc24a98f2797d34e1a39d270237"
+        },
+        {
+          "id": "refill-limit-3-one-below",
+          "sha256": "4194ca50eedad2bfffcfcfb9d43459b7e98f8349af3162943fc835da07c8ceb1"
+        },
+        {
+          "id": "refill-limit-1-none-yet",
+          "sha256": "bb3132ce4019f4a6ac0210cf1265a91a21c0ba523640a6a7a7a074b1ba884b05"
+        }
+      ]
+    },
+    {
+      "requirement": "refill limit boundary: at or over the limit needs follow-up",
+      "kind": "rules",
+      "outcome": "FOLLOW_UP_REQUIRED",
+      "reasonCode": "REFILL_LIMIT_REACHED",
+      "entries": [
+        {
+          "id": "refill-limit-2-one-over",
+          "sha256": "31f760939efd66ac4fc940f3a4f1fecc9a15534b0c98fdeacac61cb7de67ffdc"
+        },
+        {
+          "id": "refill-limit-3-at-limit",
+          "sha256": "87c7184fa1fb030acabaa00ab098a3acebf83a13df6480b8e64f7bc2924875e5"
+        },
+        {
+          "id": "refill-limit-1-at-limit",
+          "sha256": "fd6395a5cc5eea015b5ab7f156885c8dc6167882092b503587f5c227cc70dbf9"
+        }
+      ]
+    },
+    {
+      "requirement": "safety signal outranks refill limit",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "REFILL_LIMIT_REACHED",
+      "entries": [
+        {
+          "id": "refill-limit-reached-with-item9",
+          "sha256": "004faf7179f131d850aecb299639133483cc5435d0739d38ea526431348a6855"
+        }
+      ]
+    },
+    {
+      "requirement": "PHQ-9 item 9 boundary",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "PHQ9_ITEM9_POSITIVE",
+      "entries": [
+        {
+          "id": "phq9-item9-one-only-total-1",
+          "sha256": "f65fa145ec691700f5e46c73466a255413e115e760848592394a60bacb2b2e2a"
+        },
+        {
+          "id": "phq9-item9-three",
+          "sha256": "fcc77b1026b8bcda3c630ee6b9d3b78dd1aad94fe5f2b51d15d9d5990da2a102"
+        }
+      ]
+    },
+    {
+      "requirement": "PHQ-9 boundary 14 stays eligible",
+      "kind": "benign-clean",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "phq9-total-14-item9-zero-auto",
+          "sha256": "82efc1acb4e7d4f7f5532581fa1a564f2710e679d016581fd17dbb32f2a32827"
+        }
+      ]
+    },
+    {
+      "requirement": "PHQ-9 total >= 15 boundary",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "PHQ9_TOTAL_HIGH",
+      "entries": [
+        {
+          "id": "phq9-total-15-prior-15-no-rise",
+          "sha256": "8c84f2a8ea9aab0a6fe10902f794a44a49330c3accda4e78e4eacd95a11fa6a2"
+        },
+        {
+          "id": "phq9-total-15",
+          "sha256": "20fd6f60ba870c320e4adca09be19d044c4574ce209da5f7b98f5cc511c50121"
+        }
+      ]
+    },
+    {
+      "requirement": "PHQ-9 rise boundary 4 stays eligible",
+      "kind": "benign-clean",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "phq9-rise-4-auto",
+          "sha256": "adf59084f9d7545b4cc023f70f7880ab3685e1311d9bc16825887fcf93a22e5d"
+        }
+      ]
+    },
+    {
+      "requirement": "PHQ-9 rise >= 5 boundary",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "PHQ9_RISE",
+      "entries": [
+        {
+          "id": "phq9-rise-5-from-prior-5",
+          "sha256": "c29bf7a5ef549268029e563030512b813d326ad58b60698c16f7a1d6d5142b5e"
+        },
+        {
+          "id": "phq9-rise-from-prior-zero",
+          "sha256": "4851669596094da625b2fc4457f0435237d01eb9fca02bf7d0cd442d3fc3f44a"
+        },
+        {
+          "id": "phq9-rise-5",
+          "sha256": "b1e13e356e5be25a7a436efae2ab1fb6c101e3f04541feeec3a650d9c2731152"
+        }
+      ]
+    },
+    {
+      "requirement": "PHQ-9 total and rise together",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "PHQ9_TOTAL_HIGH",
+      "entries": [
+        {
+          "id": "phq9-rise-and-total-high",
+          "sha256": "fb83a69d9bed845485cf994c1192e13b88aca466550dadc02b24711c11ad9de2"
+        }
+      ]
+    },
+    {
+      "requirement": "PHQ-9 improvement stays eligible",
+      "kind": "benign-clean",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "phq9-improved-from-high-prior-auto",
+          "sha256": "3f70c13458e27aca14381f38bb25cd4c74300bb13b3bcc11c408590febc88b44"
+        }
+      ]
+    },
+    {
+      "requirement": "GAD-7 does not affect eligibility (SPEC has no GAD-7 rule)",
+      "kind": "benign-clean",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "gad7-maximum-no-rule",
+          "sha256": "2d9512569f7c0569adb6b54e92b92c919e6d2732bbcd4e793cbf02542bd0dd0b"
+        }
+      ]
+    },
+    {
+      "requirement": "mild side effect text stays eligible (AI path, no signals)",
+      "kind": "benign-clean-ai",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "side-effects-mild-text-auto",
+          "sha256": "257ad6ef441e2d8312217e8cd20266898c77b6cc581a9f8a710119575c3505e0"
+        }
+      ]
+    },
+    {
+      "requirement": "trazodone at the limit stays eligible (AI path)",
+      "kind": "benign-clean-ai",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "trazodone-150-nightly-boundary-auto",
+          "sha256": "1677442d4b5945a635edc0c2db1338c3288c8ec859165866a008d7d13f0d1418"
+        }
+      ]
+    },
+    {
+      "requirement": "trazodone over the limit",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "TRAZODONE_LIMIT_EXCEEDED",
+      "entries": [
+        {
+          "id": "trazodone-151-nightly",
+          "sha256": "6ce65e35c970aea5dbcc781fc59c6e243b2fa515fa5acd94499141cbe8b8548f"
+        },
+        {
+          "id": "trazodone-50-twice-daily",
+          "sha256": "5e5d57b3569c1d71c645d4a5732779bbee4559b0eee001cc91455caed6d91e1b"
+        }
+      ]
+    },
+    {
+      "requirement": "mirtazapine monitoring on file stays eligible (AI path)",
+      "kind": "benign-clean-ai",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "mirtazapine-baseline-recorded-3-months-auto",
+          "sha256": "c5badf5ca07078b1feafff9323c581a7e8e37e4b896b9d155e111aa5d29460ca"
+        }
+      ]
+    },
+    {
+      "requirement": "mirtazapine monitoring on file stays eligible",
+      "kind": "benign-clean",
+      "outcome": "AUTO_ELIGIBLE",
+      "entries": [
+        {
+          "id": "mirtazapine-5-months-six-month-not-due",
+          "sha256": "3c722abbb78f00ba82b3a45c161195c5e275445e63633a6d9971f01c553b324c"
+        },
+        {
+          "id": "mirtazapine-8-months-six-month-recorded-auto",
+          "sha256": "b79921cd8aa95729b2075fddc8c96edbadb5620213e664280f922e1e617692cd"
+        }
+      ]
+    },
+    {
+      "requirement": "mirtazapine monitoring missing",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "MIRTAZAPINE_MONITORING_MISSING",
+      "entries": [
+        {
+          "id": "mirtazapine-6-months-six-month-missing",
+          "sha256": "787cfadcf2bd74e7f10a44c2c2c9aea328c6d870e8979e3b9ad79ee61f3574b1"
+        }
+      ]
+    },
+    {
+      "requirement": "hydroxyzine always escalates",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "HYDROXYZINE_ALWAYS_ESCALATE",
+      "entries": [
+        {
+          "id": "hydroxyzine-pamoate-always-escalate",
+          "sha256": "8f4dbd9424a80f7e3e4ad2f95a8c35e4973ec6d4a318454c09fbe8a3fbef5717"
+        },
+        {
+          "id": "hydroxyzine-hcl-low-dose-still-escalates",
+          "sha256": "5f54b8ef7c5f00acbd6d3c9135532da96dc30d974029aeeddce434e541c4c1a5"
+        }
+      ]
+    },
+    {
+      "requirement": "disguised dose change in free text (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "dose_or_drug_change_request"
+      ],
+      "entries": [
+        {
+          "id": "ai-disguised-dose-change",
+          "sha256": "c015f084a8309527edc76fae7f41ff80e7fbba79cea476f059cd7dddd5d7339a"
         }
       ]
     }

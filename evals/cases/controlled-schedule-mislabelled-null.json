@@ -1,0 +1,43 @@
+{
+  "id": "controlled-schedule-mislabelled-null",
+  "scenario": "Alprazolam whose record wrongly says not controlled (schedule null)",
+  "category": "controlled-substance",
+  "labeledFrom": "R03: a controlled drug must never reach the AI path even if the record under-reports its schedule; alprazolam is schedule IV by its RxCUI and name. R02: not on the allowlist, so REJECT. Zero model calls required.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Same refill as always.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "596",
+    "name": "alprazolam",
+    "doseMg": 0.5,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "alprazolam"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "596"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "REJECT",
+    "reasonCodes": ["NOT_ON_FORMULARY", "CONTROLLED_SUBSTANCE"]
+  },
+  "aiFixture": "ai-controlled-blocked-unused"
+}

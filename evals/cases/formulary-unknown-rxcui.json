@@ -1,0 +1,41 @@
+{
+  "id": "formulary-unknown-rxcui",
+  "scenario": "Medication with an RxCUI that is not on the formulary",
+  "category": "formulary",
+  "labeledFrom": "R02 (medication on formulary allowlist, else reject); synthetic drug name and RxCUI, not on the 15-drug list.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "999999",
+    "name": "examplemed-two",
+    "doseMg": 10,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": null
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "999999"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "REJECT",
+    "reasonCodes": ["NOT_ON_FORMULARY"]
+  }
+}

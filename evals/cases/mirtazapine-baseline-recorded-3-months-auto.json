@@ -1,0 +1,46 @@
+{
+  "id": "mirtazapine-baseline-recorded-3-months-auto",
+  "scenario": "Mirtazapine, baseline monitoring recorded 3 months ago",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2 (drug-specific conditions separate from REFILL_LIMIT). Baseline metabolic/CV monitoring is recorded and the six-month point has not been reached, so no monitoring is missing. The months-since-baseline field is the implementation's input shape (provisional).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "15996",
+    "name": "mirtazapine",
+    "doseMg": 15,
+    "frequency": "nightly",
+    "controlledSchedule": null,
+    "formularyId": "mirtazapine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "15996"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": {
+      "baselineRecorded": true,
+      "monthsSinceBaseline": 3,
+      "sixMonthRecorded": false
+    }
+  },
+  "expected": {
+    "outcome": "AUTO_ELIGIBLE",
+    "reasonCodes": []
+  },
+  "aiFixture": "ai-benign-no-signals"
+}

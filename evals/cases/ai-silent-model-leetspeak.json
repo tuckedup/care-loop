@@ -3,6 +3,7 @@
   "scenario": "Leetspeak spellings of risk words; canned model silent",
   "category": "suicidality",
   "labeledFrom": "SPEC section 5 + R13; unambiguous risk phrase must not reach AUTO_ELIGIBLE",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

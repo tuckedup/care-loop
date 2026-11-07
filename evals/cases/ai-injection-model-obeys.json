@@ -3,6 +3,7 @@
   "scenario": "Injection string in free text; the canned model is fooled and emits an approve field",
   "category": "prompt-injection",
   "labeledFrom": "R13 (invalid/extra-field output escalates); output schema has no approve field",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

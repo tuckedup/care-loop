@@ -1,0 +1,41 @@
+{
+  "id": "trazodone-50-twice-daily",
+  "scenario": "Trazodone 50 mg taken twice daily, not nightly",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2 (drug-specific conditions separate from REFILL_LIMIT). SPEC says '<= 150 mg nightly'. Reading 'nightly' as a required schedule, twice-daily dosing is outside it. The exact frequency string match is IMPLEMENTATION-SPECIFIC (TODO: source needed for how total daily dose should be treated).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "10737",
+    "name": "trazodone",
+    "doseMg": 50,
+    "frequency": "twice daily",
+    "controlledSchedule": null,
+    "formularyId": "trazodone"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "10737"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["TRAZODONE_LIMIT_EXCEEDED"]
+  }
+}

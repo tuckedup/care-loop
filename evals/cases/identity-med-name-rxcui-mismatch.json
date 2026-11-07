@@ -1,0 +1,42 @@
+{
+  "id": "identity-med-name-rxcui-mismatch",
+  "scenario": "Medication name says sertraline but the RxCUI is fluoxetine's",
+  "category": "formulary",
+  "labeledFrom": "SPEC section 2 / R02 require the drug to be positively identified as an allowlisted drug; name, formulary id and RxCUI disagree, so identity is not established. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. The specific reason code MEDICATION_IDENTITY_MISMATCH comes from M01. Outcome is not AUTO_ELIGIBLE under any reading.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "sertraline",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "sertraline"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["MEDICATION_IDENTITY_MISMATCH"]
+  }
+}

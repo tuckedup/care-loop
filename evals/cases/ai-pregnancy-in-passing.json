@@ -3,6 +3,7 @@
   "scenario": "Pregnancy question answered no, but free text mentions trying to conceive",
   "category": "pregnancy",
   "labeledFrom": "SPEC section 10 hard case (pregnancy mentioned in passing) + R13",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

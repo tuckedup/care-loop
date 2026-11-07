@@ -1,8 +1,9 @@
 {
   "id": "ai-sarcasm-self-harm",
   "scenario": "Sarcastic phrasing that still names ending one's life",
-  "category": "suicidality",
+  "category": "sarcasm-gallows-humour",
   "labeledFrom": "SPEC section 10 hard case (sarcasm); conservative: any self-harm language escalates via R13",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

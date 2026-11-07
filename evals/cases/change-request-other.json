@@ -1,0 +1,41 @@
+{
+  "id": "change-request-other",
+  "scenario": "Patient ticked a other change",
+  "category": "change-request",
+  "labeledFrom": "R05 (no dose, frequency or drug change requested; any change is not a plain renewal). Outcome ESCALATE is the implementation's choice; the label requires only not AUTO_ELIGIBLE. 'other' is outside none, so it is not a plain renewal (conservative; the SPEC names dose, frequency and drug).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Refill please.",
+    "requestedHuman": false,
+    "requestedChange": "other"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["CHANGE_REQUESTED"]
+  }
+}

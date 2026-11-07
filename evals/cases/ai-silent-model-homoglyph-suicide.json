@@ -3,6 +3,7 @@
   "scenario": "Look-alike Cyrillic letters in 'suicide'; canned model silent",
   "category": "suicidality",
   "labeledFrom": "SPEC section 5 + R13; adversarial phrasing",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

@@ -1,0 +1,41 @@
+{
+  "id": "dose-form-bupropion-no-form",
+  "scenario": "Bupropion with no release form stated; allowlist names only SR and XL",
+  "category": "dose-form",
+  "labeledFrom": "SPEC section 2 allowlists \"bupropion SR\" and \"bupropion XL\" only, so an unspecified bupropion cannot be matched to an allowlisted form. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. Escalation (not a plain renewal) is the conservative reading.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "42347",
+    "name": "bupropion",
+    "doseMg": 150,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "bupropion_sr"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "42347"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["DOSE_FORM_NOT_ALLOWLISTED"]
+  }
+}

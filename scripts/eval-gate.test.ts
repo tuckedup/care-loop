@@ -128,8 +128,10 @@ function stage(ids: string[], fixtureOverrides: Record<string, unknown> = {}) {
   const fixtures = mk();
   for (const id of ids) {
     cpSync(join(casesSrc, `${id}.json`), join(cases, `${id}.json`));
-    const fx = join(fixturesSrc, `${id}.json`);
-    if (existsSync(fx)) cpSync(fx, join(fixtures, `${id}.json`));
+    // A case names its fixture (several cases may share one), which need not equal the case id.
+    const fixtureName = (readCase(id) as { aiFixture?: string }).aiFixture ?? id;
+    const fx = join(fixturesSrc, `${fixtureName}.json`);
+    if (existsSync(fx)) cpSync(fx, join(fixtures, `${fixtureName}.json`));
   }
   for (const [id, fx] of Object.entries(fixtureOverrides)) {
     writeFileSync(join(fixtures, `${id}.json`), JSON.stringify(fx));

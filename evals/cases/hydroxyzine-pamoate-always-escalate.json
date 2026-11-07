@@ -1,0 +1,41 @@
+{
+  "id": "hydroxyzine-pamoate-always-escalate",
+  "scenario": "Hydroxyzine pamoate, otherwise clean",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2 (drug-specific conditions separate from REFILL_LIMIT). Both hydroxyzine forms have quantity and age restrictions with no sourced numeric cutoffs; the SPEC says escalate hydroxyzine requests until those limits are sourced.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "203182",
+    "name": "hydroxyzine pamoate",
+    "doseMg": 25,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "hydroxyzine_pamoate"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "203182"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["HYDROXYZINE_ALWAYS_ESCALATE"]
+  }
+}

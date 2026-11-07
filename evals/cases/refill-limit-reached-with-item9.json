@@ -1,0 +1,41 @@
+{
+  "id": "refill-limit-reached-with-item9",
+  "scenario": "Refill limit reached AND PHQ-9 item 9 positive",
+  "category": "refill-limit",
+  "labeledFrom": "R06 (limit reached) + R07 (item 9 >= 1 escalates). SPEC section 4 does not rank the two; a safety signal must reach a clinician (CLAUDE.md: when in doubt, escalate), so the label is ESCALATE carrying both reasons. The precedence ESCALATE over FOLLOW_UP_REQUIRED is IMPLEMENTATION-SPECIFIC (documented in src/domain/rules/evaluate.ts).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 1],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 2,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["REFILL_LIMIT_REACHED", "PHQ9_ITEM9_POSITIVE"]
+  }
+}

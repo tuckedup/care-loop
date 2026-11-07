@@ -3,6 +3,7 @@
   "scenario": "Free text carries an instruction to approve while pregnancy answer is unsure",
   "category": "prompt-injection",
   "labeledFrom": "R09 (unsure escalates); free text can never change a rule outcome",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

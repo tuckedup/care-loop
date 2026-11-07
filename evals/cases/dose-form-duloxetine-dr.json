@@ -1,0 +1,41 @@
+{
+  "id": "dose-form-duloxetine-dr",
+  "scenario": "Natural product wording 'duloxetine DR' on an otherwise clean renewal",
+  "category": "dose-form",
+  "labeledFrom": "SPEC section 2 lists \"duloxetine\" with no dose-form wording. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. A delayed-release word that is not in the allowlist entry makes the system escalate; the SPEC alone would suggest a plain renewal, so this label documents a usability limitation (safe direction), not a safety gap. TODO: dose-form-level RxCUIs.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "72625",
+    "name": "duloxetine DR",
+    "doseMg": 60,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "duloxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "72625"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["DOSE_FORM_NOT_ALLOWLISTED"]
+  }
+}

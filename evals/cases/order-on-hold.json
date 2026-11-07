@@ -1,0 +1,41 @@
+{
+  "id": "order-on-hold",
+  "scenario": "Clinician order exists but is on-hold",
+  "category": "order-status",
+  "labeledFrom": "R04 (an active clinician-originated MedicationRequest must exist) + clinical-rules skill (status active, intent order). The SPEC gives no per-rule outcome for R04; ESCALATE (a human looks at why) is the implementation's choice and the label only requires that it is not AUTO_ELIGIBLE. Status on-hold is not active.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "on-hold",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["NO_ACTIVE_ORDER"]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "mirtazapine-6-months-six-month-missing",
+  "scenario": "Mirtazapine, 6 months since baseline, six-month check missing",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2 (drug-specific conditions separate from REFILL_LIMIT). Six months have elapsed since baseline and the six-month monitoring is not recorded. The boundary (6 months counts as due) is IMPLEMENTATION-SPECIFIC; escalation is the conservative reading (TODO: source needed).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "15996",
+    "name": "mirtazapine",
+    "doseMg": 15,
+    "frequency": "nightly",
+    "controlledSchedule": null,
+    "formularyId": "mirtazapine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "15996"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": {
+      "baselineRecorded": true,
+      "monthsSinceBaseline": 6,
+      "sixMonthRecorded": false
+    }
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["MIRTAZAPINE_MONITORING_MISSING"]
+  }
+}

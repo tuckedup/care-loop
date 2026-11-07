@@ -1,0 +1,43 @@
+{
+  "id": "controlled-vyvanse-brand-name",
+  "scenario": "Controlled stimulant requested by brand name (Vyvanse)",
+  "category": "controlled-substance",
+  "labeledFrom": "R03 + R02 (lisdexamfetamine is schedule II; brand alias Vyvanse). REJECT because not on the allowlist; zero model calls required.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Please send my Vyvanse refill to the usual pharmacy.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "700810",
+    "name": "Vyvanse 30 mg",
+    "doseMg": 30,
+    "frequency": "daily",
+    "controlledSchedule": "II",
+    "formularyId": "lisdexamfetamine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "700810"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "REJECT",
+    "reasonCodes": ["NOT_ON_FORMULARY", "CONTROLLED_SUBSTANCE"]
+  },
+  "aiFixture": "ai-controlled-blocked-unused"
+}

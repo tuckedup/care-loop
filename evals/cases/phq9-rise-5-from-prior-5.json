@@ -1,0 +1,41 @@
+{
+  "id": "phq9-rise-5-from-prior-5",
+  "scenario": "PHQ-9 rises by exactly 5 (5 to 10)",
+  "category": "depression-severity",
+  "labeledFrom": "R08: a rise of >= 5 from the last score escalates; 10 - 5 = 5. Total 10 < 15, item 9 = 0.",
+  "input": {
+    "phq9": [2, 2, 1, 1, 1, 1, 1, 1, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": 5,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["PHQ9_RISE"]
+  }
+}

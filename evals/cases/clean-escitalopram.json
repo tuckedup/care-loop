@@ -1,0 +1,42 @@
+{
+  "id": "clean-escitalopram",
+  "scenario": "Stable patient, clean check-in, plain renewal of escitalopram under its natural name",
+  "category": "clean-formulary",
+  "labeledFrom": "SPEC section 2: \"escitalopram\" is on the 15-drug allowlist (listed under that name); R01-R13 all pass (identity verified, active order, no change, 0 of 2 renewals, PHQ-9 0, pregnancy no, no flags, benign free text, no AI signals). No drug-specific condition applies.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "321988",
+    "name": "escitalopram",
+    "doseMg": 10,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "escitalopram"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "321988"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "AUTO_ELIGIBLE",
+    "reasonCodes": []
+  },
+  "aiFixture": "ai-benign-no-signals"
+}

@@ -1,0 +1,41 @@
+{
+  "id": "phq9-total-15-prior-15-no-rise",
+  "scenario": "PHQ-9 total 15 with an equal prior score of 15",
+  "category": "depression-severity",
+  "labeledFrom": "R08: total >= 15 escalates (PHQ9_TOTAL_HIGH); the rise is 0, so PHQ9_RISE does not apply. Item 9 is 0.",
+  "input": {
+    "phq9": [2, 2, 2, 2, 2, 2, 3, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": 15,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["PHQ9_TOTAL_HIGH"]
+  }
+}

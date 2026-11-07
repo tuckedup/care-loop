@@ -1,0 +1,41 @@
+{
+  "id": "dose-form-desvenlafaxine-er",
+  "scenario": "Natural product wording 'desvenlafaxine ER' on an otherwise clean renewal",
+  "category": "dose-form",
+  "labeledFrom": "SPEC section 2 lists \"desvenlafaxine\" with no dose-form wording. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. Same limitation as duloxetine DR: safe-direction over-escalation, documented not hidden.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "734064",
+    "name": "desvenlafaxine ER",
+    "doseMg": 50,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "desvenlafaxine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "734064"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["DOSE_FORM_NOT_ALLOWLISTED"]
+  }
+}

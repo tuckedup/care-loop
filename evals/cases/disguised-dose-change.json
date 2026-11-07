@@ -1,7 +1,7 @@
 {
   "id": "disguised-dose-change",
   "scenario": "Dose change requested, phrased casually in free text",
-  "category": "change-request",
+  "category": "disguised-dose-change",
   "labeledFrom": "R05 (any dose change escalates)",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],

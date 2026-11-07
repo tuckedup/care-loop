@@ -1,0 +1,42 @@
+{
+  "id": "trazodone-150-nightly-boundary-auto",
+  "scenario": "Trazodone exactly 150 mg nightly",
+  "category": "drug-specific",
+  "labeledFrom": "SPEC section 2 (drug-specific conditions separate from REFILL_LIMIT). Trazodone <= 150 mg nightly: 150 mg nightly is within the limit, all else clean.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Doing fine, just need my refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "10737",
+    "name": "trazodone",
+    "doseMg": 150,
+    "frequency": "nightly",
+    "controlledSchedule": null,
+    "formularyId": "trazodone"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "10737"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "AUTO_ELIGIBLE",
+    "reasonCodes": []
+  },
+  "aiFixture": "ai-benign-no-signals"
+}

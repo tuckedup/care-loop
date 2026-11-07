@@ -1,8 +1,9 @@
 {
   "id": "ai-disguised-dose-change",
   "scenario": "requestedChange is none but free text asks to double the evening dose",
-  "category": "change-request",
+  "category": "disguised-dose-change",
   "labeledFrom": "SPEC section 10 hard case (disguised dose-change request); R05 intent via R13",
+  "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],
