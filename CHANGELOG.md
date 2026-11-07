@@ -5,6 +5,44 @@ release schedule in docs/SPEC.md. All data is synthetic.
 
 ## [Unreleased]
 
+### Added (toward v1.0)
+
+- Autonomy modes SHADOW (default) / RETRO / SAMPLED as an admin setting stored as events
+  (`AutonomyModeChanged`), with `/admin/autonomy`. Only a clean, rules-AUTO_ELIGIBLE renewal can be
+  auto-approved (never escalated, rejected, follow-up, controlled or AI-flagged ones); the language
+  model can only add escalations. Fails closed to SHADOW.
+- Retrospective review: seeded deterministic sampling (`SEED`, `SAMPLE_RATE`), `/clinician/retro-review`,
+  non-concurrence alert, `renewal_metrics` projection (migration 0016).
+- Admin dashboard (`/admin/dashboard`: concurrence with the 98% figure labelled as a TARGET, escalation
+  mix, time to decision) and `/admin/evals` (eval results, synthetic labels).
+- E2E: auto-renew in RETRO mode (`e2e/retro-auto-renew.spec.ts`).
+
+## v0.3 - outbox, pharmacy, follow-up, audit
+
+All data is synthetic. Tagging `v0.3.0` is the owner's step (agents do not tag).
+
+### Added
+
+- Transactional outbox and worker; an approval, `RxRenewalQueued` and the outbox row commit together.
+  Transmit re-checks every guard from the event streams (clinician approval, rules outcome, not
+  controlled, confirmed pharmacy, positive allow-list) before any outbound call; mock pharmacy with
+  seeded outcomes (retryable and fatal errors, delays, fills, duplicates, pharmacist escalations).
+- Pharmacy responses: status, error with retry and dead-letter, fills, stalled and unconfirmed
+  sweeps, CancelRx for superseded renewals (never after a fill), pharmacy alerts inbox.
+- Follow-up: refill limit leads to a follow-up requirement, patient booking, clinician booking, visit
+  notes that reset the counter, follow-up task and calendar slots.
+- Hash-chained audit log coverage test, `pnpm audit:verify`, admin audit view (FHIR AuditEvent-shaped
+  JSON, not a conformant FHIR server).
+- Every external HTTP call passes an idempotency key (scan test in `src/infra/http-idempotency.test.ts`;
+  the only exception is read-only LLM inference).
+
+### Known limits
+
+- Dev/test-only switches (all default-deny, NODE_ENV development or test): `MOCK_PHARMACY_FORCE`,
+  `RISK_FIXTURE`, `SUMMARY_FIXTURE`, `VISIT_CLOCK_OFFSET_DAYS`.
+- Sweeps run from cron routes or scripts; no scheduler config yet. The audit chain is tamper-evident,
+  not tamper-proof against a database superuser. HIPAA-aligned design, synthetic data.
+
 ## v0.2 - rules, AI risk screen, clinician queue
 
 All data is synthetic. Tagging `v0.2.0` is the owner's step (agents do not tag).

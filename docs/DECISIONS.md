@@ -430,3 +430,54 @@ the audit chain is tamper-EVIDENT, not a compliance certification.
   CalendarSlotCreated slots, and the follow-up slot is the first free grid slot at/after the
   default gap. TODO: source needed for the 28-day follow-up gap (demo scheduling placeholder, not a
   clinical value).
+
+## ADR: autonomy modes, auto-approval and retrospective review (F059-F062)
+
+Status: accepted for the demo. All data is synthetic. Implementer choices below need confirmation.
+
+- **Mode is an event.** `AutonomyModeChanged{mode, changedBy}` on the stream `settings-autonomy`
+  (additive event). No events, an unreadable or schema-invalid stream, or any error reads as
+  SHADOW (`readAutonomyMode` never throws). Only an admin changes it: the server action calls
+  `requireRole("admin")` first, the actor is the session subject, and the aggregate re-checks the
+  role. A non-SHADOW mode also needs a valid `SEED` / `SAMPLE_RATE` config; a config error is SHADOW.
+- **One system-approval path.** `RenewalApproved{by:"system"}` is produced only by the review
+  aggregate's `AutoApprove` command, whose schema cannot express SHADOW. It refuses unless, from
+  the stream itself: the rules outcome is AUTO_ELIGIBLE and every rule result passed; nothing is
+  escalated (including a late signal), controlled, blocked or pipeline-errored; the AI recorded a
+  clean result (a `RiskSignalsExtracted` with no signals and no `unavailable:` / `local-tripwire:`
+  marker; a missing record is not clean); identity is verified; no clinician started review; a
+  pharmacy is confirmed. The handler adds the positive transmit allow-list
+  (`medicationTransmittable`) and refuses when an earlier unsettled renewal of the same
+  prescription exists (that needs a clinician to supersede it). Approval, `RxRenewalQueued`, the
+  outbox row, the sampling event and the audit entry are one transaction (`handleCommandWithOutbox`).
+  Any refusal or error leaves the renewal for a clinician: SHADOW behaviour.
+- **Transmit gate widened narrowly.** `checkTransmittable` used to accept only clinician approvals.
+  It now also accepts a system approval, but only when the stream folds to a clean AUTO_ELIGIBLE
+  renewal (outcome, rulesClean, aiClean, not escalated, no reviewer) and the approval event carries
+  autonomyMode RETRO or SAMPLED; a forged system approval of an escalated renewal, or one stamped
+  SHADOW, is refused (tests). The CancelRx handler still requires a clinician-approved superseding
+  renewal, which is why an auto-approval never supersedes anything.
+- **Sampling.** `sampleUnit = sha256("careloop-sample:" + seed + ":" + renewalId)` first 48 bits / 2^48,
+  selected when `< rate`. Deterministic per (seed, renewal id, rate); the event reason is
+  `RETRO_ALL` (RETRO queues every auto-approval) or `SAMPLED_RANDOM`. `AuditSampleSelected` gained an
+  optional `reason`. In SAMPLED mode an unsampled auto-approval gets no retrospective review by
+  design. TODO: product decision whether a long-unreviewed share should alert.
+- **Retro review.** `RecordRetroReview` is clinician only, reviewer id from the session, one
+  review per renewal, and only for a system auto-approval that was queued for review. A
+  non-concurrence appends the event, and the `renewal_metrics` projection records a
+  `RETRO_NON_CONCURRENCE` anomaly that the dashboard and the review page show as an alert and count.
+  It does not switch the mode automatically (TODO: owner decision; the alert suggests Shadow).
+- **renewal_metrics projection (migration 0016).** One row per renewal: request/decision times,
+  decision (gated like the queue: a system decision on an escalated row is ignored, a clinician
+  decision needs its id and, when escalated, a review start), escalation reason codes, sampling and
+  review outcome. Time to decision = RenewalRequested -> first honoured approval / denial /
+  follow-up. The 98% concurrence figure is shown only as a TARGET label from public reporting; the
+  page shows a measured rate over synthetic demo reviews, or an empty state, never a claim.
+- **Dev/test switches for e2e.** The auto-renew e2e needs `RISK_FIXTURE=synthetic-handwritten`
+  (existing dev/test-only gate) so the model stand-in answers "no signals"; without it the AI path
+  fails closed and every renewal escalates. The default mock pharmacy fills only a random share of
+  messages, so the Filled assertions need `MOCK_PHARMACY_FORCE=retry-then-fill` and are skipped
+  without it.
+- **Eval page.** `/admin/evals` reads `evals/results/latest.json` (and `live-latest.json` if it
+  exists) with Zod; a missing or malformed file shows an explicit state. TODO (F069): include the
+  results files in the Vercel server bundle.

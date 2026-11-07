@@ -378,7 +378,9 @@ export const renewalMetrics = pgTable(
     retroReviewerId: text("retro_reviewer_id"),
     retroConcur: boolean("retro_concur"),
     retroReviewedAt: timestamp("retro_reviewed_at", { withTimezone: true }),
-    lastPosition: bigint("last_position", { mode: "bigint" }).notNull().default(sql`0`),
+    lastPosition: bigint("last_position", { mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
   },
   (t) => [
     index("renewal_metrics_sampled_idx").on(t.sampled, t.autoApprovedAt),
