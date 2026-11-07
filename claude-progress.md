@@ -290,3 +290,20 @@ invariants, review workflow and history, ordered continuation plan (finish F067 
 F043/F058-F067 -> F068-F070), known gaps/owner decisions, gotchas and a resume prompt.
 In flight at the time: safety review of F059/F060/F062, verifier for F043/F058/F061, evals builder on F067
 (uncommitted src/ai/judge.ts, evals/judge-*, evals/fixtures/judge, evals/judge-cases).
+
+## 2026-11-07 — Autonomy modes (F059, F060, F062) passing
+
+Fresh clinical-safety-reviewer PASS (first round): 355-case cross product through the real pipeline produced
+exactly 3 system approvals, all clean sertraline under RETRO/SAMPLED; forged system approvals on 14 renewal
+kinds were refused by the transmit gate; mode changes admin-only; malformed/unknown mode reads as SHADOW;
+sampling deterministic; retro review clinician-only, one per renewal. Orchestrator re-ran: autonomy.test.ts
+(31), retro-review.test.ts (15), gated e2e retro-auto-renew (6 passed). F062's listed verification now sets its
+env gates via cross-env (it skipped silently before).
+
+Reviewer's non-blocking notes (all need a direct event-store write): the transmit gate cannot verify the mode
+at approval time nor require AuditSampleSelected for RETRO (a forged RETRO-stamped approval of a clean
+AUTO_ELIGIBLE renewal passes; it re-derives eligibility so nothing unsafe sends); a corrupt settings event
+reads as SHADOW but makes setAutonomyMode throw (admin cannot recover via UI); renewal_metrics counts a forged
+system approval of any stamp, and evolveReview marks a forged non-escalated system approval decided (would stop
+a clinician deciding it); SAMPLED leaves the unsampled share without retro review (documented); a /clinician
+nav link to retro-review is missing (layout out of scope for the builder).

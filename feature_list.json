@@ -875,7 +875,7 @@
     "verification": [
       "pnpm test src/domain/autonomy/autonomy.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F060",
@@ -890,7 +890,7 @@
     "verification": [
       "pnpm test src/domain/autonomy/retro-review.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F061",
@@ -919,9 +919,9 @@
       "Appears in the retro review queue"
     ],
     "verification": [
-      "pnpm e2e e2e/retro-auto-renew.spec.ts"
+      "pnpm exec cross-env RISK_FIXTURE=synthetic-handwritten CRON_SECRET=e2e-secret MOCK_PHARMACY_FORCE=retry-then-fill pnpm e2e e2e/retro-auto-renew.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F063",
