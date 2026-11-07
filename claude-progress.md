@@ -253,3 +253,32 @@ so it really runs (3 tests). The pharmacy builder's own safety review of F048/F0
 re-send; cross-attributed fills) and was fixed in 5f2bcd7; a FRESH independent review is still required
 before F048 (safety-flagged) is flagged. NOTE: after pulling migrations always run `pnpm db:migrate`
 before `pnpm projections:rebuild` (0012_pharmacy_alerts).
+
+## 2026-11-06 — v0.3 stream: F048, F051, F052, F053, F055, F056, F057 passing
+
+Clean verification on a quiet machine (own DB/port/dist dir): format, typecheck, lint, pnpm test
+(88 files / 1520 tests), eval 47, eval:pins, audit:verify (chain intact), projections:rebuild, full
+e2e (43 passed, 12 env-gated skipped), plus the env-gated specs run separately: pharmacy-retry-fill (3,
+MOCK_PHARMACY_FORCE=retry-then-fill CRON_SECRET=...), follow-up specs (8, RISK_FIXTURE=synthetic-handwritten
+VISIT_CLOCK_OFFSET_DAYS=60), visit-summary fixture mode (1).
+
+Safety review history (honest record):
+
+- F048 (approval -> outbox -> transmit): builder's own review FAIL, fresh review FAIL (controlled backstop,
+  dead-letter stranding, ...), fresh round 2 FAIL (no-pharmacy approval, stall contradiction), fresh round 3 FAIL
+  (CancelRx after fill, copy untrue, docs). All fixed with tests (95e2e55, ef2047c). The core guarantee
+  (no outbound message for a non-clinician-approved / non-allowlisted / unconfirmed-pharmacy renewal) held in
+  every round. The LAST delta (ef2047c) was verified by the orchestrator's clean run but did NOT get a
+  fourth independent safety review: flagged on that basis.
+- F051 (follow-up): fresh review FAIL (note signed before the visit reset the refill limit; counter forgery
+  via client visitId) -> fixed; round 2 found no safety hole (small items) -> fixed in 0c7a4c3; delta verified
+  by the orchestrator, no third fresh review.
+- F052/F053/F055/F056/F057 (not safety-flagged): verified by tests/e2e; the verifier agent was cut off by the
+  usage limit, so verification was done by the orchestrator's clean run.
+
+Known gaps to carry forward: dev/test-only env switches exist (MOCK_PHARMACY_FORCE, RISK_FIXTURE,
+SUMMARY_FIXTURE, VISIT_CLOCK_OFFSET_DAYS: all default-deny, gated to NODE_ENV development/test); the stalled
+and approved-not-sent sweeps run only from cron/script (no scheduler config yet: F069); clinician booking is
+two appends (retry converges); audit chain cannot detect a DB superuser rewriting the whole chain + head.
+Use NEXT_DIST_DIR + own DATABASE_URL (..._e2e) + PORT for concurrent e2e. Next.js auto-edits tsconfig.json
+when NEXT_DIST_DIR is set: `git checkout tsconfig.json` afterwards.

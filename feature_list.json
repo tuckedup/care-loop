@@ -716,7 +716,7 @@
     "verification": [
       "pnpm test src/infra/outbox/transmit.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F049",
@@ -759,7 +759,7 @@
       "pnpm test src/domain/visit/follow-up.test.ts",
       "pnpm e2e e2e/follow-up-booking.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F052",
@@ -773,7 +773,7 @@
     "verification": [
       "pnpm test src/domain/visit/note-signed.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F053",
@@ -786,7 +786,7 @@
     "verification": [
       "pnpm e2e e2e/refill-limit-followup.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F054",
@@ -813,7 +813,7 @@
     "verification": [
       "pnpm test src/infra/audit/coverage.test.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F056",
@@ -827,7 +827,7 @@
       "pnpm test src/infra/audit/verify.test.ts",
       "pnpm audit:verify"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F057",
@@ -842,7 +842,7 @@
       "pnpm test src/infra/audit/audit-event-shape.test.ts",
       "pnpm e2e e2e/admin-audit.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F058",
