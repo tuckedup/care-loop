@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: dose_or_drug_change_request.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"dose_or_drug_change_request\",\"quote\":\"Same pills just more of them please\",\"sourceField\":\"freeText\",\"start\":30,\"end\":65}]}"
+  }
+}

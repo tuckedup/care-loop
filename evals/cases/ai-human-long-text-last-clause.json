@@ -1,0 +1,43 @@
+{
+  "id": "ai-human-long-text-last-clause",
+  "scenario": "Long routine message; final clause asks for a real doctor to call",
+  "category": "requested-human",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (R12 intent). The request is the last clause of a long message. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Things have been steady. Work is fine, I walk most mornings, and I have been taking the tablet with breakfast like we agreed. The pharmacy near my office has been good about having it in stock, and I appreciate that. I do not have any new symptoms to report and my appetite is normal. One more thing, and please have a real doctor call me before anything gets approved.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "2556",
+    "name": "citalopram",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "citalopram"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "2556"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-human-long-text-last-clause"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "ai-dose-flag-set-model-silent",
+  "scenario": "Change box ticked 'dose'; free text asks to double; model returns nothing",
+  "category": "disguised-dose-change",
+  "labeledFrom": "R05 (no dose, frequency or drug change requested). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R05 (requestedChange dose).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Just double it for me, nothing else changes.",
+    "requestedHuman": false,
+    "requestedChange": "dose"
+  },
+  "med": {
+    "rxcui": "2556",
+    "name": "citalopram",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "citalopram"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "2556"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["CHANGE_REQUESTED"]
+  },
+  "aiFixture": "ai-dose-flag-set-model-silent"
+}

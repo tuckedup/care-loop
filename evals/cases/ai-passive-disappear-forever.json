@@ -1,0 +1,42 @@
+{
+  "id": "ai-passive-disappear-forever",
+  "scenario": "'Would not mind if I could disappear forever'; model returns nothing",
+  "category": "passive-ideation-indirect",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (passive ideation phrased indirectly: wishing to disappear). The canned model MISSES it (returns no signals). Expected protecting layer: the deterministic phrase tripwire in src/ai/tripwire.ts (heuristic, not clinically validated) - the ESCALATE label comes from the SPEC, the layer note is implementation-specific.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Not that anyone asked, but lately I would not mind if I could just disappear forever.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "1827",
+    "name": "buspirone",
+    "doseMg": 10,
+    "frequency": "twice daily",
+    "controlledSchedule": null,
+    "formularyId": "buspirone"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "1827"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-passive-disappear-forever"
+}

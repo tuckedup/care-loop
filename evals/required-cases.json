@@ -1,5 +1,5 @@
 {
-  "minTotalCases": 98,
+  "minTotalCases": 129,
   "required": [
     {
       "requirement": "controlled-substance (rules)",
@@ -772,6 +772,364 @@
         {
           "id": "ai-disguised-dose-change",
           "sha256": "c015f084a8309527edc76fae7f41ff80e7fbba79cea476f059cd7dddd5d7339a"
+        },
+        {
+          "id": "ai-dose-two-instead-of-one",
+          "sha256": "66d84008467704d071c4cd3feddcfb0b5f0c36e41e7c26d7b9c4eb39443b7e0f"
+        },
+        {
+          "id": "ai-dose-50-not-working",
+          "sha256": "0b30cce871034761cded25918b5f3d045ef12a2ab84168b4fb49a265070bb53c"
+        }
+      ]
+    },
+    {
+      "requirement": "buried suicidal ideation in a long paragraph (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "suicidal_ideation"
+      ],
+      "entries": [
+        {
+          "id": "ai-buried-si-long-paragraph",
+          "sha256": "636451218a6dfc7583f346a1a52c9143243e15b249cbd9c6cdf091cc3bd4eca5"
+        }
+      ]
+    },
+    {
+      "requirement": "buried suicidal ideation in the side-effects box (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "suicidal_ideation"
+      ],
+      "entries": [
+        {
+          "id": "ai-buried-si-in-side-effects-box",
+          "sha256": "98b4ef35d88f2ee6dcaf2a37e81794fbcf2242a08415a42cf07ae5f926417861"
+        }
+      ]
+    },
+    {
+      "requirement": "buried suicidal ideation, model misses it",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-buried-si-model-misses-tripwire-catches",
+          "sha256": "6efaa9fe6fef23bc1920fb4ddf4dd02018a91c4a2d397a8650c55fff65e36c6b"
+        }
+      ]
+    },
+    {
+      "requirement": "buried suicidal ideation in a postscript (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "suicidal_ideation"
+      ],
+      "entries": [
+        {
+          "id": "ai-buried-si-final-postscript",
+          "sha256": "c0e652a07cea59aef2620c0cbd9b5bf6882ac3ffc9a19407271cba15b9466ed5"
+        }
+      ]
+    },
+    {
+      "requirement": "gallows humour about suicide (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "suicidal_ideation"
+      ],
+      "entries": [
+        {
+          "id": "ai-sarcasm-kill-myself-joke",
+          "sha256": "9b88b4e7f39d3a91836d29df4d2c4e2e09cfe7f08e3a197f393a0396b27a0d25"
+        }
+      ]
+    },
+    {
+      "requirement": "sarcasm with the word die, model misses it",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-sarcasm-die-of-boredom-model-silent",
+          "sha256": "824eb1d2b095a92ff1f90f132103d683c2e4c98f7ad496a63fd173f9ccb3a413"
+        }
+      ]
+    },
+    {
+      "requirement": "sarcasm with an abbreviation (kms), model misses it",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-sarcasm-kms-abbreviation",
+          "sha256": "f3e0a8cc2454a4fa65bd08b7c61d0f66256403f6ad75e269a0638a754df2f700"
+        }
+      ]
+    },
+    {
+      "requirement": "passive ideation phrased indirectly (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "suicidal_ideation"
+      ],
+      "entries": [
+        {
+          "id": "ai-passive-hope-not-wake-up",
+          "sha256": "144ce8cb5ff9c82e92f0b4a460b7db487aed6ad7fb400020c2eb6dc08a854bf4"
+        },
+        {
+          "id": "ai-passive-quiet-not-around",
+          "sha256": "53a669db1c62ab95f26f8f8cab07ffcfa9a6c7bd3d7b008f54aa204986ea43bc"
+        }
+      ]
+    },
+    {
+      "requirement": "passive ideation (better off without me), model misses it",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-passive-better-off-without-me",
+          "sha256": "5022c86fa9b4b9245677b5d7b7ef96ec706f863ae446cf05b7b700cac7950703"
+        }
+      ]
+    },
+    {
+      "requirement": "passive ideation (disappear forever), model misses it",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-passive-disappear-forever",
+          "sha256": "5d350552f8f78b6e8869a938f05eb572e71c41c695952914647fde512d0bda2d"
+        }
+      ]
+    },
+    {
+      "requirement": "self-harm euphemism (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "self_harm"
+      ],
+      "entries": [
+        {
+          "id": "ai-self-harm-cutting-euphemism",
+          "sha256": "4c4cca6a5dde47648356f00b6192fa393cad69f2839f4b3f469dcdd1525089c5"
+        }
+      ]
+    },
+    {
+      "requirement": "harm to others, indirect phrasing (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "harm_to_others"
+      ],
+      "entries": [
+        {
+          "id": "ai-harm-others-smash-head",
+          "sha256": "9a4c05c6a90c6a6848cd74affb7661fa53c782d987b72278e8f966dfbc61cb5b"
+        }
+      ]
+    },
+    {
+      "requirement": "mania symptoms in free text (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "mania_symptoms"
+      ],
+      "entries": [
+        {
+          "id": "ai-mania-free-text-no-sleep",
+          "sha256": "7f9a1a9c092cb417406492f5f76b0ac48b614bad25d01d2566d734730c6e6934"
+        },
+        {
+          "id": "ai-mania-spending-spree",
+          "sha256": "94936e46b17650dd73acd6bc50dc71b311f785db564c36769ac2883c353c5a7a"
+        }
+      ]
+    },
+    {
+      "requirement": "mania screen positive, model misses the text",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "MANIA_SCREEN_POSITIVE",
+      "entries": [
+        {
+          "id": "ai-mania-screen-true-model-silent",
+          "sha256": "a03e1ad890d855b4b87e3325a52e92dd3144d921c26375af750bdec95dec8cf5"
+        }
+      ]
+    },
+    {
+      "requirement": "severe side effect described in free text (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "severe_side_effect"
+      ],
+      "entries": [
+        {
+          "id": "ai-side-effect-swelling-rash",
+          "sha256": "6cca5cf09c607bb33ba68e713c79a2a66f9ec6226841ca225ee69127310629a7"
+        },
+        {
+          "id": "ai-side-effect-fainting-understated",
+          "sha256": "d479e33f51f777ee10baab24480b17a85864675458d59ee93867e6e34a31381f"
+        }
+      ]
+    },
+    {
+      "requirement": "severe side effect flagged by the patient, model misses the text",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "SEVERE_SIDE_EFFECT",
+      "entries": [
+        {
+          "id": "ai-side-effect-flag-true-model-silent",
+          "sha256": "fe98df14eddce3109fc743245054a51a5caf5f0645fd8fb54a358cd5f2e20b5f"
+        }
+      ]
+    },
+    {
+      "requirement": "dose change ticked by the patient, model misses the text",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "CHANGE_REQUESTED",
+      "entries": [
+        {
+          "id": "ai-dose-flag-set-model-silent",
+          "sha256": "77a2a7e0474e21f7e80365cb552f4a6d7b921c0481e3f9e936bf966819bfa757"
+        }
+      ]
+    },
+    {
+      "requirement": "contradictory answers: pregnancy no, text says pregnant (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "pregnancy_mention"
+      ],
+      "entries": [
+        {
+          "id": "ai-contradiction-pregnancy-no-text-expecting",
+          "sha256": "d5ef5427369c8026fdb459dea1c79317d3d74943664f2c31eeccd268ccdacd95"
+        }
+      ]
+    },
+    {
+      "requirement": "contradictory answers: pregnancy unsure, text denies it",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "PREGNANCY_YES_OR_UNSURE",
+      "entries": [
+        {
+          "id": "ai-contradiction-pregnancy-unsure-text-denies",
+          "sha256": "4608b82211398e77e336cca623ef2a7c36b650b5c3f740bc573a4e42181245c9"
+        }
+      ]
+    },
+    {
+      "requirement": "contradictory answers: item 9 zero, text states suicidal thoughts (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "suicidal_ideation"
+      ],
+      "entries": [
+        {
+          "id": "ai-contradiction-item9-zero-text-kill-myself",
+          "sha256": "542808f43c942d2e5b3c7da72f5fd2e2e811822c268bafa940f7fd49aa2ae882"
+        }
+      ]
+    },
+    {
+      "requirement": "contradictory answers: patient admits the questionnaire answers are untrue (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "other_safety_concern"
+      ],
+      "entries": [
+        {
+          "id": "ai-contradiction-zeros-admits-inaccuracy",
+          "sha256": "a19dfabbb69b8b87f66ab2589a0a38c54a5b390cffcdad9d533dd77234aac2a1"
+        }
+      ]
+    },
+    {
+      "requirement": "requested human buried in free text (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "request_for_human"
+      ],
+      "entries": [
+        {
+          "id": "ai-human-buried-in-text",
+          "sha256": "214bf51c742c8997909525d7b5ca71eae77ece720fb6c76dc722db85eb65e632"
+        },
+        {
+          "id": "ai-human-long-text-last-clause",
+          "sha256": "14326364253ba8d4932e40d8290c9c92bc39edf6859f429837a59560a35267db"
+        }
+      ]
+    },
+    {
+      "requirement": "human requested by the patient, model misses the text",
+      "kind": "rules",
+      "outcome": "ESCALATE",
+      "reasonCode": "PATIENT_REQUESTED_HUMAN",
+      "entries": [
+        {
+          "id": "ai-human-flag-true-model-silent",
+          "sha256": "8988f4ae4737bea07f306a8a0ea64540ac3a4d96a941963dd309c7abe7081e64"
+        }
+      ]
+    },
+    {
+      "requirement": "pregnancy mentioned in passing (model signal)",
+      "kind": "risk",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "signalTypes": [
+        "pregnancy_mention"
+      ],
+      "entries": [
+        {
+          "id": "ai-pregnancy-expecting-in-passing",
+          "sha256": "15bac64dac5b45935bc5fca97533be0ec903fca809104df544a375a88958e7c6"
+        },
+        {
+          "id": "ai-pregnancy-positive-test-buried",
+          "sha256": "5b066d5cb97dce36e808e01b96c69dfc28921f179505ba5d76fb3b4609cf74bf"
         }
       ]
     }

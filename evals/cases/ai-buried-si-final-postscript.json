@@ -1,0 +1,42 @@
+{
+  "id": "ai-buried-si-final-postscript",
+  "scenario": "Routine request followed by a P.S. that says the family would be better off without the patient",
+  "category": "buried-suicidal-ideation",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case. Risk appears only in a trailing postscript after a routine request. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. The phrase tripwire would also match 'better off without me'.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Please renew my usual prescription. Nothing has changed. P.S. my family would be better off without me, but anyway thanks for the refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "2556",
+    "name": "citalopram",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "citalopram"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "2556"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-buried-si-final-postscript"
+}

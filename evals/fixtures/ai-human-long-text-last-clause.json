@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: request_for_human.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"request_for_human\",\"quote\":\"please have a real doctor call me before anything gets approved\",\"sourceField\":\"freeText\",\"start\":305,\"end\":368}]}"
+  }
+}

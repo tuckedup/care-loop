@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: severe_side_effect.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"severe_side_effect\",\"quote\":\"Passed out in the shower once\",\"sourceField\":\"sideEffects\",\"start\":47,\"end\":76}]}"
+  }
+}

@@ -5,8 +5,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { runAiStage } from "../evals/ai-runner";
 import { AiFixtureSchema } from "../evals/fixtures";
-import { loadCases, loadManifest } from "../evals/lib";
+import { loadCases, loadManifest, runCase } from "../evals/lib";
 import { EvalCaseSchema, RISK_CATEGORIES, isRiskCategory } from "../evals/schema";
 import { ALLOWLISTED_DRUGS } from "../src/domain/formulary";
 
@@ -60,6 +61,32 @@ describe("eval set size (SPEC section 10)", () => {
     ]);
     const unknown = [...new Set(cases.map((c) => c.category))].filter((c) => !known.has(c));
     expect(unknown).toEqual([]);
+  });
+});
+
+describe("risk categories", () => {
+  const byCategory = (cat: string) => cases.filter((c) => c.category === cat);
+
+  for (const cat of RISK_CATEGORIES) {
+    it(`${cat}: >= 3 cases including >= 1 adversarial phrasing`, () => {
+      const inCat = byCategory(cat);
+      expect(inCat.length).toBeGreaterThanOrEqual(3);
+      expect(inCat.filter((c) => c.adversarial === true).length).toBeGreaterThanOrEqual(1);
+    });
+  }
+
+  it("risk categories: AI-dependent risk cases have a hand-written fixture", () => {
+    for (const c of cases.filter((x) => isRiskCategory(x.category) && x.aiFixture)) {
+      const fx = AiFixtureSchema.parse(readJson(join(fixturesDir, `${c.aiFixture}.json`)));
+      expect(fx.header.kind).toBe("synthetic-handwritten");
+    }
+  });
+
+  it("risk categories: no risk case is ever labelled AUTO_ELIGIBLE", () => {
+    const bad = cases
+      .filter((c) => isRiskCategory(c.category) && c.expected.outcome === "AUTO_ELIGIBLE")
+      .map((c) => c.id);
+    expect(bad).toEqual([]);
   });
 });
 
@@ -135,5 +162,34 @@ describe("formulary coverage (SPEC section 2)", () => {
     expect(has(-1)).toBe(true);
     expect(has(0)).toBe(true);
     expect(has(1)).toBe(true);
+  });
+});
+
+describe("known limitations stay documented (evals/known-limitations)", () => {
+  const limitsDir = join(root, "evals", "known-limitations");
+  const limits = loadCases(limitsDir);
+
+  it("every probe passes the case schema and is labelled as a limitation", () => {
+    expect(limits.length).toBeGreaterThanOrEqual(1);
+    for (const c of limits) {
+      expect(c.id.startsWith("limit-")).toBe(true);
+      expect(c.labeledFrom).toMatch(/KNOWN LIMITATION/);
+    }
+  });
+
+  it("probes are not in the gated case set", () => {
+    const gated = new Set(cases.map((c) => c.id));
+    expect(limits.filter((c) => gated.has(c.id))).toEqual([]);
+  });
+
+  it("each probe is still AUTO_ELIGIBLE although labelled ESCALATE (if one starts escalating, move it into evals/cases)", async () => {
+    for (const c of limits) {
+      expect(c.expected.outcome).toBe("ESCALATE");
+      const stage = await runAiStage(c, false);
+      const actual = runCase(c, stage.ai).actualOutcome;
+      expect(actual, `${c.id} now escalates: promote it to evals/cases and the manifest`).toBe(
+        "AUTO_ELIGIBLE",
+      );
+    }
   });
 });

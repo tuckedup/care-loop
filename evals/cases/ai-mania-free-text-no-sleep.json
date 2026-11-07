@@ -1,0 +1,42 @@
+{
+  "id": "ai-mania-free-text-no-sleep",
+  "scenario": "Screen answered no; text describes days without sleep, racing mind, new projects",
+  "category": "mania",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (R11 intent: signs of mania escalate; the screening box was answered no but the text describes symptoms). Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase covers mania; only the model can catch this wording.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Honestly I have felt incredible lately. I have barely slept in four days and I am not tired at all, my mind is racing with business ideas and I started three new projects this week.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "36437",
+    "name": "sertraline",
+    "doseMg": 50,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "sertraline"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "36437"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-mania-free-text-no-sleep"
+}

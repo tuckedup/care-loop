@@ -1,0 +1,43 @@
+{
+  "id": "ai-side-effect-fainting-understated",
+  "scenario": "Understated fainting spells, severe flag false",
+  "category": "severe-side-effect",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (R10 intent). Fainting is described with minimising language ('probably nothing'). Protecting layer: the (canned) model's signal; the label does not depend on the tripwire.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "Probably nothing, just little fainting spells. Passed out in the shower once.",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Same refill.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "10737",
+    "name": "trazodone",
+    "doseMg": 100,
+    "frequency": "nightly",
+    "controlledSchedule": null,
+    "formularyId": "trazodone"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "10737"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-side-effect-fainting-understated"
+}

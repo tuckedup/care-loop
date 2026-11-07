@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: severe_side_effect.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"severe_side_effect\",\"quote\":\"Rash spreading across my chest and my lips feel swollen\",\"sourceField\":\"sideEffects\",\"start\":0,\"end\":55}]}"
+  }
+}

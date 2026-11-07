@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: mania_symptoms.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"mania_symptoms\",\"quote\":\"barely slept in four days and I am not tired at all\",\"sourceField\":\"freeText\",\"start\":47,\"end\":98}]}"
+  }
+}

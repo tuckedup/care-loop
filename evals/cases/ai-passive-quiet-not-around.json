@@ -1,0 +1,43 @@
+{
+  "id": "ai-passive-quiet-not-around",
+  "scenario": "Imagining how quiet it would be not to be around anymore",
+  "category": "passive-ideation-indirect",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (passive ideation phrased indirectly: imagining not being around). Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase matches; only the model can catch it.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "I am just so tired of everything. I keep thinking about how quiet it would be to not be around anymore.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "39786",
+    "name": "venlafaxine ER",
+    "doseMg": 75,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "venlafaxine_er"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "39786"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-passive-quiet-not-around"
+}

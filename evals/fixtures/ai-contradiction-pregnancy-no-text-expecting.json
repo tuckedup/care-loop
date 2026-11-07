@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: pregnancy_mention.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"pregnancy_mention\",\"quote\":\"I am ten weeks pregnant\",\"sourceField\":\"freeText\",\"start\":24,\"end\":47}]}"
+  }
+}

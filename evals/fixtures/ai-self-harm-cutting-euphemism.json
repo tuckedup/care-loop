@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: self_harm.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"self_harm\",\"quote\":\"started cutting again on my arms\",\"sourceField\":\"freeText\",\"start\":27,\"end\":59}]}"
+  }
+}

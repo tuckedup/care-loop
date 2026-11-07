@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: other_safety_concern.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"other_safety_concern\",\"quote\":\"I just clicked zeros to get through the questions\",\"sourceField\":\"freeText\",\"start\":0,\"end\":49}]}"
+  }
+}

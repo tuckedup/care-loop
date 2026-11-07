@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: request_for_human.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"request_for_human\",\"quote\":\"I would rather speak with an actual person\",\"sourceField\":\"freeText\",\"start\":42,\"end\":84}]}"
+  }
+}

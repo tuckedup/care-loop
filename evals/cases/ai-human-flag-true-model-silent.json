@@ -1,0 +1,42 @@
+{
+  "id": "ai-human-flag-true-model-silent",
+  "scenario": "Human box ticked and text asks for a call; model returns nothing",
+  "category": "requested-human",
+  "labeledFrom": "R12 (patient requested a human). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R12 (requestedHuman true).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Please have someone call me.",
+    "requestedHuman": true,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["PATIENT_REQUESTED_HUMAN"]
+  },
+  "aiFixture": "ai-human-flag-true-model-silent"
+}

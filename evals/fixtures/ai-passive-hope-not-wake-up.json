@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: suicidal_ideation.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"suicidal_ideation\",\"quote\":\"hope I just do not wake up in the morning\",\"sourceField\":\"freeText\",\"start\":63,\"end\":104}]}"
+  }
+}

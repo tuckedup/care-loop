@@ -1,0 +1,43 @@
+{
+  "id": "ai-mania-spending-spree",
+  "scenario": "Cheerful description of a spending spree and no need for sleep",
+  "category": "mania",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (R11 intent). Mania expressed as risky behaviour and enthusiasm, a cheerful tone that a naive reader could take as good news. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase covers mania; only the model can catch this wording.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Best I have ever felt. Spent my whole savings on a spree yesterday because I just knew I could not lose, no need for sleep, everyone keeps telling me to slow down.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "42347",
+    "name": "bupropion XL",
+    "doseMg": 150,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "bupropion_xl"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "42347"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-mania-spending-spree"
+}

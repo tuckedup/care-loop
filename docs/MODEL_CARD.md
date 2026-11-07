@@ -166,3 +166,46 @@ read-only generation); successful summaries are cached in process memory for fiv
 fixtures are hand-written (synthetic-handwritten). `SUMMARY_FIXTURE=synthetic-handwritten` enables a
 hand-written fixture model only when `NODE_ENV` is exactly `development` or `test` (default deny),
 for e2e.
+
+## Eval set, labelling and known limitations (F063-F066)
+
+How the eval cases were made: every case in `evals/cases/*.json` was labelled by hand from SPEC
+sections 2, 4 and 5 and the clinical-rules skill BEFORE it was run; no label was copied from the
+output of the code or a model. `labeledFrom` in each case says which rule or SPEC text the label
+comes from. Where the system's behaviour goes beyond the SPEC (dose-form checks M01/M02, the
+`nightly` string for trazodone, the six-month monitoring boundary, ESCALATE outranking
+FOLLOW_UP_REQUIRED) the case says IMPLEMENTATION-SPECIFIC in `labeledFrom`. The model answers
+used by AI-dependent cases are hand-written canned responses (`synthetic-handwritten`); no live
+model has ever produced a result in this repo, so the results show how the pipeline reacts to a
+correct or a missing model signal, not how any real model performs.
+
+The case set is organised by risk category (`RISK_CATEGORIES` in `evals/schema.ts`); each
+category has at least three cases including one adversarial phrasing, enforced by
+`scripts/evals-count.test.ts`. For each AI-dependent risk case the `labeledFrom` note records
+which layer is expected to catch it: the (canned) model signal, the phrase tripwire with a silent
+model, or a structured answer / rule with a silent model. Counts, per-category breakdown and
+metrics are in `evals/results/latest.json`.
+
+Known limitations the eval set demonstrates (kept in `evals/known-limitations/`, NOT gated, and
+asserted to still fail by `scripts/evals-count.test.ts` so they cannot go stale silently):
+
+- If the model returns no signal and the wording is outside the small tripwire lexicon and no
+  structured answer covers it, the system escalates nothing and the outcome is AUTO_ELIGIBLE. The
+  probes cover: passive ideation ("hope I just do not wake up"), buried intent ("giving away my
+  belongings because I will not be needing them"), mania described in free text, a disguised dose
+  change ("can I take two instead of one") with the change box left at none, pregnancy hinted at
+  ("prenatal vitamins"), a request for a human in free text with the box unticked, severe side
+  effects described only in text, and a patient admitting that the PHQ-9 answers were not honest.
+  For these wordings the model is the ONLY protection. In SHADOW mode a clinician still approves
+  every renewal; in RETRO and SAMPLED modes such a renewal is sent automatically.
+- The tripwire cannot read tone: gallows humour ("die of boredom", "kms") escalates by design
+  (accepted over-escalation, escalate-when-in-doubt).
+- Natural product wording that adds a dose-form word the allowlist entry does not contain
+  ("duloxetine DR", "desvenlafaxine ER", unspecified "bupropion") escalates. This is
+  implementation-specific over-escalation (usability cost, safe direction); the SPEC lists those
+  drugs without a form word. TODO: dose-form-level RxCUIs.
+- GAD-7 has no rule in SPEC section 4, so a GAD-7 of 21 does not affect the outcome (a labelled
+  case documents this; TODO: clinical review whether a trigger is wanted).
+- Mirtazapine monitoring: SPEC names baseline and six-month monitoring only. The due point
+  (>= 6 months since baseline) and the absence of a recurrence interval are implementation
+  choices. TODO: source needed.

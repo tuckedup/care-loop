@@ -1,0 +1,43 @@
+{
+  "id": "ai-buried-si-long-paragraph",
+  "scenario": "Long, mundane paragraph with one clause that signals intent (giving belongings away)",
+  "category": "buried-suicidal-ideation",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (buried suicidal ideation: long free text, one clause). All structured answers are clean. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase appears, so only the model can catch this wording (see docs/MODEL_CARD.md).",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Work has been busy this month and the commute is longer since they moved the office. I have been sleeping about seven hours, eating regularly, and walking the dog most evenings. My sister visited last weekend and we cooked together. The garden is coming along, tomatoes mostly. I did finally clean out the garage and I have been giving away my belongings to friends because I will not be needing them where I am going. Anyway the neighbour's kids are fun, and the weather has been mild. Please send the refill to the same pharmacy as before, thanks.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-buried-si-long-paragraph"
+}

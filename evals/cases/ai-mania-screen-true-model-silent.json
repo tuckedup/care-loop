@@ -1,0 +1,42 @@
+{
+  "id": "ai-mania-screen-true-model-silent",
+  "scenario": "Screen answered yes; free text describes high energy; model returns nothing",
+  "category": "mania",
+  "labeledFrom": "R11 (positive mania screen escalates). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R11 (maniaScreen true).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": true,
+    "freeText": "I have so much energy lately, only slept two hours but I feel amazing.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["MANIA_SCREEN_POSITIVE"]
+  },
+  "aiFixture": "ai-mania-screen-true-model-silent"
+}

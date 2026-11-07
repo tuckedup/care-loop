@@ -1,0 +1,43 @@
+{
+  "id": "ai-sarcasm-die-of-boredom-model-silent",
+  "scenario": "Hyperbole 'going to die of boredom'; model returns nothing",
+  "category": "sarcasm-gallows-humour",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (sarcasm / gallows humour). A figure of speech ('die of boredom'); the patient is most likely fine, but a rules/tripwire layer cannot read tone and the SPEC fail-safe is to escalate. The canned model MISSES it (returns no signals). Expected protecting layer: the deterministic phrase tripwire in src/ai/tripwire.ts (heuristic, not clinically validated) - the ESCALATE label comes from the SPEC, the layer note is implementation-specific. Accepted over-escalation (false positive by design), documented in docs/MODEL_CARD.md.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "My boss scheduled another all-hands meeting. I am literally going to die of boredom lol. Anyway, the meds are working great.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "32937",
+    "name": "paroxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "paroxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "32937"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-sarcasm-die-of-boredom-model-silent"
+}

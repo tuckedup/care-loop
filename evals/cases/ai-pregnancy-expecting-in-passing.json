@@ -1,0 +1,42 @@
+{
+  "id": "ai-pregnancy-expecting-in-passing",
+  "scenario": "'We are expecting a baby in the spring' as a side remark",
+  "category": "pregnancy",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (pregnancy mentioned in passing; R09 passes on the 'no' box). Protecting layer: the (canned) model's signal; the label does not depend on the tripwire.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "We are expecting a baby in the spring, otherwise all good and no changes.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "42347",
+    "name": "bupropion SR",
+    "doseMg": 150,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "bupropion_sr"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "42347"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-pregnancy-expecting-in-passing"
+}

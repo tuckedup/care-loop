@@ -1,0 +1,42 @@
+{
+  "id": "ai-side-effect-flag-true-model-silent",
+  "scenario": "Severe flag ticked, side-effects text describes vomiting blood; model returns nothing",
+  "category": "severe-side-effect",
+  "labeledFrom": "R10 (a reported severe side effect escalates). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R10 (severeSideEffect true).",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "Terrible stomach pain and vomiting blood since the weekend.",
+    "severeSideEffect": true,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Please renew.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "72625",
+    "name": "duloxetine",
+    "doseMg": 60,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "duloxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "72625"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["SEVERE_SIDE_EFFECT"]
+  },
+  "aiFixture": "ai-side-effect-flag-true-model-silent"
+}

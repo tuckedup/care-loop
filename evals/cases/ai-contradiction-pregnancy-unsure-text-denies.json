@@ -1,0 +1,42 @@
+{
+  "id": "ai-contradiction-pregnancy-unsure-text-denies",
+  "scenario": "Pregnancy box says unsure; free text says definitely not pregnant",
+  "category": "contradictory-answers",
+  "labeledFrom": "R09 (pregnancy yes or unsure escalates): the structured answer cannot be overridden by free text. The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R09 (pregnancy unsure); the text 'definitely not pregnant' must not cancel it.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "unsure",
+    "maniaScreen": false,
+    "freeText": "Definitely not pregnant, ignore that box.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["PREGNANCY_YES_OR_UNSURE"]
+  },
+  "aiFixture": "ai-contradiction-pregnancy-unsure-text-denies"
+}

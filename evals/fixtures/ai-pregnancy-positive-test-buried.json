@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Correct signal with exact quote: pregnancy_mention.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"pregnancy_mention\",\"quote\":\"the pregnancy test I took yesterday was positive\",\"sourceField\":\"freeText\",\"start\":52,\"end\":100}]}"
+  }
+}

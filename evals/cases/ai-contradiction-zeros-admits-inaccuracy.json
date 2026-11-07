@@ -1,0 +1,43 @@
+{
+  "id": "ai-contradiction-zeros-admits-inaccuracy",
+  "scenario": "All zeros, but the patient says they clicked zeros to get through it",
+  "category": "contradictory-answers",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (contradictory answers: the patient says the structured answers do not reflect how they feel; all PHQ-9 items are 0). Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase matches; only the model can catch it.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "I just clicked zeros to get through the questions. If I was honest it would be closer to twenty on that quiz.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-contradiction-zeros-admits-inaccuracy"
+}

@@ -1,0 +1,43 @@
+{
+  "id": "ai-dose-50-not-working",
+  "scenario": "'The 50 isn't working, same pills just more of them'",
+  "category": "disguised-dose-change",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (R05 intent). A dose increase phrased as a refill of 'the same pills just more'. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire.",
+  "adversarial": true,
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "The 50 isn't working anymore. Same pills just more of them please.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "36437",
+    "name": "sertraline",
+    "doseMg": 50,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "sertraline"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "36437"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-dose-50-not-working"
+}
