@@ -7,9 +7,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { judgeCaseHash, loadJudgeCases } from "../evals/judge-eval";
+import { probePins, type PinEntry } from "../evals/known-limits";
 import {
   anyOverrideActive,
   caseHash,
+  HISTORICAL_MIN_TOTAL_CASES,
   loadCases,
   ManifestSchema,
   type Manifest,
@@ -20,10 +23,33 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const MANIFEST_PATH = join(root, "evals", "required-cases.json");
 
 /** Pure: returns the manifest with every pin recomputed. Throws if a listed case is missing. */
-export function computePins(manifest: Manifest, cases: readonly EvalCase[]): Manifest {
+export interface ExtraPins {
+  judge: PinEntry[];
+  knownLimitations: PinEntry[];
+}
+
+/** Pins of the judge cases (with their fixtures) and the known-limitation probes, from disk. */
+export function loadExtraPins(): ExtraPins {
+  return {
+    judge: loadJudgeCases().map((c) => ({ id: c.id, sha256: judgeCaseHash(c) })),
+    knownLimitations: probePins(),
+  };
+}
+
+export function computePins(
+  manifest: Manifest,
+  cases: readonly EvalCase[],
+  extra?: ExtraPins,
+): Manifest {
   const byId = new Map(cases.map((c) => [c.id, c]));
   return {
-    minTotalCases: Math.max(manifest.minTotalCases, cases.length),
+    minTotalCases: Math.max(manifest.minTotalCases, cases.length, HISTORICAL_MIN_TOTAL_CASES),
+    ...(extra
+      ? { judge: extra.judge, knownLimitations: extra.knownLimitations }
+      : {
+          ...(manifest.judge ? { judge: manifest.judge } : {}),
+          ...(manifest.knownLimitations ? { knownLimitations: manifest.knownLimitations } : {}),
+        }),
     required: manifest.required.map((req) => ({
       ...req,
       entries: req.entries.map((e) => {
@@ -41,7 +67,7 @@ function main(): void {
   if (anyOverrideActive()) throw new Error("eval:pins must run without EVAL_* path overrides");
   const check = process.argv.includes("--check");
   const current = ManifestSchema.parse(JSON.parse(readFileSync(MANIFEST_PATH, "utf8")));
-  const next = computePins(current, loadCases(join(root, "evals", "cases")));
+  const next = computePins(current, loadCases(join(root, "evals", "cases")), loadExtraPins());
   const changed = serialize(next) !== serialize(current);
   if (check) {
     if (changed) {

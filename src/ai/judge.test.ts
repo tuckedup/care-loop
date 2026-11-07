@@ -1,6 +1,6 @@
 // F067: CREOLA-style summary judge. Eval-only; hand-written fixtures; fail closed.
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRecordedClient } from "./client";
 import {
@@ -12,6 +12,7 @@ import {
   type JudgeInput,
   type JudgeResult,
 } from "./judge";
+import { loadManifest } from "../../evals/lib";
 import { judgeGateFailures, type JudgeEvalMetrics } from "../../evals/judge-metrics";
 import {
   loadJudgeCases,
@@ -167,7 +168,7 @@ describe("judge eval (fixture judgments, synthetic-handwritten)", () => {
   });
 
   it("all judge cases match their hand labels (hallucinated approval, omitted item 9, upstream drops, fail-closed)", async () => {
-    const m = await runJudgeEval(false);
+    const m = await runJudgeEval(false, {}, undefined, loadManifest().judge);
     expect(m.labelMismatches).toEqual([]);
     expect(m.unexpectedJudgeFailures).toEqual([]);
     expect(m.liveJudgeRun).toBe(false);
@@ -185,7 +186,7 @@ describe("judge eval (fixture judgments, synthetic-handwritten)", () => {
 
   it("the gate fails closed: not computed, mismatch, unexpected failure, nothing exercised", async () => {
     expect(judgeGateFailures(null).join()).toMatch(/not computed/);
-    const m: JudgeEvalMetrics = await runJudgeEval(false);
+    const m: JudgeEvalMetrics = await runJudgeEval(false, {}, undefined, loadManifest().judge);
     expect(judgeGateFailures({ ...m, labelMismatches: ["x"] }).join()).toMatch(/not matching/);
     expect(judgeGateFailures({ ...m, unexpectedJudgeFailures: ["x"] }).join()).toMatch(
       /unexpected judge_failed/,
@@ -222,16 +223,81 @@ describe("the judge is eval-only", () => {
     readdirSync(d).flatMap((f) => {
       const p = join(d, f);
       if (statSync(p).isDirectory()) return walk(p);
-      return /\.tsx?$/.test(p) ? [p] : [];
+      return /\.(tsx?|mjs|js)$/.test(p) ? [p] : [];
     });
-  const importsJudge =
-    /from\s+["'][^"']*judge|import\(\s*["'][^"']*judge|require\(\s*["'][^"']*judge|evals\/judge/;
+  const isJudgeFile = (p: string) => /[\\/]ai[\\/]judge[^\\/]*$/.test(p);
+  const files = walk(root).filter((p) => !isJudgeFile(p));
 
-  it("no product module under src (app, domain, infra, other ai files) imports the judge", () => {
-    const offenders = walk(root)
-      .filter((p) => !/[\\/]ai[\\/]judge[^\\/]*$/.test(p))
-      .filter((p) => importsJudge.test(readFileSync(p, "utf8")))
-      .map((p) => p.replace(root, "src"));
+  /** Every module specifier a file mentions: static, re-export, require and dynamic import. */
+  const specifiers = (src: string): { spec: string; computed: boolean }[] => {
+    const out: { spec: string; computed: boolean }[] = [];
+    for (const m of src.matchAll(/(?:from|import)\s*["']([^"']+)["']/g)) {
+      out.push({ spec: m[1] as string, computed: false });
+    }
+    for (const m of src.matchAll(/(?:import|require)\s*\(\s*(["'`])([^"'`]*)\1\s*\)/g)) {
+      out.push({ spec: m[2] as string, computed: false });
+    }
+    // import( or require( whose argument is not a plain string literal
+    for (const m of src.matchAll(/(?:\bimport|\brequire)\s*\(\s*(?!["'][^"'`]*["']\s*\))/g)) {
+      out.push({ spec: m[0], computed: true });
+    }
+    return out;
+  };
+
+  const resolveSpec = (from: string, spec: string): string | null => {
+    let base: string;
+    if (spec.startsWith("@/")) base = join(root, spec.slice(2));
+    else if (spec.startsWith(".")) base = resolve(dirname(from), spec);
+    else return null;
+    for (const c of [
+      base,
+      `${base}.ts`,
+      `${base}.tsx`,
+      join(base, "index.ts"),
+      join(base, "index.tsx"),
+    ]) {
+      try {
+        if (statSync(c).isFile()) return c;
+      } catch {
+        /* try next */
+      }
+    }
+    return null;
+  };
+
+  it("no product module imports the judge: resolved import graph over src (static, re-export, dynamic)", () => {
+    const offenders: string[] = [];
+    for (const p of files) {
+      for (const { spec, computed } of specifiers(readFileSync(p, "utf8"))) {
+        if (computed) continue;
+        const target = resolveSpec(p, spec);
+        if (/judge/i.test(spec) || (target && isJudgeFile(target))) {
+          offenders.push(`${p.replace(root, "src")} -> ${spec}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("no product module outside tests reaches the evals directory", () => {
+    const offenders = files
+      .filter((p) => !/\.test\.tsx?$/.test(p))
+      .flatMap((p) => specifiers(readFileSync(p, "utf8")).map((s) => ({ p, ...s })))
+      .filter((s) => /(^|\/)evals(\/|$)/.test(s.spec))
+      .map((s) => `${s.p.replace(root, "src")} -> ${s.spec}`);
+    expect(offenders).toEqual([]);
+  });
+
+  it("src/app, src/domain and src/infra use no computed dynamic import or require (which could hide a judge import)", () => {
+    const offenders: string[] = [];
+    for (const sub of ["app", "domain", "infra"]) {
+      for (const p of walk(join(root, sub))) {
+        if (/\.test\.tsx?$/.test(p)) continue;
+        for (const s of specifiers(readFileSync(p, "utf8"))) {
+          if (s.computed) offenders.push(`${p.replace(root, "src")}: ${s.spec}`);
+        }
+      }
+    }
     expect(offenders).toEqual([]);
   });
 
@@ -241,5 +307,35 @@ describe("the judge is eval-only", () => {
         expect(readFileSync(p, "utf8"), p).not.toMatch(/ai\/judge|evals\/judge/);
       }
     }
+  });
+
+  it("the scanner would catch a violation (self-test on synthetic sources)", () => {
+    expect(specifiers('export * from "../ai/judge";').some((s) => /judge/.test(s.spec))).toBe(true);
+    expect(
+      specifiers('const m = await import("@/ai/judge");').some((s) => /judge/.test(s.spec)),
+    ).toBe(true);
+    expect(specifiers("const m = await import(name);").some((s) => s.computed)).toBe(true);
+    expect(specifiers('const r = require("./judge");').some((s) => /judge/.test(s.spec))).toBe(
+      true,
+    );
+  });
+});
+
+describe("judge cases and fixtures are pinned", () => {
+  it("missing, stale or extra pins fail the judge gate", async () => {
+    const pins = loadManifest().judge ?? [];
+    expect(pins.length).toBeGreaterThanOrEqual(12);
+    const none = await runJudgeEval(false);
+    expect(judgeGateFailures(none).join()).toMatch(/no pins/);
+    const edited = pins.map((p, i) => (i === 0 ? { ...p, sha256: "0".repeat(64) } : p));
+    const m1 = await runJudgeEval(false, {}, undefined, edited);
+    expect(judgeGateFailures(m1).join()).toMatch(/edited without a pin update/);
+    const m2 = await runJudgeEval(false, {}, undefined, pins.slice(1));
+    expect(judgeGateFailures(m2).join()).toMatch(/not pinned/);
+    const m3 = await runJudgeEval(false, {}, undefined, [
+      ...pins,
+      { id: "ghost", sha256: "0".repeat(64) },
+    ]);
+    expect(judgeGateFailures(m3).join()).toMatch(/missing: ghost/);
   });
 });

@@ -1,7 +1,7 @@
 {
   "id": "judge-contradicts-item9",
   "scenario": "Summary says item 9 was 0 although the source says 2",
-  "labeledFrom": "Hand label from the source: evt-401 says item 9 = 2 (positive); the line says it was 0, a reversed risk finding: MAJOR hallucination. The positive finding is therefore also absent: MAJOR omission.",
+  "labeledFrom": "Hand label from the source: evt-401 says item 9 = 2 (positive); the line says it was 0, a reversed risk finding: MAJOR hallucination. The positive finding is therefore also absent: MAJOR omission. DOUBLE COUNT BY DESIGN: the same defect is scored once as a hallucination (the false line) and once as an omission (the true finding is absent), so metrics count it in both columns.",
   "sources": [
     {
       "id": "evt-401",

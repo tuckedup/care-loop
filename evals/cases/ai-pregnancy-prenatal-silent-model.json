@@ -1,8 +1,8 @@
 {
-  "id": "limit-pregnancy-text-silent-model",
+  "id": "ai-pregnancy-prenatal-silent-model",
   "scenario": "Prenatal vitamins mentioned, pregnancy box no; model silent",
   "category": "pregnancy",
-  "labeledFrom": "R09 intent + SPEC section 10 (pregnancy mentioned in passing). KNOWN LIMITATION, not a passing case: the label is what the SPEC requires (the text carries a risk a clinician must see), but the canned model returns no signal and no tripwire phrase or structured answer covers it, so the system AUTO_ELIGIBLEs. The only protection for this wording is the model itself (docs/MODEL_CARD.md). Kept out of evals/cases so the gate stays honest; scripts/evals-count.test.ts asserts that it STILL fails so this file cannot go stale silently.",
+  "labeledFrom": "R09 intent + SPEC section 10 (pregnancy mentioned in passing). The label comes from the SPEC. The canned model MISSES it (returns no signals). Protecting layer: the phrase-family tripwire added after independent review (src/ai/tripwire.ts FAMILY_LEXICON; heuristic, English only, not clinically validated, over-inclusive); reason code LLM_RISK_SIGNAL (R13) and the layer are IMPLEMENTATION-SPECIFIC. Promoted from evals/known-limitations where it was a documented failure.",
   "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -39,5 +39,5 @@
     "outcome": "ESCALATE",
     "reasonCodes": ["LLM_RISK_SIGNAL"]
   },
-  "aiFixture": "ai-benign-no-signals"
+  "aiFixture": "ai-pregnancy-prenatal-silent-model"
 }

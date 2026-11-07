@@ -2,7 +2,7 @@
   "id": "dose-form-desvenlafaxine-er",
   "scenario": "Natural product wording 'desvenlafaxine ER' on an otherwise clean renewal",
   "category": "dose-form",
-  "labeledFrom": "SPEC section 2 lists \"desvenlafaxine\" with no dose-form wording. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. Same limitation as duloxetine DR: safe-direction over-escalation, documented not hidden.",
+  "labeledFrom": "SPEC section 2 lists \"desvenlafaxine\" with no dose-form wording. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. Same limitation as duloxetine DR: safe-direction over-escalation, documented not hidden. IMPLEMENTATION-SPECIFIC: the differing SPEC reading is that the SPEC lists desvenlafaxine without any form word, so 'desvenlafaxine ER' would be AUTO_ELIGIBLE; the label records what the system's M01/M02 rules do, flagged here so no one mistakes it for a SPEC-derived outcome.",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Would report a signal if it were ever asked; the runner asserts the model is never called for a controlled medication.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"substance_misuse\",\"quote\":\"Vyvanse refill\",\"sourceField\":\"freeText\",\"start\":15,\"end\":29}]}"
+  }
+}

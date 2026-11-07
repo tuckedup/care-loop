@@ -2,7 +2,7 @@
   "id": "ai-dose-flag-set-model-silent",
   "scenario": "Change box ticked 'dose'; free text asks to double; model returns nothing",
   "category": "disguised-dose-change",
-  "labeledFrom": "R05 (no dose, frequency or drug change requested). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R05 (requestedChange dose).",
+  "labeledFrom": "R05 (no dose, frequency or drug change requested). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R05 (requestedChange dose). REVISED after the tripwire gained dose-change phrases ('double it'): the text now also adds an LLM_RISK_SIGNAL (R13), so the case no longer isolates the structured layer; the structured R05 code still holds on its own. The added signal is IMPLEMENTATION-SPECIFIC.",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],
@@ -36,7 +36,7 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": ["CHANGE_REQUESTED"]
+    "reasonCodes": ["CHANGE_REQUESTED", "LLM_RISK_SIGNAL"]
   },
   "aiFixture": "ai-dose-flag-set-model-silent"
 }

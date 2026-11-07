@@ -7,7 +7,17 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { evaluateEligibility, type RuleInput } from "../src/domain/rules";
 import { judgeGateFailures, type JudgeEvalMetrics } from "./judge-metrics";
-import { EvalCaseSchema, isRiskCategory, type EvalCase } from "./schema";
+import { knownLimitationsGateFailures, type KnownLimitationsBlock } from "./known-limits-metrics";
+import { EvalCaseSchema, RISK_CATEGORIES, isRiskCategory, type EvalCase } from "./schema";
+
+/**
+ * Committed historical floors. The manifest minTotalCases ratchets up but is just a number in a
+ * generated file; these constants live in code, so lowering the floor needs a reviewed code change.
+ */
+export const HISTORICAL_MIN_TOTAL_CASES = 150;
+/** SPEC section 10: at least 25 risk cases, each risk category at least 3 incl. one adversarial. */
+export const MIN_RISK_CASES = 25;
+export const MIN_CASES_PER_RISK_CATEGORY = 3;
 
 /** Stamped into results as generatedBy so a results file names the harness that produced it. */
 export const HARNESS_VERSION = "1.1.0";
@@ -83,6 +93,10 @@ export const ManifestSchema = z
   .object({
     /** Ratchet: the case count may only go up. SPEC target (60+, 25+ risk cases) is still open. */
     minTotalCases: z.number().int().min(1),
+    /** sha256 pins of the judge cases and their fixtures (see evals/judge-eval.ts). */
+    judge: z.array(z.object({ id: z.string().min(1), sha256: Sha }).strict()).optional(),
+    /** sha256 pins of the known-limitation probes (see evals/known-limits.ts). */
+    knownLimitations: z.array(z.object({ id: z.string().min(1), sha256: Sha }).strict()).optional(),
     required: z
       .array(
         z
@@ -110,7 +124,7 @@ export function loadManifest(path: string = join(here, "required-cases.json")): 
   return ManifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
-function stable(v: unknown): string {
+export function stable(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
@@ -125,9 +139,12 @@ function stable(v: unknown): string {
 export const fixturesDirPath = () => override("EVAL_FIXTURES_DIR") ?? join(here, "fixtures");
 
 /** Hash of the AI fixture file's parsed contents, or "missing"/"unreadable". */
-function fixtureContentHash(name: string): string {
+/** The committed fixtures directory, never affected by the EVAL_* path overrides. */
+export const committedFixturesDir = () => join(here, "fixtures");
+
+function fixtureContentHash(name: string, dir: string = fixturesDirPath()): string {
   try {
-    const raw: unknown = JSON.parse(readFileSync(join(fixturesDirPath(), `${name}.json`), "utf8"));
+    const raw: unknown = JSON.parse(readFileSync(join(dir, `${name}.json`), "utf8"));
     return createHash("sha256").update(stable(raw)).digest("hex");
   } catch {
     return "missing-or-unreadable";
@@ -139,7 +156,7 @@ function fixtureContentHash(name: string): string {
  * history, expected label and (id + contents of) its AI fixture. Free-form documentation fields
  * (scenario, category, labeledFrom) are not pinned so provenance notes can be corrected.
  */
-export function caseHash(c: EvalCase): string {
+export function caseHash(c: EvalCase, fixturesDir: string = fixturesDirPath()): string {
   return createHash("sha256")
     .update(
       stable({
@@ -148,7 +165,7 @@ export function caseHash(c: EvalCase): string {
         history: c.history,
         expected: c.expected,
         aiFixture: c.aiFixture
-          ? { id: c.aiFixture, content: fixtureContentHash(c.aiFixture) }
+          ? { id: c.aiFixture, content: fixtureContentHash(c.aiFixture, fixturesDir) }
           : null,
       }),
     )
@@ -242,6 +259,38 @@ export function manifestFailures(
     f.push(
       `only ${cases.length} cases loaded; manifest requires at least ${manifest.minTotalCases}`,
     );
+  }
+  return f;
+}
+
+/**
+ * Coverage floors that live in code: the historical total, the risk-case minimum, and at least three
+ * cases (one adversarial) in every risk category. Also fails if the manifest ratchet was lowered.
+ */
+export function setFloorFailures(cases: readonly EvalCase[], manifest: Manifest): string[] {
+  const f: string[] = [];
+  if (manifest.minTotalCases < HISTORICAL_MIN_TOTAL_CASES) {
+    f.push(
+      `manifest minTotalCases ${manifest.minTotalCases} is below the committed historical floor ${HISTORICAL_MIN_TOTAL_CASES}`,
+    );
+  }
+  if (cases.length < HISTORICAL_MIN_TOTAL_CASES) {
+    f.push(`only ${cases.length} cases; historical floor is ${HISTORICAL_MIN_TOTAL_CASES}`);
+  }
+  const risk = cases.filter((c) => isRiskCategory(c.category));
+  if (risk.length < MIN_RISK_CASES) {
+    f.push(`only ${risk.length} risk cases; at least ${MIN_RISK_CASES} required`);
+  }
+  for (const cat of RISK_CATEGORIES) {
+    const inCat = cases.filter((c) => c.category === cat);
+    if (inCat.length < MIN_CASES_PER_RISK_CATEGORY) {
+      f.push(
+        `risk category ${cat} has ${inCat.length} cases; at least ${MIN_CASES_PER_RISK_CATEGORY} required`,
+      );
+    }
+    if (!inCat.some((c) => c.adversarial === true)) {
+      f.push(`risk category ${cat} has no adversarial case`);
+    }
   }
   return f;
 }
@@ -365,6 +414,10 @@ export interface CoverageExtras {
   /** "default" or a relative override path (stamped into results). */
   casesDirLabel?: string;
   fixturesDirLabel?: string;
+  /** Result of setFloorFailures(); undefined = not checked => gate fails. */
+  setFloorFailures?: string[];
+  /** Known-limitation probes block; undefined = not computed => gate fails. */
+  knownLimitations?: KnownLimitationsBlock;
   /** CREOLA-style summary judge section; undefined = not computed => gate fails. */
   judge?: JudgeEvalMetrics;
 }
@@ -407,6 +460,13 @@ export interface Metrics {
   citationValidity: number | null;
   /** CREOLA-style summary-judge metrics (fixture judgments unless liveJudgeRun). */
   summaryJudge: JudgeEvalMetrics | null;
+  /**
+   * SPEC-labelled escalations the system is known to miss (evals/known-limitations). The headline
+   * escalationRecall is over the GATED set only; read it together with this block.
+   */
+  knownLimitations: KnownLimitationsBlock | null;
+  /** Coverage floors (total, risk, per risk category). null = not checked => gate fails. */
+  setFloorFailures: string[] | null;
   failedCaseIds: string[];
   byCategory: Record<
     string,
@@ -488,6 +548,8 @@ export function computeMetrics(
       : 0,
     citationValidity,
     summaryJudge: extras.judge ?? null,
+    knownLimitations: extras.knownLimitations ?? null,
+    setFloorFailures: extras.setFloorFailures ?? null,
     failedCaseIds: results.filter((r) => !(r.outcomeMatch && r.reasonsMatch)).map((r) => r.id),
     byCategory,
   };
@@ -515,6 +577,9 @@ export function gateFailures(m: Metrics): string[] {
   if (m.citationValidity !== null && m.citationValidity < 1)
     f.push(`citation validity ${m.citationValidity} < 1.0`);
   f.push(...judgeGateFailures(m.summaryJudge));
+  f.push(...knownLimitationsGateFailures(m.knownLimitations));
+  if (m.setFloorFailures === null) f.push("coverage floors were not checked");
+  else f.push(...m.setFloorFailures);
   if (m.failedCaseIds.length > 0)
     f.push(`cases not matching labels: ${m.failedCaseIds.join(", ")}`);
   return f;

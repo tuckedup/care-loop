@@ -5,6 +5,7 @@
 // surviving lines. In CI the judge is a recorded client over hand-written fixtures
 // (evals/fixtures/judge/*, synthetic-handwritten): the verdicts are fixture judgments, not a live
 // judge. `pnpm eval:live` uses the real API for the judge only; it is implemented but UNTESTED.
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +22,8 @@ import {
 } from "../src/ai/judge";
 import { filterCitedLines } from "../src/ai/summarize";
 import { AiFixtureSchema, type AiFixture } from "./fixtures";
+import { comparePins, type PinEntry } from "./known-limits";
+import { stable } from "./lib";
 import type { JudgeCaseOutcome, JudgeEvalMetrics } from "./judge-metrics";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +103,30 @@ export function loadJudgeFixture(name: string, dir: string = judgeFixturesDir())
   return parsed.data;
 }
 
+/**
+ * sha256 over everything that defines a judge case: sources, raw summary, escalated flag, the hand
+ * label and the id and contents of its judge fixture. scenario and labeledFrom are not pinned.
+ */
+export function judgeCaseHash(c: JudgeCase): string {
+  let fx: unknown = "missing";
+  try {
+    fx = JSON.parse(readFileSync(join(judgeFixturesDir(), `${c.judgeFixture}.json`), "utf8"));
+  } catch {
+    /* hash stays "missing" */
+  }
+  return createHash("sha256")
+    .update(
+      stable({
+        sources: c.sources,
+        rawSummary: c.rawSummary,
+        escalated: c.escalated,
+        expected: c.expected,
+        fixture: { id: c.judgeFixture, content: fx },
+      }),
+    )
+    .digest("hex");
+}
+
 const NEVER = () => new Promise<string>(() => {});
 
 export interface JudgeRunOptions {
@@ -158,7 +185,10 @@ export async function runJudgeCase(
     timeoutMs = 60_000;
   } else {
     model = "fixture-judge";
-    timeoutMs = 50;
+    // A fixture that simulates a hang resolves nothing, so a short deadline is enough; every other
+    // fixture answers immediately and gets a load-proof deadline.
+    const hangs = fixture.response.type === "error" && fixture.response.error === "timeout";
+    timeoutMs = hangs ? 50 : 5000;
     client = createRecordedClient(() => {
       const r = fixture.response;
       if (r.type === "text") return r.text;
@@ -195,6 +225,7 @@ export async function runJudgeEval(
   live: boolean,
   opts: JudgeRunOptions = {},
   dir: string = judgeCasesDir(),
+  pinned?: readonly PinEntry[],
 ): Promise<JudgeEvalMetrics> {
   const cases = loadJudgeCases(dir);
   const runs: { c: JudgeCase; run: JudgeCaseRun }[] = [];
@@ -211,6 +242,11 @@ export async function runJudgeEval(
     judgeFailed: 0,
     expectedJudgeFailed: 0,
     unexpectedJudgeFailures: [],
+    pinFailures: comparePins(
+      "judge case",
+      pinned,
+      cases.map((c) => ({ id: c.id, sha256: judgeCaseHash(c) })),
+    ),
     labelMismatches: [],
     linesJudged: 0,
     linesDroppedUpstream: 0,

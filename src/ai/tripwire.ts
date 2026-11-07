@@ -87,6 +87,55 @@ export const TRIPWIRE_LEXICON: readonly LexiconEntry[] = [
   },
 ];
 
+/**
+ * SPEC-FAMILY PHRASES (F063-F067 review): escalation-only phrase families for risks other than
+ * self-harm/violence, so that a missed or silent model does not leave common wordings uncovered.
+ * HEURISTIC, NOT CLINICALLY VALIDATED, English only, deliberately over-inclusive (e.g. "do not
+ * wake up" also fires on ordinary sleep talk, "giving away my" on a yard sale). They run on the
+ * plain normalised text only (no run-together or spaced variants) and every pattern is linear.
+ * Mapping to the SPEC escalation family: R12 (patient asks for a human) -> request_for_human,
+ * R09 (pregnancy) -> pregnancy_mention, R05 (dose/frequency/drug change) ->
+ * dose_or_drug_change_request, passive ideation and giving belongings away ->
+ * suicidal_ideation (R07 intent).
+ */
+export const FAMILY_LEXICON: readonly LexiconEntry[] = [
+  // R12: patient wants a human
+  {
+    type: "request_for_human",
+    re: /\b(?:speak|talk|chat) (?:with|to) (?:an? )?(?:actual|real|live) (?:person|human|doctor|clinician|prescriber|nurse)\b/g,
+  },
+  { type: "request_for_human", re: /\b(?:an? )?(?:actual|real|live) (?:person|human)\b/g },
+  { type: "request_for_human", re: /\b(?:speak|talk) (?:with|to) (?:someone|somebody)\b/g },
+  // R09: pregnancy (a negated "not pregnant" is not matched; the structured answer still decides)
+  { type: "pregnancy_mention", re: /\bprenatal\b/g },
+  { type: "pregnancy_mention", re: /(?<!\bnot )(?<!n't )\bpregnan(?:t|cy)\b/g },
+  { type: "pregnancy_mention", re: /\bexpecting (?:a |our |my |another )?(?:baby|child)\b/g },
+  { type: "pregnancy_mention", re: /\btrying to (?:conceive|get pregnant)\b/g },
+  // R05: dose, frequency or amount change worded as a refill
+  { type: "dose_or_drug_change_request", re: /\bdouble (?:up|it|them|the dose|my dose)\b/g },
+  { type: "dose_or_drug_change_request", re: /\btwo instead of (?:one|1)\b/g },
+  { type: "dose_or_drug_change_request", re: /\btak(?:e|ing) (?:more|less|extra)\b/g },
+  {
+    type: "dose_or_drug_change_request",
+    re: /\b(?:increase|decrease|raise|lower|reduce|up) (?:my|the) (?:dose|dosage)\b/g,
+  },
+  {
+    type: "dose_or_drug_change_request",
+    re: /\b(?:higher|lower|bigger|stronger|weaker) (?:dose|dosage|pills?|tablets?)\b/g,
+  },
+  // passive ideation and giving belongings away (R07 intent)
+  {
+    type: "suicidal_ideation",
+    re: /\b(?:don'?t|do not|dont|not|never|won'?t|will not) (?:ever )?wake up\b/g,
+  },
+  { type: "suicidal_ideation", re: /\bgiving away my\b/g },
+  { type: "suicidal_ideation", re: /\bnot be needing\b/g },
+  {
+    type: "suicidal_ideation",
+    re: /\b(?:won'?t|will not) (?:be )?need(?:ing)? (?:them|it|any ?more)\b/g,
+  },
+];
+
 const BS = String.fromCharCode(92) + "b"; // the regex word-boundary token, written as text
 
 const derive = (dropBoundaries: boolean, dropSpaces: boolean): readonly LexiconEntry[] =>
@@ -234,6 +283,25 @@ export function detectTripwire(input: RiskTextInput): VerifiedSignal[] {
               ? push(type, 0, Math.min(original.length, MAX_QUOTE_LENGTH))
               : push(type, s, e);
           if (added) count++;
+        }
+      }
+    }
+
+    // Phrase families (requests for a human, pregnancy, dose change, passive ideation).
+    let familyCount = 0;
+    for (const norm of B.text !== A.text ? [A, B] : [A]) {
+      for (const { type, re } of FAMILY_LEXICON) {
+        re.lastIndex = 0;
+        for (const m of norm.text.matchAll(re)) {
+          if (familyCount >= MAX_PER_FIELD) break;
+          const a = m.index ?? 0;
+          const s = norm.start[a];
+          const e = norm.end[a + m[0].length - 1];
+          const ok =
+            s === undefined || e === undefined || e <= s
+              ? push(type, 0, Math.min(original.length, MAX_QUOTE_LENGTH))
+              : push(type, s, e);
+          if (ok) familyCount++;
         }
       }
     }

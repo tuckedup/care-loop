@@ -2,7 +2,7 @@
   "id": "dose-form-duloxetine-dr",
   "scenario": "Natural product wording 'duloxetine DR' on an otherwise clean renewal",
   "category": "dose-form",
-  "labeledFrom": "SPEC section 2 lists \"duloxetine\" with no dose-form wording. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. A delayed-release word that is not in the allowlist entry makes the system escalate; the SPEC alone would suggest a plain renewal, so this label documents a usability limitation (safe direction), not a safety gap. TODO: dose-form-level RxCUIs.",
+  "labeledFrom": "SPEC section 2 lists \"duloxetine\" with no dose-form wording. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. A delayed-release word that is not in the allowlist entry makes the system escalate; the SPEC alone would suggest a plain renewal, so this label documents a usability limitation (safe direction), not a safety gap. TODO: dose-form-level RxCUIs. IMPLEMENTATION-SPECIFIC: the differing SPEC reading is that the SPEC lists duloxetine without any form word, so a plain renewal of 'duloxetine DR' would be AUTO_ELIGIBLE; the label records what the system's M01/M02 rules do, flagged here so no one mistakes it for a SPEC-derived outcome.",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

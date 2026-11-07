@@ -61,6 +61,23 @@ AI renewal features (F031 onward, anything in `src/ai` or the AI decision path) 
   fails the gate. This is a guard against accidents, not a security boundary. An overridden run
   stamps `casesDir`/`fixturesDir` into its results and can never write the committed `latest.json`.
 
+Further gate requirements (F063-F067 and the independent review):
+
+- `summaryJudge` (CREOLA-style summary judge, `evals/judge-eval.ts`) must be computed: at least 12
+  judge cases, every case matching its hand label, no unexpected `judge_failed`, at least three
+  fail-closed cases, a major hallucination, a major omission and an upstream-dropped line exercised.
+  Judge cases and fixtures are sha256-pinned in `required-cases.json` (`judge`). Labels and fixtures
+  are both hand-written (circular): this tests parsing and fail-closed handling, not summary quality.
+  The judge (`src/ai/judge.ts`) is eval-only; `src/ai/judge.test.ts` walks the resolved import graph
+  of `src` to prove no product module imports it.
+- `knownLimitations` block (`evals/known-limits.ts`): mandatory. It lists the pinned probes in
+  `evals/known-limitations` (SPEC-labelled escalations the system misses), the failing ids, and a recall
+  that includes them. `escalationRecall` alone is over the gated set. A probe that now escalates
+  fails the gate (promote it into `evals/cases`).
+- Coverage floors inside the gate (`setFloorFailures`): the committed `HISTORICAL_MIN_TOTAL_CASES`,
+  25 risk cases, and every risk category with at least 3 cases including an adversarial one; the
+  manifest `minTotalCases` may not be below the historical floor.
+
 `EVAL_LIVE=1` without `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` fails before running anything and
 writes nothing. Live results go to `evals/results/live-latest.json`, never over `latest.json`.
 `latest.json` records `fixtureKind: "synthetic-handwritten"` and `liveModelRun: false`, so it

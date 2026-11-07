@@ -2,7 +2,7 @@
   "id": "dose-form-bupropion-no-form",
   "scenario": "Bupropion with no release form stated; allowlist names only SR and XL",
   "category": "dose-form",
-  "labeledFrom": "SPEC section 2 allowlists \"bupropion SR\" and \"bupropion XL\" only, so an unspecified bupropion cannot be matched to an allowlisted form. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. Escalation (not a plain renewal) is the conservative reading.",
+  "labeledFrom": "SPEC section 2 allowlists \"bupropion SR\" and \"bupropion XL\" only, so an unspecified bupropion cannot be matched to an allowlisted form. IMPLEMENTATION-SPECIFIC (not derived from SPEC section 4): M01/M02 dose-form and identity checks (docs/DECISIONS.md ADR-003) deliberately over-escalate. Escalation (not a plain renewal) is the conservative reading. IMPLEMENTATION-SPECIFIC: the differing SPEC reading is that the SPEC lists bupropion SR and XL, and an unspecified bupropion is neither clearly listed nor clearly excluded; the label records what the system's M01/M02 rules do, flagged here so no one mistakes it for a SPEC-derived outcome.",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

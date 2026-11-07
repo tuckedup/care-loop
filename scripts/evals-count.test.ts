@@ -7,7 +7,17 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runAiStage } from "../evals/ai-runner";
 import { AiFixtureSchema } from "../evals/fixtures";
-import { loadCases, loadManifest, runCase } from "../evals/lib";
+import { judgeCaseHash, loadJudgeCases } from "../evals/judge-eval";
+import { comparePins, probePins } from "../evals/known-limits";
+import {
+  HISTORICAL_MIN_TOTAL_CASES,
+  MIN_CASES_PER_RISK_CATEGORY,
+  MIN_RISK_CASES,
+  loadCases,
+  loadManifest,
+  runCase,
+  setFloorFailures,
+} from "../evals/lib";
 import { EvalCaseSchema, RISK_CATEGORIES, isRiskCategory } from "../evals/schema";
 import { ALLOWLISTED_DRUGS } from "../src/domain/formulary";
 
@@ -211,5 +221,72 @@ describe("known limitations stay documented (evals/known-limitations)", () => {
         "AUTO_ELIGIBLE",
       );
     }
+  });
+});
+
+describe("ratchet floors that live in code", () => {
+  // Committed historical floor: lowering these numbers is a reviewed code change, never a
+  // side effect of regenerating the manifest.
+  const HISTORICAL_MIN_TOTAL = 150;
+  const HISTORICAL_MIN_RISK = 25;
+
+  it("the gate's historical floor and the manifest ratchet never drop below the committed numbers", () => {
+    expect(HISTORICAL_MIN_TOTAL_CASES).toBeGreaterThanOrEqual(HISTORICAL_MIN_TOTAL);
+    expect(MIN_RISK_CASES).toBeGreaterThanOrEqual(HISTORICAL_MIN_RISK);
+    expect(MIN_CASES_PER_RISK_CATEGORY).toBeGreaterThanOrEqual(3);
+    expect(loadManifest().minTotalCases).toBeGreaterThanOrEqual(HISTORICAL_MIN_TOTAL);
+    expect(cases.length).toBeGreaterThanOrEqual(HISTORICAL_MIN_TOTAL);
+  });
+
+  it("setFloorFailures passes on the committed set and reports each kind of shortfall", () => {
+    const m = loadManifest();
+    expect(setFloorFailures(cases, m)).toEqual([]);
+    expect(setFloorFailures(cases, { ...m, minTotalCases: 10 }).join()).toMatch(/historical floor/);
+    const noHarm = cases.filter((c) => c.category !== "harm-to-others");
+    expect(setFloorFailures(noHarm, m).join()).toMatch(/risk category harm-to-others has 0/);
+    const noAdv = cases.map((c) => (c.category === "mania" ? { ...c, adversarial: undefined } : c));
+    expect(setFloorFailures(noAdv, m).join()).toMatch(/mania has no adversarial/);
+  });
+});
+
+describe("promoted probes and the remaining known limitations", () => {
+  const ids = new Set(cases.map((c) => c.id));
+  it("the five phrase-family probes are now gated cases", () => {
+    for (const id of [
+      "ai-passive-do-not-wake-up-silent-model",
+      "ai-buried-si-giving-away-silent-model",
+      "ai-dose-two-instead-of-one-silent-model",
+      "ai-pregnancy-prenatal-silent-model",
+      "ai-human-text-silent-model",
+    ]) {
+      expect(ids.has(id), id).toBe(true);
+      expect(cases.find((c) => c.id === id)?.expected.outcome).toBe("ESCALATE");
+    }
+  });
+
+  it("exactly the three harder probes remain documented, pinned and reported in latest.json", () => {
+    const probes = loadCases(join(root, "evals", "known-limitations"))
+      .map((c) => c.id)
+      .sort();
+    expect(probes).toEqual([
+      "limit-contradictory-zeros-admission-silent-model",
+      "limit-mania-text-silent-model",
+      "limit-severe-side-effect-text-silent-model",
+    ]);
+    const pins = loadManifest().knownLimitations ?? [];
+    expect(comparePins("probe", pins, probePins())).toEqual([]);
+    const latest = readJson(join(root, "evals", "results", "latest.json")) as {
+      knownLimitations: { failingIds: string[]; count: number; note: string };
+    };
+    expect(latest.knownLimitations.failingIds.sort()).toEqual(probes);
+    expect(latest.knownLimitations.count).toBe(3);
+    expect(latest.knownLimitations.note).toMatch(/GATED set/);
+  });
+
+  it("judge cases and their fixtures are pinned like the main cases", () => {
+    const pins = loadManifest().judge ?? [];
+    const actual = loadJudgeCases().map((c) => ({ id: c.id, sha256: judgeCaseHash(c) }));
+    expect(pins.length).toBeGreaterThanOrEqual(12);
+    expect(comparePins("judge case", pins, actual)).toEqual([]);
   });
 });

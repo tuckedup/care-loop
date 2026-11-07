@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadAiConfig } from "../src/ai/config";
 import { runAiStage } from "./ai-runner";
 import { runJudgeEval } from "./judge-eval";
+import { runKnownLimitations } from "./known-limits";
 import {
   computeMetrics,
   dirLabel,
@@ -11,6 +12,7 @@ import {
   loadManifest,
   manifestFailures,
   runCase,
+  setFloorFailures,
   writeResults,
   type CaseResult,
   type CitationStats,
@@ -71,8 +73,18 @@ async function load(): Promise<Loaded> {
       blockedAiCases,
       llmCallsOnBlocked,
       envFailures,
-      judge: await runJudgeEval(LIVE),
+      setFloorFailures: setFloorFailures(cases, manifest),
+      judge: await runJudgeEval(LIVE, {}, undefined, manifest.judge),
     };
+    const esc = results.filter((x) => x.expectedOutcome === "ESCALATE");
+    extras.knownLimitations = await runKnownLimitations(
+      LIVE,
+      {
+        escalationCases: esc.length,
+        escalated: esc.filter((x) => x.actualOutcome === "ESCALATE").length,
+      },
+      manifest.knownLimitations,
+    );
     return { ok: true, results, citations, extras };
   } catch (error) {
     return { ok: false, error };

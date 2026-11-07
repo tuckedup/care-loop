@@ -35,6 +35,8 @@ export interface JudgeEvalMetrics {
   expectedJudgeFailed: number;
   unexpectedJudgeFailures: string[];
   /** Cases whose judged result differs from the hand label. */
+  /** Pin problems: a judge case or fixture edited, missing or unpinned in required-cases.json. */
+  pinFailures: string[];
   labelMismatches: string[];
   linesJudged: number;
   linesDroppedUpstream: number;
@@ -53,6 +55,7 @@ export function judgeGateFailures(m: JudgeEvalMetrics | null): string[] {
   if (m.cases < MIN_JUDGE_CASES) {
     f.push(`only ${m.cases} judge cases ran; at least ${MIN_JUDGE_CASES} required`);
   }
+  f.push(...m.pinFailures);
   if (m.labelMismatches.length > 0) {
     f.push(`judge cases not matching labels: ${m.labelMismatches.join(", ")}`);
   }

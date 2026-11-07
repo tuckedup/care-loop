@@ -16,7 +16,8 @@ import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { runAiStage } from "../evals/ai-runner";
 import type { JudgeEvalMetrics } from "../evals/judge-metrics";
-import { computePins, serialize } from "./eval-pins";
+import { KNOWN_LIMITATIONS_NOTE, type KnownLimitationsBlock } from "../evals/known-limits-metrics";
+import { computePins, loadExtraPins, serialize } from "./eval-pins";
 import {
   computeMetrics,
   envGuardFailures,
@@ -167,6 +168,7 @@ const goodJudge: JudgeEvalMetrics = {
   judgeFailed: 6,
   expectedJudgeFailed: 6,
   unexpectedJudgeFailures: [],
+  pinFailures: [],
   labelMismatches: [],
   linesJudged: 6,
   linesDroppedUpstream: 1,
@@ -175,6 +177,19 @@ const goodJudge: JudgeEvalMetrics = {
   cleanCases: 1,
   casesWithMajorFinding: 2,
   perCase: [],
+};
+const goodLimits: KnownLimitationsBlock = {
+  note: KNOWN_LIMITATIONS_NOTE,
+  probeIds: ["p1", "p2", "p3"],
+  failingIds: ["p1", "p2", "p3"],
+  staleIds: [],
+  count: 3,
+  escalationRecallGatedSet: 1,
+  escalationRecallIncludingKnownLimitations: 0.9,
+  specLabelledEscalations: 30,
+  specLabelledEscalationsMissed: 3,
+  pinFailures: [],
+  liveModelRun: false,
 };
 const cm = (
   results: CaseResult[],
@@ -186,6 +201,8 @@ const cm = (
     manifestFailures: [],
     blockedAiCases: 2,
     judge: goodJudge,
+    setFloorFailures: [],
+    knownLimitations: goodLimits,
     ...extras,
   });
 const cites = (modelSignals: number, verified: number, tripwire = 0): CitationStats => ({
@@ -740,7 +757,7 @@ describe("coverage floor, environment guard and live mode (process level)", () =
 
   // ---- Pin completeness, reproducible regeneration, live-mode blocked cases ----
   it("pins are reproducible: eval-pins output equals the committed manifest", () => {
-    const next = computePins(loadManifest(), loadCases(casesSrc));
+    const next = computePins(loadManifest(), loadCases(casesSrc), loadExtraPins());
     expect(serialize(next)).toBe(
       readFileSync(join(root, "evals", "required-cases.json"), "utf8").replace(/\r\n/g, "\n"),
     );
@@ -848,5 +865,78 @@ describe("coverage floor, environment guard and live mode (process level)", () =
     expect(
       (await runAiStage(timeout, true, { liveClient: throwing, liveModel: "m" })).skipped,
     ).toBe(true);
+  });
+});
+
+describe("known limitations, coverage floors and judge pins in the gate", () => {
+  it("the knownLimitations block is mandatory", () => {
+    const m = computeMetrics([result({})], "fixtures", cites(1, 1), {
+      manifestFailures: [],
+      blockedAiCases: 2,
+      judge: goodJudge,
+      setFloorFailures: [],
+    });
+    expect(gateFailures(m).join()).toMatch(/knownLimitations block was not computed/);
+  });
+
+  it("a stale probe list fails: a probe that now escalates must be promoted", () => {
+    const m = cm([result({})], "fixtures", cites(1, 1), {
+      knownLimitations: { ...goodLimits, failingIds: ["p1", "p2"], staleIds: ["p3"], count: 2 },
+    });
+    expect(gateFailures(m).join()).toMatch(/promote them into evals\/cases: p3/);
+    const inconsistent = cm([result({})], "fixtures", cites(1, 1), {
+      knownLimitations: { ...goodLimits, probeIds: ["p1", "p2", "p3", "p4"] },
+    });
+    expect(gateFailures(inconsistent).join()).toMatch(/probe list is stale/);
+  });
+
+  it("probe pin failures fail the gate, and the block states the gated-set caveat", () => {
+    const m = cm([result({})], "fixtures", cites(1, 1), {
+      knownLimitations: {
+        ...goodLimits,
+        pinFailures: ["known-limitation probe edited without a pin update: p1"],
+      },
+    });
+    expect(gateFailures(m).join()).toMatch(/probe edited without a pin update/);
+    expect(goodLimits.note).toMatch(/GATED set/);
+  });
+
+  it("coverage floors must have been checked, and their failures fail the gate", () => {
+    const unchecked = computeMetrics([result({})], "fixtures", cites(1, 1), {
+      manifestFailures: [],
+      blockedAiCases: 2,
+      judge: goodJudge,
+      knownLimitations: goodLimits,
+    });
+    expect(gateFailures(unchecked).join()).toMatch(/coverage floors were not checked/);
+    const short = cm([result({})], "fixtures", cites(1, 1), {
+      setFloorFailures: ["risk category pregnancy has 2 cases; at least 3 required"],
+    });
+    expect(gateFailures(short).join()).toMatch(/risk category pregnancy/);
+  });
+
+  it("judge pin failures fail the gate", () => {
+    const m = cm([result({})], "fixtures", cites(1, 1), {
+      judge: { ...goodJudge, pinFailures: ["judge case edited without a pin update: x"] },
+    });
+    expect(gateFailures(m).join()).toMatch(/judge case edited without a pin update/);
+  });
+
+  it("removing most of a risk category fails pnpm eval at process level with a floor message", async () => {
+    const ids = readdirSync(casesSrc)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => f.replace(/\.json$/, ""))
+      .filter((id) => readCase(id).category !== "harm-to-others");
+    const s = stage(ids);
+    const r = await runEval(s.cases, s.fixtures);
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/risk category harm-to-others has 0 cases/);
+  }, 120_000);
+
+  it("the committed latest.json carries the knownLimitations block and the judge section", () => {
+    const latest = readResults(join(root, "evals", "results", "latest.json"));
+    expect(latest.knownLimitations.count).toBe(latest.knownLimitations.failingIds.length);
+    expect(latest.knownLimitations.escalationRecallIncludingKnownLimitations).toBeLessThan(1);
+    expect(latest.summaryJudge.liveJudgeRun).toBe(false);
   });
 });

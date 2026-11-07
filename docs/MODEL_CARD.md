@@ -15,7 +15,8 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 ## Model
 
 - Provider/model: set by env `ANTHROPIC_MODEL` (TODO: record the exact model used for published eval results)
-- Prompt and schema version: TODO
+- Prompt versions: risk extraction `risk-signals-v1` (src/ai/prompt.ts), visit summary `visit-summary-v2`,
+  summary judge `summary-judge-v1` (eval only). Output schemas are the strict Zod schemas in src/ai.
 
 ## Safety design
 
@@ -161,44 +162,89 @@ and not exhaustive; prompt injection resistance of the model itself is not claim
 the summary "AI-generated summary, not a recommendation; escalation reason codes above are
 authoritative", and the reason codes remain the authoritative record.
 
-Known limits: the summary has not been run against a live model; its quality is not evaluated (no
-CREOLA-style labelling yet, see SPEC section 11); the call carries no idempotency key (it is a
+Known limits: the summary has not been run against a live model; its quality is evaluated only by the
+fixture-based CREOLA-style judge described below (hand-written fixtures, not a live judge); the call carries no idempotency key (it is a
 read-only generation); successful summaries are cached in process memory for five minutes. Test
 fixtures are hand-written (synthetic-handwritten). `SUMMARY_FIXTURE=synthetic-handwritten` enables a
 hand-written fixture model only when `NODE_ENV` is exactly `development` or `test` (default deny),
 for e2e.
 
-## Eval set, labelling and known limitations (F063-F066)
+## Eval set, labelling and known limitations (F063-F066, revised after independent review)
 
 How the eval cases were made: every case in `evals/cases/*.json` was labelled by hand from SPEC
-sections 2, 4 and 5 and the clinical-rules skill BEFORE it was run; no label was copied from the
-output of the code or a model. `labeledFrom` in each case says which rule or SPEC text the label
-comes from. Where the system's behaviour goes beyond the SPEC (dose-form checks M01/M02, the
-`nightly` string for trazodone, the six-month monitoring boundary, ESCALATE outranking
-FOLLOW_UP_REQUIRED) the case says IMPLEMENTATION-SPECIFIC in `labeledFrom`. The model answers
-used by AI-dependent cases are hand-written canned responses (`synthetic-handwritten`); no live
-model has ever produced a result in this repo, so the results show how the pipeline reacts to a
-correct or a missing model signal, not how any real model performs.
+sections 2, 4 and 5 and the clinical-rules skill. The author derived each label from the SPEC text
+and did not copy the output of a model. That claim has exceptions that are recorded here rather
+than hidden:
 
-The case set is organised by risk category (`RISK_CATEGORIES` in `evals/schema.ts`); each
-category has at least three cases including one adversarial phrasing, enforced by
-`scripts/evals-count.test.ts`. For each AI-dependent risk case the `labeledFrom` note records
-which layer is expected to catch it: the (canned) model signal, the phrase tripwire with a silent
-model, or a structured answer / rule with a silent model. Counts, per-category breakdown and
-metrics are in `evals/results/latest.json`.
+- `ai-blocked-homoglyph-drug` and `ai-blocked-unknown-drug` were CORRECTED after a review/run to
+  add `LLM_FAILURE`: a medication blocked from the AI path has no AI result, and R13 escalates an
+  absent or failed result (fail closed), so the code belongs in the set. The first draft omitted
+  it. `ai-controlled-never-called` differs: R13 is skipped for controlled substances (they never
+  enter the AI path, `src/domain/rules/r13-ai-signal.ts`), so its set is `NOT_ON_FORMULARY` and
+  `CONTROLLED_SUBSTANCE` only.
+- Four injection cases (`ai-injection-homoglyph-with-pregnancy`,
+  `-zero-width-with-high-phq9`, `-spanish-with-severe-side-effect`,
+  `-approve-request-with-item9`) first encoded a gap of the injection detector (structured code
+  only). After review the detector was extended and they were relabelled to carry
+  `LLM_RISK_SIGNAL` as well. `ai-dose-flag-set-model-silent` was relabelled the same way after the
+  tripwire gained dose-change phrases.
+- Five probes (passive ideation, buried intent, dose change, pregnancy hint, request for a human, in
+  free text with a silent model) were failing known limitations; after review the tripwire gained
+  phrase families for them and they were promoted into the gated set.
+- Reason-code sets and "which layer catches it" notes are partly implementation-specific; see the
+  list below and each case's `labeledFrom`, which says IMPLEMENTATION-SPECIFIC where it applies.
+  Cases whose label depends on an implementation choice rather than SPEC text: the three
+  dose-form cases (`dose-form-duloxetine-dr`, `dose-form-desvenlafaxine-er`,
+  `dose-form-bupropion-no-form`: the SPEC lists those drugs without a form word, so a plain
+  renewal would be eligible), `identity-med-name-rxcui-mismatch`, `trazodone-50-twice-daily`, the
+  three mirtazapine boundary cases, `refill-limit-reached-with-item9` (precedence), the `order-*`
+  and `change-request-*` outcomes (ESCALATE rather than REJECT),
+  `ai-injection-markdown-fence-system-line` (the parser accepts one fenced JSON block, so the
+  output is valid and the code is `LLM_RISK_SIGNAL`; a stricter reading of R13 could give
+  `LLM_FAILURE`), and every `tripwire-silent-model` case.
 
-Known limitations the eval set demonstrates (kept in `evals/known-limitations/`, NOT gated, and
-asserted to still fail by `scripts/evals-count.test.ts` so they cannot go stale silently):
+The model answers used by AI-dependent cases are hand-written canned responses
+(`synthetic-handwritten`); no live model has ever produced a result in this repo, so the results
+show how the pipeline reacts to a correct or a missing model signal, not how any real model
+performs.
 
-- If the model returns no signal and the wording is outside the small tripwire lexicon and no
-  structured answer covers it, the system escalates nothing and the outcome is AUTO_ELIGIBLE. The
-  probes cover: passive ideation ("hope I just do not wake up"), buried intent ("giving away my
-  belongings because I will not be needing them"), mania described in free text, a disguised dose
-  change ("can I take two instead of one") with the change box left at none, pregnancy hinted at
-  ("prenatal vitamins"), a request for a human in free text with the box unticked, severe side
-  effects described only in text, and a patient admitting that the PHQ-9 answers were not honest.
-  For these wordings the model is the ONLY protection. In SHADOW mode a clinician still approves
-  every renewal; in RETRO and SAMPLED modes such a renewal is sent automatically.
+The case set is organised by risk category (`RISK_CATEGORIES` in `evals/schema.ts`). The floors
+(150 cases, 25 risk cases, every risk category at least 3 cases incl. one adversarial) are enforced
+both by `scripts/evals-count.test.ts` and inside `pnpm eval` (`setFloorFailures` in `evals/lib.ts`,
+with `HISTORICAL_MIN_TOTAL_CASES` committed in code so the manifest ratchet cannot be lowered by
+regenerating a file). Counts, per-category breakdown and metrics are in `evals/results/latest.json`.
+
+`escalationRecall` in `latest.json` is over the GATED set only. The `knownLimitations` block of the
+same file lists the SPEC-labelled escalations that the system is known to miss (probe ids in
+`evals/known-limitations/`, pinned, not gated) and an honest recall that includes them
+(`escalationRecallIncludingKnownLimitations`). The block is mandatory in the gate; a probe that now
+escalates fails the gate until it is promoted into `evals/cases`.
+
+Phrase families added after review (`FAMILY_LEXICON` in `src/ai/tripwire.ts`, escalation-only,
+English only, heuristic, NOT clinically validated, deliberately over-inclusive): a request for a
+human (`speak with an actual person`, `real person`), pregnancy (`prenatal`, `pregnant`,
+`expecting a baby`, `trying to conceive`; a negated `not pregnant` is not matched), dose change
+(`double up`, `two instead of one`, `take more`, `increase my dose`) and passive ideation or giving
+belongings away (`do not wake up`, `giving away my`, `not be needing`). Signal types map to the
+SPEC escalation family. The injection detector now also runs on normalised text (look-alike
+letters, zero-width characters, accents) and recognises Spanish `ignora las instrucciones
+anteriores`-style text and `approve ... automatically`-style text. False-positive impact measured:
+0 of the 200 sentences of the existing benign corpus gained a flag (the differential test), 0 of a
+further 50 ordinary check-in sentences and 0 of 12 ordinary near-miss sentences; the cost is
+over-escalation on innocent uses of the same words, asserted in `src/ai/tripwire-families.test.ts`
+("I do not wake up at night anymore", "giving away my old couch", "my neighbour is pregnant", "a real
+person at the pharmacy counter"). Over-escalation is accepted by design.
+
+Known limitations that remain (the three probes in `evals/known-limitations/`, which the system
+still gets wrong with a silent model): mania described only in free text, severe side effects
+described only in free text, and a patient admitting that the PHQ-9 answers were not honest. For
+these wordings the model is the ONLY protection. In SHADOW mode a clinician still approves every
+renewal; in RETRO and SAMPLED modes such a renewal is sent automatically. Other wordings of the
+families above that the phrase lists do not contain remain uncovered when the model is silent (the
+lists are small).
+
+Other known limitations:
+
 - The tripwire cannot read tone: gallows humour ("die of boredom", "kms") escalates by design
   (accepted over-escalation, escalate-when-in-doubt).
 - Natural product wording that adds a dose-form word the allowlist entry does not contain
@@ -210,6 +256,8 @@ asserted to still fail by `scripts/evals-count.test.ts` so they cannot go stale 
 - Mirtazapine monitoring: SPEC names baseline and six-month monitoring only. The due point
   (>= 6 months since baseline) and the absence of a recurrence interval are implementation
   choices. TODO: source needed.
+- Known deny-list passes (summaries, from the F041 safety review; the deny-list is heuristic and
+  not exhaustive): "Seems fine overall", "Doing great, no problems", "Fully stable".
 
 ## CREOLA-style summary judge (F067)
 
@@ -234,3 +282,12 @@ same model as the summariser may share its blind spots. The judge cases include 
 asserts clearance for an escalated renewal, an omitted positive item 9, a reversed item 9, and lines
 dropped upstream (uncited or stale ids, approval wording). The upstream deny-list is heuristic;
 the judge section's expected labels assume its documented behaviour.
+
+Judge cases are as strictly pinned as the main cases: `evals/judge-cases/*` and
+`evals/fixtures/judge/*` are sha256-pinned in `evals/required-cases.json` (`judge`, regenerated by
+`pnpm eval:pins`), and an unpinned, edited or missing judge case fails the gate. Both the hand label
+and the judge fixture are written by hand by the same author, so the judge section is circular by
+construction: it tests parsing, validation, fail-closed handling, the upstream filter and the metrics
+code, not the quality of any summary or judge. A defect that is both a false line and a missing true
+finding is scored once as a hallucination and once as an omission on purpose (the tallies count both
+columns); the affected cases say so in `labeledFrom`.

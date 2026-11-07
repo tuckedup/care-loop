@@ -33,6 +33,8 @@ export interface LiveOverrides {
   /** Test seam: stands in for the real Anthropic client in live mode. */
   liveClient?: RiskLlmClient | null;
   liveModel?: string;
+  /** Fixture directory to read from (default: the override-aware one). */
+  fixturesDir?: string;
 }
 
 export async function runAiStage(
@@ -43,7 +45,7 @@ export async function runAiStage(
   if (!c.aiFixture) {
     throw new Error(`case ${c.id} has no aiFixture; rules-only cases do not run the AI stage`);
   }
-  const fixture = loadFixture(c.aiFixture);
+  const fixture = loadFixture(c.aiFixture, opts.fixturesDir);
   // Blocked medications make no model call, so they run in live mode too (and must be counted).
   const blockedUpFront = !isAiPathPermitted(toRuleInput(c, { status: "failed" }));
   if (live && !fixture.header.liveApplicable && !blockedUpFront) {
@@ -103,6 +105,9 @@ export async function runAiStage(
     counted = rec;
   }
 
+  // A fixture that simulates a hang resolves nothing, so a short deadline suffices; every other
+  // fixture answers at once and gets a load-proof deadline.
+  const hangs = fixture.response.type === "error" && fixture.response.error === "timeout";
   const ruleInput = toRuleInput(c, { status: "failed" });
   const result = await runRiskExtraction(
     ruleInput,
@@ -110,7 +115,7 @@ export async function runAiStage(
     {
       client: live && !liveInner ? null : client,
       model,
-      timeoutMs: live ? 60_000 : 50,
+      timeoutMs: live ? 60_000 : hangs ? 50 : 5000,
     },
   );
   const calls = counted.calls.length;
