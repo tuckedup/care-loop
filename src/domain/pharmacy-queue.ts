@@ -2,13 +2,16 @@
 // command path that appends events AND the outbox row together.
 import type { Sql } from "postgres";
 import { appendToStream, type AppendResult, type AuditContext } from "@/infra/audit";
-import { withConcurrencyRetry } from "@/infra/event-store";
+import { readStream, withConcurrencyRetry } from "@/infra/event-store";
+import { foldRxStatus } from "@/infra/projections/rx-status";
 import type { OutboxMessageInput } from "@/infra/outbox/messages";
 import { replay, type Aggregate } from "./aggregate";
 import { loadStream } from "./aggregate-handler";
 import { isAiPathPermitted } from "@/ai/ai-path-gate";
 import { makeEvent, type DomainEvent, type EventData } from "./events";
 import { buildRuleInput } from "./renewal/decision";
+import { renewalStreamId } from "./renewal/renewal";
+import { isStalled, SUPERSEDABLE_CODES } from "./pharmacy-stall";
 
 export { rxIdempotencyKey, rxMessageId } from "./pharmacy-keys";
 
@@ -20,6 +23,19 @@ export function outboxFor(events: readonly DomainEvent[]): OutboxMessageInput[] 
     const { pharmacyId, messageId } = e.data;
     // A queued event without a pharmacy/message id queues nothing: it can never be transmitted.
     if (!pharmacyId || !messageId) continue;
+    // Supersede: cancel each stalled earlier renewal in the SAME transaction as this send.
+    for (const s of e.data.supersedes ?? []) {
+      out.push({
+        type: "pharmacy.CancelRx",
+        idempotencyKey: rxCancelKey(s.renewalId, e.data.renewalId),
+        payload: {
+          renewalId: s.renewalId,
+          prescriptionId: e.data.prescriptionId,
+          pharmacyId: s.pharmacyId,
+          messageId: `rxcancel-${s.renewalId}-${e.data.renewalId}`,
+        },
+      });
+    }
     out.push({
       type: "pharmacy.RxRenewalResponse",
       idempotencyKey: e.data.idempotencyKey,
@@ -69,6 +85,55 @@ export function medicationTransmittable(order: EventData<"MedicationPrescribed">
     return isAiPathPermitted(input);
   } catch {
     return false;
+  }
+}
+
+/** Idempotency key of the CancelRx that supersedes `superseded` when `by` is approved. */
+export const rxCancelKey = (superseded: string, by: string) => `rx-cancel:${superseded}:${by}`;
+
+/**
+ * Earlier renewals of the same prescription that are unsettled but past the point of waiting
+ * (STALLED by the injected clock, or marked stalled/unconfirmed) and not yet superseded. Fail-soft:
+ * on any read problem nothing is superseded (R2 then simply fails the duplicate-send guard).
+ */
+export async function findSupersedable(
+  sql: Sql,
+  renewalId: string,
+  opts: { now: Date; staleHours: number },
+): Promise<{ renewalId: string; pharmacyId: string }[]> {
+  try {
+    const mine = (await loadStream(sql, renewalStreamId(renewalId))).events.find(
+      (e) => e.type === "RenewalRequested",
+    );
+    if (!mine || mine.type !== "RenewalRequested") return [];
+    const others = await sql.unsafe<{ stream_id: string }[]>(
+      `SELECT DISTINCT stream_id FROM events
+       WHERE type = 'RenewalRequested' AND data->>'prescriptionId' = $1 AND stream_id <> $2`,
+      [mine.data.prescriptionId, renewalStreamId(renewalId)],
+    );
+    const out: { renewalId: string; pharmacyId: string }[] = [];
+    for (const o of others) {
+      const stored = await readStream(sql, o.stream_id);
+      const row = foldRxStatus(stored);
+      if (!row) continue;
+      const queued = stored.find((e) => e.type === "RxRenewalQueued");
+      const pharmacyId = (queued?.data as { pharmacyId?: string } | undefined)?.pharmacyId;
+      if (!queued || !pharmacyId) continue;
+      const unconfirmed =
+        row.status === "pharmacy_error" &&
+        SUPERSEDABLE_CODES.some((c) => row.pharmacyStatus === `ERROR:${c}`);
+      if (!unconfirmed && !isStalled(row, opts.now, opts.staleHours)) continue;
+      const already = await sql.unsafe(
+        `SELECT 1 FROM events WHERE type = 'RxRenewalQueued'
+         AND data->'supersedes' @> $1::text::jsonb LIMIT 1`,
+        [JSON.stringify([{ renewalId: row.renewalId }])],
+      );
+      if (already.length > 0) continue;
+      out.push({ renewalId: row.renewalId, pharmacyId });
+    }
+    return out;
+  } catch {
+    return [];
   }
 }
 

@@ -83,6 +83,11 @@ export const StartReviewSchema = z.object(Clinician);
 export const ApproveSchema = z.object({
   ...Clinician,
   autonomyMode: AutonomyModeSchema.default("SHADOW"),
+  /** Set only by the approve handler (stalled earlier renewals of this prescription). */
+  supersedes: z
+    .array(z.object({ renewalId: id, pharmacyId: z.string().regex(/^[0-9]{7}$/) }))
+    .max(10)
+    .default([]),
 });
 export const DenySchema = z.object({
   ...Clinician,
@@ -456,6 +461,14 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
       } else if (state.reviewerId !== null && state.reviewerId !== c.clinicianId) {
         throw new DomainError("REVIEWER_MISMATCH", "another clinician is reviewing this renewal");
       }
+      // An approval that could never be sent is refused for EVERY caller (not just the UI): the
+      // patient must have confirmed a pharmacy, and the renewal must name its prescription.
+      if (state.pharmacyId === null || state.prescriptionId === null) {
+        throw new DomainError(
+          "NO_CONFIRMED_PHARMACY",
+          "the patient has not confirmed a pharmacy, so an approval could not be sent",
+        );
+      }
       const approved: DomainEvent = {
         type: "RenewalApproved",
         data: {
@@ -470,7 +483,7 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
       // the same transaction, see handleCommandWithOutbox). Every guard above already refused
       // controlled / REJECT / blocked / follow-up renewals. Without a confirmed pharmacy nothing
       // is queued (fail closed: never guess a pharmacy).
-      if (state.pharmacyId !== null && state.prescriptionId !== null && !state.queued) {
+      if (!state.queued) {
         return [
           approved,
           {
@@ -482,6 +495,7 @@ export function decideReview(state: ReviewState, command: ReviewCommand): Domain
               idempotencyKey: rxIdempotencyKey(c.renewalId),
               pharmacyId: state.pharmacyId,
               messageId: rxMessageId(c.renewalId),
+              ...(c.supersedes.length > 0 ? { supersedes: c.supersedes } : {}),
             },
           },
         ];

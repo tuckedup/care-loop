@@ -1,5 +1,10 @@
 import type { Sql } from "postgres";
-import { createTransmitDeadLetterHook, createTransmitHandler } from "./transmit";
+import {
+  createCancelDeadLetterHook,
+  createCancelHandler,
+  createTransmitDeadLetterHook,
+  createTransmitHandler,
+} from "./transmit";
 import { HandlerRegistry } from "./worker";
 
 export interface RegistryDeps {
@@ -18,6 +23,8 @@ export function createDefaultRegistry(deps?: RegistryDeps): HandlerRegistry {
   const registry = new HandlerRegistry();
   if (deps) {
     registry.register("pharmacy.RxRenewalResponse", createTransmitHandler(deps));
+    registry.register("pharmacy.CancelRx", createCancelHandler(deps));
+    registry.registerDeadLetter("pharmacy.CancelRx", createCancelDeadLetterHook(deps.sql));
     registry.registerDeadLetter(
       "pharmacy.RxRenewalResponse",
       createTransmitDeadLetterHook(deps.sql),

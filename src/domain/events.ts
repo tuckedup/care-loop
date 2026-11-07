@@ -161,6 +161,14 @@ const payloads = {
     /** Additive (F048): where and under which message id the outbox row will transmit it. */
     pharmacyId: pharmacyId.optional(),
     messageId: id.optional(),
+    /**
+     * Additive: earlier renewals of the same prescription (stalled, unfilled) that this approval
+     * supersedes. The same transaction queues a CancelRx for each; they are no longer unsettled.
+     */
+    supersedes: z
+      .array(z.object({ renewalId: id, pharmacyId }))
+      .max(10)
+      .optional(),
   }),
   RxRenewalTransmitted: z.object({
     v: v1,

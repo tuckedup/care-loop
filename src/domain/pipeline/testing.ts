@@ -1,5 +1,6 @@
 // Test support for the decision pipeline: seeds a patient, a prescribed order and a renewal
 // through the real audited handlers. Synthetic data only. Imported by tests, never by app code.
+import { selectRenewalPharmacy } from "../pharmacy-selection";
 import { randomUUID } from "node:crypto";
 import type { Sql } from "postgres";
 import { createRecordedClient } from "@/ai/client";
@@ -91,6 +92,21 @@ export async function seedRenewal(sql: Sql, opts: ScenarioOptions = {}): Promise
   await verifyIdentity(
     sql,
     { renewalId, provided: { dateOfBirth: "1980-01-01", lastName: "Patient" } },
+    ctx(patientId, "patient"),
+  );
+  // The patient confirms a (synthetic) pharmacy before the check-in, like the real flow: an
+  // approval without one is refused (NO_CONFIRMED_PHARMACY). Idempotent for the same pharmacy.
+  await selectRenewalPharmacy(
+    sql,
+    {
+      renewalId,
+      pharmacy: {
+        id: "1234567",
+        name: "Test Pharmacy (synthetic)",
+        address: "1 Elm Street, Faketown",
+        phone: "(555) 010-0000",
+      },
+    },
     ctx(patientId, "patient"),
   );
   if (!opts.skipCheckIn) {

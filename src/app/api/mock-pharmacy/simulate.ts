@@ -69,6 +69,9 @@ export const DEFAULT_RATES: SimulationRates = {
   escalation: 0.08,
 };
 
+/** Chance that a retryable error repeats on a later attempt (demo tuning, not a clinical value). */
+export const RETRY_PERSIST = 0.5;
+
 const RETRYABLE_CODES = [
   ["PHARMACY_BUSY", "Pharmacy system busy, retry later"],
   ["TEMPORARY_UNAVAILABLE", "Pharmacy system temporarily unavailable"],
@@ -108,7 +111,11 @@ export function simulate(
   req: MockPharmacyRequest,
   rates: SimulationRates = DEFAULT_RATES,
   force?: ForcedScenario,
-  /** The Idempotency-Key header, if any. The outcome depends on (seed, key), never on the attempt. */
+  /**
+   * The Idempotency-Key header, if any. Whether a message is fatal / OK / filled / duplicated /
+   * escalated depends only on (seed, key). Only a RETRYABLE error depends on the attempt too, so a
+   * retry can recover; each (key, attempt) is still deterministic.
+   */
   idempotencyKey?: string | null,
 ): Simulation {
   const attempt = req.attempt ?? 1;
@@ -170,7 +177,16 @@ export function simulate(
     };
   }
 
-  if (rError < rates.retryableError) {
+  // A key in the retryable band keeps failing on later attempts with probability RETRY_PERSIST,
+  // drawn from (key, attempt); attempt 1 is the stable draw itself.
+  let retryNow = rError < rates.retryableError;
+  if (retryNow && attempt > 1) {
+    const again = mulberry32(
+      (seed ^ hashString(`${idempotencyKey || req.messageId}#retry${attempt}`)) >>> 0,
+    );
+    retryNow = again() < RETRY_PERSIST;
+  }
+  if (retryNow) {
     const [code, description] = pick(RETRYABLE_CODES);
     return {
       httpStatus: 503,
@@ -178,7 +194,7 @@ export function simulate(
       messages: [{ type: "Error", messageId: mid("error"), code, retryable: true, description }],
     };
   }
-  if (rError < rates.retryableError + rates.fatalError) {
+  if (rError >= rates.retryableError && rError < rates.retryableError + rates.fatalError) {
     const [code, description] = pick(FATAL_CODES);
     return {
       httpStatus: 422,

@@ -113,12 +113,16 @@ describe("approval queues the transmission in one transaction", () => {
     expect(await verifyAuditChain(db.sql)).toMatchObject({ valid: true });
   });
 
-  it("without a confirmed pharmacy nothing is queued and no outbox row exists", async () => {
+  it("without a confirmed pharmacy Approve is REFUSED (NO_CONFIRMED_PHARMACY): no approval, no queue, no outbox row", async () => {
     const r = await readyRenewal(db.sql, { noPharmacy: true });
     await startReview(db.sql, clinician, { renewalId: r.renewalId });
-    await approveRenewal(db.sql, clinician, { renewalId: r.renewalId });
+    await expect(
+      approveRenewal(db.sql, clinician, { renewalId: r.renewalId }),
+    ).rejects.toMatchObject({
+      code: "NO_CONFIRMED_PHARMACY",
+    });
     const types = await streamTypes(db.sql, r.renewalId);
-    expect(types).toContain("RenewalApproved");
+    expect(types).not.toContain("RenewalApproved");
     expect(types).not.toContain("RxRenewalQueued");
     expect(await outboxRow(rxIdempotencyKey(r.renewalId))).toBeUndefined();
   });
@@ -379,10 +383,9 @@ describe("defence in depth: the handler refuses to transmit", () => {
   });
 
   it("a renewal whose pharmacy was never selected", async () => {
+    // Forged approval + queue that name a pharmacy the patient never confirmed.
     const r = await readyRenewal(db.sql, { noPharmacy: true });
-    await startReview(db.sql, clinician, { renewalId: r.renewalId });
-    await approveRenewal(db.sql, clinician, { renewalId: r.renewalId });
-    await forgeRow(r);
-    await expectRefused(r, /REFUSED: no matching RxRenewalQueued/);
+    await forgeApprovedQueued(db.sql, r);
+    await expectRefused(r, /REFUSED: pharmacy not confirmed by the patient/);
   });
 });

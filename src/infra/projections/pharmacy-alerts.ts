@@ -36,6 +36,18 @@ function errorMessage(code: string): string {
   if (code === "TRANSMIT_DEAD_LETTERED") {
     return "The prescription could not be sent to the pharmacy (delivery gave up or was refused). The patient has been told there was a problem.";
   }
+  if (code === "TRANSMIT_UNCONFIRMED") {
+    return "The prescription was sent but the pharmacy never confirmed it (delivery was interrupted). Please check with the pharmacy.";
+  }
+  if (code === "CANCEL_DEAD_LETTERED") {
+    return "A cancellation (for a prescription replaced by a newer approved renewal) could not be delivered. Please contact the pharmacy to cancel the older prescription.";
+  }
+  if (code === "FILL_AFTER_SUPERSEDE") {
+    return "The pharmacy filled a prescription that had been replaced by a newer approved renewal. This may be a double fill: please review.";
+  }
+  if (code === "APPROVED_NOT_SENT") {
+    return "A renewal was approved but nothing was queued to send it to the pharmacy. Please check it.";
+  }
   if (code === "STALLED_NO_FILL") {
     return "The pharmacy accepted the prescription but no fill has been reported within the expected time. Please check with the pharmacy.";
   }

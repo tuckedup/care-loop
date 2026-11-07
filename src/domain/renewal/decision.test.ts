@@ -360,6 +360,7 @@ describe("process manager against Postgres (F036)", () => {
     expect(await types(s.renewalId)).toEqual([
       "RenewalRequested",
       "IdentityVerified",
+      "PharmacySelected",
       "CheckInSubmitted",
       "RiskSignalsExtracted",
       "EligibilityEvaluated",

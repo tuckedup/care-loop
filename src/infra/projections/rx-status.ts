@@ -18,6 +18,7 @@ export type RxStatusValue =
   | "pharmacy_error"
   | "filled"
   | "cancelled"
+  | "cancel_requested"
   | "follow_up_required";
 
 export interface RxStatusRow {
@@ -43,6 +44,7 @@ const STICKY: ReadonlySet<RxStatusValue> = new Set([
   "pharmacy_error",
   "filled",
   "cancelled",
+  "cancel_requested",
 ]);
 
 /** filled, cancelled, or a pharmacy error that is explicitly not retryable. */
@@ -106,6 +108,18 @@ export function reduceRxStatus(
       case "RxFillReceived":
         if (current.status !== "pharmacy_error") return current;
         break;
+      default:
+    }
+  }
+  // Superseded by a newer approval: a CancelRx is on its way. Pharmacy progress does not walk the
+  // row back; a fill (flagged elsewhere as an anomaly) or the cancel acknowledgement still apply.
+  if (current !== null && current.status === "cancel_requested") {
+    switch (event.type) {
+      case "RxRenewalQueued":
+      case "RxRenewalTransmitted":
+      case "PharmacyStatusReceived":
+      case "PharmacyErrorReceived":
+        return current;
       default:
     }
   }
@@ -203,6 +217,28 @@ export const rxStatusProjection: Projection = {
       // A schema-invalid event is skipped and surfaced, never allowed to halt the projection.
       await recordAnomaly(tx, "rx_status", stored, "INVALID_EVENT", String(e));
       return;
+    }
+    // A newer renewal's approval supersedes earlier ones: mark each earlier row cancel_requested.
+    if (event.type === "RxRenewalQueued") {
+      for (const s of event.data.supersedes ?? []) {
+        const [old] = await tx.unsafe<RxDbRow[]>(
+          `SELECT * FROM rx_status WHERE renewal_id = $1 FOR UPDATE`,
+          [s.renewalId],
+        );
+        if (!old) continue;
+        const cur = toRxRow(old);
+        if (cur.status === "filled" || cur.status === "cancelled") continue;
+        await tx.unsafe(
+          `UPDATE rx_status SET status = 'cancel_requested', last_event_type = $2,
+                  last_position = $3::bigint, updated_at = $4::timestamptz WHERE renewal_id = $1`,
+          [
+            s.renewalId,
+            event.type,
+            stored.globalPosition.toString(),
+            stored.createdAt.toISOString(),
+          ],
+        );
+      }
     }
     const renewalId = renewalIdOf(event);
     if (renewalId === null) return;

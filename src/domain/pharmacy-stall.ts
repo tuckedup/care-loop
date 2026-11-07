@@ -4,6 +4,18 @@
 // value).
 
 export const STALLED_CODE = "STALLED_NO_FILL";
+/** Sent, but the transmission was never confirmed (e.g. a leased message reaped to dead). */
+export const UNCONFIRMED_CODE = "TRANSMIT_UNCONFIRMED";
+/**
+ * Errors that mean "the pharmacy may still hold this prescription": the renewal stays UNSETTLED for
+ * the duplicate-send guard until a clinician approves a newer renewal, which then SUPERSEDES it
+ * (a CancelRx is queued in the same transaction) instead of both sending.
+ */
+export const SUPERSEDABLE_CODES: readonly string[] = [STALLED_CODE, UNCONFIRMED_CODE];
+/** An approval with a confirmed pharmacy that was never queued for sending (alert, not silence). */
+export const APPROVED_NOT_SENT_CODE = "APPROVED_NOT_SENT";
+/** A fill arrived for a renewal that had been superseded: possible double fill, needs a person. */
+export const FILL_AFTER_SUPERSEDE_CODE = "FILL_AFTER_SUPERSEDE";
 export const DEFAULT_STALE_HOURS = 72;
 
 /** PHARMACY_STALE_HOURS (hours); anything unusable falls back to the default. */
@@ -20,7 +32,15 @@ export interface FlightRow {
 }
 
 const RESUMABLE = new Set(["requested", "identity_verified"]);
-const TERMINAL = new Set(["approved", "denied", "follow_up_required", "filled", "cancelled"]);
+const TERMINAL = new Set([
+  "approved",
+  "denied",
+  "follow_up_required",
+  "filled",
+  "cancelled",
+  // superseded by a newer approved renewal; its CancelRx is on its way
+  "cancel_requested",
+]);
 const AWAITING_PHARMACY = new Set(["queued", "transmitted", "pharmacy_status"]);
 
 /** A renewal the pharmacy accepted (or should have) that has seen no fill for too long. */

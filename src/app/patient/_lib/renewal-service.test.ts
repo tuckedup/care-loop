@@ -4,6 +4,7 @@ import { DEMO_PATIENT_ID, DEMO_PATIENT_IDENTITY } from "@/domain/seed";
 import { makeEvent } from "@/domain/events";
 import { appendToStream } from "@/infra/audit";
 import { readStream } from "@/infra/event-store";
+import { confirmPatientPharmacy, listPharmacies } from "./pharmacy-service";
 import { createTestDb, type TestDb } from "@/test/db";
 import {
   checkInFromFormData,
@@ -47,8 +48,11 @@ describe("pure helpers", () => {
     expect(resultStateFor("checked_in")).toBe("under_review");
     expect(resultStateFor("escalated")).toBe("under_review");
     expect(resultStateFor("something_new")).toBe("under_review");
-    expect(resultStateFor("approved")).toBe("approved");
+    // An approval with nothing queued behind it is never reported as sent.
+    expect(resultStateFor("approved")).toBe("approved_waiting");
+    expect(resultStateFor("queued")).toBe("approved");
     expect(resultStateFor("filled")).toBe("approved");
+    expect(resultStateFor("pharmacy_error")).toBe("pharmacy_problem");
     expect(resultStateFor("follow_up_required")).toBe("follow_up_needed");
     expect(resultStateFor("denied")).toBe("follow_up_needed");
   });
@@ -164,6 +168,21 @@ describe("renew -> verify -> check-in", () => {
       fieldErrors: { phq9_3: expect.any(String), pregnancy: expect.any(String) },
     });
     expect(await eventCount()).toBe(before);
+  });
+
+  it("check-in is refused until the patient has confirmed a pharmacy", async () => {
+    const out = await submitPatientCheckIn(
+      db.sql,
+      DEMO_PATIENT_ID,
+      renewalId,
+      checkInFromFormData(validAnswers()),
+    );
+    expect(out).toMatchObject({ ok: false, formError: expect.stringMatching(/pharmacy/i) });
+    expect((await getOwnedRenewal(db.sql, DEMO_PATIENT_ID, renewalId))?.status).toBe(
+      "identity_verified",
+    );
+    const [p] = await listPharmacies(db.sql);
+    await confirmPatientPharmacy(db.sql, DEMO_PATIENT_ID, renewalId, p!.id);
   });
 
   it("check-in: valid answers are accepted and the result is under review", async () => {

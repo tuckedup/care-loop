@@ -26,6 +26,17 @@ const verified: DomainEvent = {
   type: "IdentityVerified",
   data: { v: 1, renewalId: R, method: "dob_lastname" },
 };
+const pharmacySelected: DomainEvent = {
+  type: "PharmacySelected",
+  data: {
+    v: 1,
+    renewalId: R,
+    pharmacyId: "1234567",
+    name: "Test Pharmacy (synthetic)",
+    address: "1 Elm Street, Faketown",
+    phone: "(555) 010-0000",
+  },
+};
 const checkedIn: DomainEvent = {
   type: "CheckInSubmitted",
   data: {
@@ -62,7 +73,7 @@ const started = (clinicianId: string): DomainEvent => ({
   type: "ClinicianReviewStarted",
   data: { v: 1, renewalId: R, clinicianId },
 });
-const base = [requested, verified, checkedIn];
+const base = [requested, verified, pharmacySelected, checkedIn];
 const escalatedHistory = [...base, evaluated("ESCALATE"), escalated];
 const autoHistory = [...base, evaluated("AUTO_ELIGIBLE")];
 
@@ -97,6 +108,18 @@ const cmd = {
   }),
 };
 
+/** The queued transmission an approval now appends in the same decision (F048). */
+const queuedEvent: DomainEvent = {
+  type: "RxRenewalQueued",
+  data: {
+    v: 1,
+    renewalId: R,
+    prescriptionId: "rx1",
+    idempotencyKey: "rx-renewal:r1",
+    pharmacyId: "1234567",
+    messageId: "rxmsg-r1",
+  },
+};
 const approvedBy = (clinicianId: string): DomainEvent => ({
   type: "RenewalApproved",
   data: { v: 1, renewalId: R, by: "clinician", clinicianId, autonomyMode: "SHADOW" },
@@ -137,7 +160,7 @@ describe("Approve", () => {
   it("escalated: approves only after the SAME clinician started the review", () => {
     given(reviewAggregate, ...escalatedHistory, started("c1"))
       .when(cmd.approve("c1"))
-      .then([approvedBy("c1")]);
+      .then([approvedBy("c1"), queuedEvent]);
   });
   it("escalated: no prior ClinicianReviewStarted -> rejected", () => {
     given(reviewAggregate, ...escalatedHistory)
@@ -159,10 +182,10 @@ describe("Approve", () => {
   it("non-escalated AUTO_ELIGIBLE: a clinician with an id may approve", () => {
     given(reviewAggregate, ...autoHistory)
       .when(cmd.approve("c1"))
-      .then([approvedBy("c1")]);
+      .then([approvedBy("c1"), queuedEvent]);
     given(reviewAggregate, ...autoHistory, started("c1"))
       .when(cmd.approve("c1"))
-      .then([approvedBy("c1")]);
+      .then([approvedBy("c1"), queuedEvent]);
     given(reviewAggregate, ...autoHistory, started("c1"))
       .when(cmd.approve("c2"))
       .then({ code: "REVIEWER_MISMATCH" });
@@ -231,10 +254,20 @@ describe("Approve", () => {
     };
     given(reviewAggregate, ...escalatedHistory, forgedSystem, started("c1"))
       .when(cmd.approve("c1"))
-      .then([approvedBy("c1")]);
+      .then([approvedBy("c1"), queuedEvent]);
     given(reviewAggregate, ...escalatedHistory, approvedBy("c9"), started("c1"))
       .when(cmd.approve("c1"))
-      .then([approvedBy("c1")]);
+      .then([approvedBy("c1"), queuedEvent]);
+  });
+  it("is refused for EVERY caller when no pharmacy was confirmed (NO_CONFIRMED_PHARMACY)", () => {
+    const noPharmacy = [requested, verified, checkedIn, evaluated("AUTO_ELIGIBLE")];
+    const run = () => decideReview(replay(reviewAggregate, noPharmacy), cmd.approve("c1"));
+    expect(run).toThrow(expect.objectContaining({ code: "NO_CONFIRMED_PHARMACY" }));
+    // after a started review too, and for an escalated renewal
+    const esc = [requested, verified, checkedIn, evaluated("ESCALATE"), escalated, started("c1")];
+    expect(() => decideReview(replay(reviewAggregate, esc), cmd.approve("c1"))).toThrow(
+      expect.objectContaining({ code: "NO_CONFIRMED_PHARMACY" }),
+    );
   });
   it("never emits by:'system', whatever extra fields a caller smuggles in", () => {
     const smuggled = {
@@ -244,7 +277,8 @@ describe("Approve", () => {
     } as unknown as ReviewCommand;
     const out = replay(reviewAggregate, [...escalatedHistory, started("c1")]);
     const events = decideReview(out, smuggled);
-    expect(events).toHaveLength(1);
+    expect(events).toHaveLength(2); // the approval + its queued transmission (F048)
+    expect(events[1]!.type).toBe("RxRenewalQueued");
     expect(events[0]).toMatchObject({
       type: "RenewalApproved",
       data: { by: "clinician", clinicianId: "c1", autonomyMode: "RETRO" },

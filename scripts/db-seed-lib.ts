@@ -5,7 +5,7 @@ import type { Sql } from "postgres";
 import { appendToStream, type AuditContext } from "../src/infra/audit";
 import { handleCommand, loadStream } from "../src/domain/aggregate-handler";
 import { makeEvent } from "../src/domain/events";
-import { approveRenewal, startReview } from "../src/domain/clinician/handlers";
+import { startReview } from "../src/domain/clinician/handlers";
 import { reviewAggregate } from "../src/domain/renewal/review";
 import { streamVersion } from "../src/infra/event-store";
 import { seedFormulary } from "../src/infra/db/formulary-repo";
@@ -165,7 +165,29 @@ async function seedApproval(sql: Sql, patientId: string, renewalId: string, clin
   }
   const actor = { role: "clinician", id: clinicianId } as const;
   if (!(await has("ClinicianReviewStarted"))) await startReview(sql, actor, { renewalId });
-  if (!(await has("RenewalApproved"))) await approveRenewal(sql, actor, { renewalId });
+  if (!(await has("RenewalApproved"))) {
+    // Seed HISTORY: these approvals predate any pharmacy selection or e-prescribing, so they are
+    // written directly (the live Approve command refuses an approval with no confirmed pharmacy,
+    // and a seeded approval must not queue a real send). Live approvals always go through
+    // approveRenewal.
+    const { events, version } = await loadStream(sql, renewalStreamId(renewalId));
+    void events;
+    await appendToStream(
+      sql,
+      renewalStreamId(renewalId),
+      version,
+      [
+        makeEvent("RenewalApproved", {
+          v: 1,
+          renewalId,
+          by: "clinician",
+          autonomyMode: "SHADOW",
+          clinicianId: actor.id,
+        }),
+      ],
+      ctx("seed:RenewalApproved"),
+    );
+  }
 }
 
 async function seedRenewalRequest(sql: Sql, patient: SeedPatient, r: SeedPriorRenewal) {

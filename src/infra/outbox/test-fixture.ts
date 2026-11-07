@@ -73,10 +73,26 @@ export async function readyRenewal(sql: Sql, o: ScenarioOptions = {}) {
       }),
     );
   }
-  const events: Ev[] = [
+  await push(
+    sql,
+    `renewal-${renewalId}`,
     ev("RenewalRequested", { renewalId, patientId, prescriptionId }),
-    ev("IdentityVerified", { renewalId, method: "dob_lastname" }),
-  ];
+  );
+  await readyTail(sql, { renewalId, patientId, prescriptionId }, o);
+  return { renewalId, patientId, prescriptionId };
+}
+
+/**
+ * Everything after RenewalRequested (identity, pharmacy, check-in, evaluation) for a renewal that
+ * was requested elsewhere (e.g. through requestRenewalExclusive).
+ */
+export async function readyTail(
+  sql: Sql,
+  r: { renewalId: string; patientId: string; prescriptionId: string },
+  o: ScenarioOptions = {},
+) {
+  const { renewalId } = r;
+  const events: Ev[] = [ev("IdentityVerified", { renewalId, method: "dob_lastname" })];
   if (!o.noPharmacy) {
     events.push(
       ev("PharmacySelected", {
@@ -114,7 +130,6 @@ export async function readyRenewal(sql: Sql, o: ScenarioOptions = {}) {
     }),
   );
   await push(sql, `renewal-${renewalId}`, ...events);
-  return { renewalId, patientId, prescriptionId };
 }
 
 export const clinician = { role: "clinician", id: "c-1" } as const;

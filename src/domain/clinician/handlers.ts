@@ -6,7 +6,12 @@ import type { AuditContext } from "@/infra/audit";
 import { DomainError } from "../aggregate";
 import { handleCommand, loadStream } from "../aggregate-handler";
 import { rxStreamId } from "../patient/patient";
-import { handleCommandWithOutbox, medicationTransmittable } from "../pharmacy-queue";
+import {
+  findSupersedable,
+  handleCommandWithOutbox,
+  medicationTransmittable,
+} from "../pharmacy-queue";
+import { staleHoursFrom } from "../pharmacy-stall";
 import { renewalStreamId } from "../renewal/renewal";
 import {
   reviewAggregate,
@@ -46,17 +51,30 @@ export function startReview(sql: Sql, actor: Actor, input: { renewalId: string }
   );
 }
 
-export function approveRenewal(
+export async function approveRenewal(
   sql: Sql,
   actor: Actor,
-  input: { renewalId: string; autonomyMode?: Approve["autonomyMode"] },
+  input: {
+    renewalId: string;
+    autonomyMode?: Approve["autonomyMode"];
+    /** Injected clock for the stalled check (callers at the edge pass new Date()). */
+    now?: Date;
+    staleHours?: number;
+  },
 ) {
+  // Earlier renewals of this prescription that are stalled/unconfirmed are SUPERSEDED by this
+  // approval: their CancelRx is queued in the same transaction as this renewal's send.
+  const supersedes = await findSupersedable(sql, input.renewalId, {
+    now: input.now ?? new Date(),
+    staleHours: input.staleHours ?? staleHoursFrom(process.env),
+  });
   const command: Approve = {
     type: "Approve",
     renewalId: input.renewalId,
     clinicianId: actor.id,
     actorRole: actor.role,
     ...(input.autonomyMode ? { autonomyMode: input.autonomyMode } : {}),
+    ...(supersedes.length > 0 ? { supersedes } : {}),
   };
   // F048: RenewalApproved + RxRenewalQueued + the pharmacy outbox row + the audit entry are one
   // transaction.

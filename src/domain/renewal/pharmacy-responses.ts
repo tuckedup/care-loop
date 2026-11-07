@@ -8,6 +8,7 @@ import { appendToStream, type AuditContext } from "@/infra/audit";
 import { withConcurrencyRetry } from "@/infra/event-store";
 import { loadStream } from "../aggregate-handler";
 import { makeEvent, type DomainEvent } from "../events";
+import { FILL_AFTER_SUPERSEDE_CODE } from "../pharmacy-stall";
 import { renewalStreamId } from "./renewal";
 
 const id = z.string().min(1).max(200);
@@ -78,6 +79,10 @@ export interface ResponseInput {
   idempotencyKey: string;
   httpStatus: number;
   body: unknown;
+  /** "cancel" = the answer to a CancelRx (never counts as a transmission of the renewal). */
+  kind?: "send" | "cancel";
+  /** Renewals whose approval superseded this one (read from the store by the consumer). */
+  supersededBy?: readonly string[];
 }
 
 const seenIds = (events: readonly DomainEvent[]): Set<string> => {
@@ -155,11 +160,26 @@ export function decidePharmacyResponse(
         // ...and only if it names this renewal and prescription (no cross-attribution).
         if (
           queued &&
-          !cancelled &&
           (m.renewalId === undefined || m.renewalId === renewalId) &&
           (m.prescriptionId === undefined || m.prescriptionId === queuedRx)
         ) {
-          out.push({ type: "RxFillReceived", data: { v: 1, renewalId, messageId: m.messageId } });
+          if ((input.supersededBy?.length ?? 0) > 0) {
+            // A fill for a SUPERSEDED renewal: record it (it happened) and flag it for a person.
+            // It never re-opens the renewal (filled is terminal) and is never silently ignored.
+            out.push({ type: "RxFillReceived", data: { v: 1, renewalId, messageId: m.messageId } });
+            out.push({
+              type: "PharmacyErrorReceived",
+              data: {
+                v: 1,
+                renewalId,
+                messageId: `${m.messageId}:after-supersede`,
+                code: FILL_AFTER_SUPERSEDE_CODE,
+                retryable: false,
+              },
+            });
+          } else if (!cancelled) {
+            out.push({ type: "RxFillReceived", data: { v: 1, renewalId, messageId: m.messageId } });
+          }
         }
         break;
       case "CancelRx":
@@ -199,7 +219,13 @@ export function decidePharmacyResponse(
   }
   // Accepted by the pharmacy (a clean, non-error answer): the transmission happened, once per
   // idempotency key. A garbled or error answer is NOT a transmission, so its retry still sends.
-  if (outcome.kind === "ok" && accepted && queued && !alreadyTransmitted) {
+  if (
+    outcome.kind === "ok" &&
+    accepted &&
+    queued &&
+    !alreadyTransmitted &&
+    input.kind !== "cancel"
+  ) {
     out.unshift({
       type: "RxRenewalTransmitted",
       data: { v: 1, renewalId, messageId: input.messageId, idempotencyKey: input.idempotencyKey },
@@ -217,7 +243,14 @@ export async function consumePharmacyResponse(
 ): Promise<ConsumeOutcome> {
   return withConcurrencyRetry(async () => {
     const { events: history, version } = await loadStream(sql, renewalStreamId(input.renewalId));
-    const { events, outcome } = decidePharmacyResponse(history, input);
+    const supersededBy = (
+      await sql.unsafe<{ rid: string }[]>(
+        `SELECT data->>'renewalId' AS rid FROM events
+         WHERE type = 'RxRenewalQueued' AND data->'supersedes' @> $1::text::jsonb`,
+        [JSON.stringify([{ renewalId: input.renewalId }])],
+      )
+    ).map((r) => r.rid);
+    const { events, outcome } = decidePharmacyResponse(history, { ...input, supersededBy });
     if (events.length > 0) {
       await appendToStream(
         sql,

@@ -179,29 +179,40 @@ describe("idempotent outcomes and the forced scenario guard (review items 5 and 
       ...over,
     }) as MockPharmacyRequest;
 
-  it("the same idempotency key / messageId gets the SAME answer on every attempt", () => {
+  it("fatal/OK/fill outcomes are stable per key; a retryable error may recover; each (key, attempt) is deterministic", () => {
+    let recovered = 0;
+    let persisted = 0;
     for (const seed of [1, 7, 42, 99]) {
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 200; i++) {
         const base = req({ messageId: `m-${i}` });
-        const first = simulate(
-          seed,
-          { ...base, attempt: 1 } as MockPharmacyRequest,
-          undefined,
-          undefined,
-          `key-${i}`,
-        );
-        for (const attempt of [2, 3, 5]) {
-          const again = simulate(
+        const run = (attempt: number) =>
+          simulate(
             seed,
             { ...base, attempt } as MockPharmacyRequest,
             undefined,
             undefined,
             `key-${i}`,
           );
-          expect(again).toEqual(first);
+        const first = run(1);
+        for (const attempt of [2, 3, 5]) {
+          const again = run(attempt);
+          expect(run(attempt)).toEqual(again); // deterministic per (key, attempt)
+          if (first.httpStatus === 503) {
+            if (again.httpStatus === 503) persisted++;
+            else {
+              recovered++;
+              // the recovered answer is an ordinary success path
+              expect(again.httpStatus).toBe(200);
+              expect(again.messages[0]).toMatchObject({ type: "Status" });
+            }
+          } else {
+            expect(again).toEqual(first); // fatal or OK: identical on every attempt
+          }
         }
       }
     }
+    expect(recovered).toBeGreaterThan(0);
+    expect(persisted).toBeGreaterThan(0);
   });
 
   it("a different idempotency key may differ; the key (not the attempt) drives the stream", () => {

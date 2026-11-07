@@ -13,8 +13,8 @@ import { loadStream } from "@/domain/aggregate-handler";
 import { makeEvent, type DomainEvent } from "@/domain/events";
 import { appendToStream } from "@/infra/audit";
 import { withConcurrencyRetry } from "@/infra/event-store";
-import { checkTransmittable } from "@/domain/pharmacy-queue";
-import { STALLED_CODE } from "@/domain/pharmacy-stall";
+import { checkTransmittable, rxCancelKey } from "@/domain/pharmacy-queue";
+import { SUPERSEDABLE_CODES, UNCONFIRMED_CODE } from "@/domain/pharmacy-stall";
 import { rxStreamId } from "@/domain/patient/patient";
 import { renewalStreamId } from "@/domain/renewal/renewal";
 import { reviewAggregate } from "@/domain/renewal/review";
@@ -75,8 +75,9 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
     // Deterministic duplicate guard: if ANOTHER renewal of this prescription was queued EARLIER and
     // is not settled, this one is refused (dead-lettered with an alert); the earliest queued renewal
     // wins, so two renewals can never both send and never both strand. "Settled" = filled,
-    // cancelled, or a fatal pharmacy error; a STALLED one (accepted, never filled) still counts as
-    // unsettled, so a stalled renewal is never silently duplicated.
+    // cancelled, SUPERSEDED by a newer approval (its CancelRx is queued), or a fatal pharmacy error;
+    // a STALLED / UNCONFIRMED one (accepted, never filled) still counts as unsettled until a
+    // clinician's newer approval supersedes it, so nothing is silently sent twice.
     const earlier = await deps.sql.unsafe(
       `SELECT q.stream_id FROM events q
        WHERE q.type = 'RxRenewalQueued' AND q.data->>'prescriptionId' = $1 AND q.stream_id <> $2
@@ -85,8 +86,11 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
          AND NOT EXISTS (SELECT 1 FROM events d WHERE d.stream_id = q.stream_id
                          AND (d.type IN ('RxFillReceived', 'RxCancelAcknowledged')
                               OR (d.type = 'PharmacyErrorReceived' AND d.data->>'retryable' = 'false'
-                                  AND d.data->>'code' <> $3)))`,
-      [facts.prescriptionId, renewalStreamId(facts.renewalId), STALLED_CODE],
+                                  AND d.data->>'code' <> ALL($3::text[]))))
+         AND NOT EXISTS (SELECT 1 FROM events s WHERE s.type = 'RxRenewalQueued'
+                         AND s.data->'supersedes' @> jsonb_build_array(
+                               jsonb_build_object('renewalId', q.data->>'renewalId')))`,
+      [facts.prescriptionId, renewalStreamId(facts.renewalId), [...SUPERSEDABLE_CODES]],
     );
     if (earlier.length > 0) {
       throw new NonRetryableError(
@@ -168,6 +172,10 @@ export function createTransmitDeadLetterHook(sql: Sql): DeadLetterHook {
             (!e.data.retryable || e.data.messageId === messageId)),
       );
       if (handled) return;
+      // Sent but never confirmed (e.g. a leased message reaped to dead) is NOT "could not be sent".
+      const wasTransmitted = events.some(
+        (e) => e.type === "RxRenewalTransmitted" && e.data.idempotencyKey === m.idempotencyKey,
+      );
       await appendToStream(
         sql,
         renewalStreamId(renewalId),
@@ -177,7 +185,7 @@ export function createTransmitDeadLetterHook(sql: Sql): DeadLetterHook {
             v: 1,
             renewalId,
             messageId,
-            code: DEAD_LETTER_CODE,
+            code: wasTransmitted ? UNCONFIRMED_CODE : DEAD_LETTER_CODE,
             retryable: false,
           }),
         ],
@@ -191,6 +199,130 @@ export function createTransmitDeadLetterHook(sql: Sql): DeadLetterHook {
             attempts: m.attempts,
             error: m.lastError,
           },
+        },
+      );
+    });
+  };
+}
+
+/**
+ * CancelRx for a SUPERSEDED renewal (queued in the same transaction as the newer renewal's send).
+ * Guard: the newer renewal must carry a RxRenewalQueued that supersedes this one with the same
+ * pharmacy and a clinician approval. A renewal that already ended (cancel) needs nothing.
+ */
+export function createCancelHandler(deps: TransmitDeps): OutboxHandler {
+  const doFetch = deps.fetch ?? fetch;
+  const url = new URL(MOCK_PHARMACY_PATH, deps.baseUrl).toString();
+  return async (message) => {
+    const payload = OUTBOX_PAYLOADS["pharmacy.CancelRx"].parse(message.payload);
+    const prefix = `rx-cancel:${payload.renewalId}:`;
+    if (!message.idempotencyKey.startsWith(prefix)) {
+      throw new NonRetryableError("REFUSED: cancel key does not name the renewal");
+    }
+    const newerId = message.idempotencyKey.slice(prefix.length);
+    if (rxCancelKey(payload.renewalId, newerId) !== message.idempotencyKey) {
+      throw new NonRetryableError("REFUSED: malformed cancel key");
+    }
+    const { events: newer } = await loadStream(deps.sql, renewalStreamId(newerId));
+    const supersedes = newer.some(
+      (e) =>
+        e.type === "RxRenewalQueued" &&
+        e.data.supersedes?.some(
+          (s) => s.renewalId === payload.renewalId && s.pharmacyId === payload.pharmacyId,
+        ),
+    );
+    const approved = newer.some((e) => e.type === "RenewalApproved" && e.data.by === "clinician");
+    if (!supersedes || !approved) {
+      throw new NonRetryableError("REFUSED: no clinician-approved renewal supersedes this one");
+    }
+    const { events: old } = await loadStream(deps.sql, renewalStreamId(payload.renewalId));
+    const queued = old.find((e) => e.type === "RxRenewalQueued");
+    if (
+      !queued ||
+      queued.type !== "RxRenewalQueued" ||
+      queued.data.pharmacyId !== payload.pharmacyId
+    ) {
+      throw new NonRetryableError("REFUSED: the renewal was never sent to this pharmacy");
+    }
+    if (old.some((e) => e.type === "RxCancelAcknowledged")) return; // already cancelled
+    const signal = AbortSignal.any([message.signal, AbortSignal.timeout(deps.timeoutMs ?? 10_000)]);
+    let response: Response;
+    try {
+      response = await doFetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": message.idempotencyKey },
+        body: JSON.stringify({
+          type: "CancelRx",
+          messageId: payload.messageId,
+          renewalId: payload.renewalId,
+          prescriptionId: payload.prescriptionId,
+          pharmacyId: payload.pharmacyId,
+          attempt: message.attempt,
+        }),
+        signal,
+      });
+    } catch (e) {
+      throw new PharmacyRetryableError(`pharmacy request failed: ${String(e)}`);
+    }
+    let body: unknown = null;
+    try {
+      const text = await response.text();
+      body = text.length > MAX_RESPONSE_BYTES ? OVERSIZE_BODY : JSON.parse(text);
+    } catch {
+      body = null;
+    }
+    const outcome = await consumePharmacyResponse(
+      deps.sql,
+      {
+        renewalId: payload.renewalId,
+        messageId: payload.messageId,
+        idempotencyKey: message.idempotencyKey,
+        httpStatus: response.status,
+        body,
+        kind: "cancel",
+      },
+      ctxOf("pharmacy:consume-cancel-response"),
+    );
+    if (outcome.kind === "retry") throw new PharmacyRetryableError(outcome.reason);
+    if (outcome.kind === "fatal") throw new NonRetryableError(outcome.reason);
+  };
+}
+
+export const CANCEL_DEAD_LETTER_CODE = "CANCEL_DEAD_LETTERED";
+
+/** A CancelRx that can never be delivered is flagged on the superseded renewal (once per key). */
+export function createCancelDeadLetterHook(sql: Sql): DeadLetterHook {
+  return async (m) => {
+    const payload = OUTBOX_PAYLOADS["pharmacy.CancelRx"].safeParse(m.payload);
+    if (!payload.success) return;
+    const renewalId = payload.data.renewalId;
+    const messageId = `deadletter:${m.idempotencyKey}`;
+    await withConcurrencyRetry(async () => {
+      const { events, version } = await loadStream(sql, renewalStreamId(renewalId));
+      const handled = events.some(
+        (e) =>
+          e.type === "RxCancelAcknowledged" ||
+          (e.type === "PharmacyErrorReceived" && e.data.messageId === messageId),
+      );
+      if (handled) return;
+      await appendToStream(
+        sql,
+        renewalStreamId(renewalId),
+        version,
+        [
+          makeEvent("PharmacyErrorReceived", {
+            v: 1,
+            renewalId,
+            messageId,
+            code: CANCEL_DEAD_LETTER_CODE,
+            retryable: false,
+          }),
+        ],
+        {
+          actor: "outbox-worker",
+          role: "system",
+          action: "pharmacy:cancel-dead-letter",
+          detail: { renewalId, idempotencyKey: m.idempotencyKey, error: m.lastError },
         },
       );
     });

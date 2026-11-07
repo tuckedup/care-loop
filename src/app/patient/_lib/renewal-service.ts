@@ -7,6 +7,9 @@ import type { Sql } from "postgres";
 import { z } from "zod";
 import { DomainError } from "@/domain/aggregate";
 import { CheckInAnswersSchema, FREE_TEXT_MAX, type CheckInAnswers } from "@/domain/events";
+import { loadStream } from "@/domain/aggregate-handler";
+import { selectedPharmacyId } from "@/domain/pharmacy-selection";
+import { renewalStreamId } from "@/domain/renewal/renewal";
 import { isInFlight, staleHoursFrom } from "@/domain/pharmacy-stall";
 import { RenewalConflictError, requestRenewalExclusive } from "@/domain/renewal/exclusive-request";
 import { submitCheckIn, verifyIdentity } from "@/domain/renewal/handlers";
@@ -90,7 +93,8 @@ export function nextStepFor(status: string): NextStep {
   return "result";
 }
 
-export type ResultState = "approved" | "under_review" | "follow_up_needed" | "pharmacy_problem";
+export type ResultState =
+  "approved" | "approved_waiting" | "under_review" | "follow_up_needed" | "pharmacy_problem";
 
 /**
  * Maps the rx_status projection value to what the patient sees. Anything not explicitly known
@@ -99,6 +103,8 @@ export type ResultState = "approved" | "under_review" | "follow_up_needed" | "ph
 export function resultStateFor(status: string): ResultState {
   switch (status) {
     case "approved":
+      // An approval with no RxRenewalQueued behind it: never tell the patient it was sent.
+      return "approved_waiting";
     case "queued":
     case "transmitted":
     case "pharmacy_status":
@@ -295,6 +301,12 @@ export async function submitPatientCheckIn(
   }
   const parsed = CheckInAnswersSchema.safeParse(answers);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsOf(parsed.error) };
+  // A renewal is never checked in without a confirmed pharmacy (it is what gets the Rx sent), so a
+  // clinician never meets an approval that has nowhere to go.
+  const { events: renewalEvents } = await loadStream(sql, renewalStreamId(renewalId));
+  if (selectedPharmacyId(renewalEvents) === null) {
+    return { ok: false, fieldErrors: {}, formError: "Please confirm your pharmacy first." };
+  }
   try {
     await submitCheckIn(
       sql,
