@@ -479,5 +479,32 @@ Status: accepted for the demo. All data is synthetic. Implementer choices below 
   messages, so the Filled assertions need `MOCK_PHARMACY_FORCE=retry-then-fill` and are skipped
   without it.
 - **Eval page.** `/admin/evals` reads `evals/results/latest.json` (and `live-latest.json` if it
-  exists) with Zod; a missing or malformed file shows an explicit state. TODO (F069): include the
-  results files in the Vercel server bundle.
+  exists) with Zod; a missing or malformed file shows an explicit state. F069: `outputFileTracingIncludes`
+  in next.config.ts includes `evals/results/*.json` in the server bundle for `/admin/evals` (checked by a
+  config test and a local build; not verified on Vercel).
+
+### F069 - Vercel config and production hardening
+
+- **Crons.** `vercel.json` schedules /api/cron/outbox, /decisions and /visits once a day so the file deploys on
+  a Hobby plan (more frequent expressions need Pro). Every route checks `Authorization: Bearer $CRON_SECRET`
+  (constant time, unset secret gives 401) and Vercel sends that header itself when the variable is set. With
+  daily crons the outbox drains rarely; Pro-plan schedules are in the README. Not deployed or verified on Vercel.
+- **Demo auth in production is default deny.** `demoAuthEnabled()` (src/infra/auth/production-guards.ts) is true
+  in a production build only when DEMO_AUTH_ENABLED is exactly `true`. Off: /login shows a disabled notice, the
+  switchRole action redirects, and `getSession` ignores any demo cookie (a previously issued cookie stops
+  working). Outside production it is on unless set to `false`. The Playwright webServer sets it to `true`
+  because CI runs the e2e suite against `pnpm build && pnpm start`.
+- **SESSION_SECRET.** `getSecret` now also rejects, in production only, any value starting with the
+  .env.example placeholder prefix; missing or short secrets were already rejected. A null secret means nothing
+  can be signed or verified (fail closed) and the login action redirects with a not-configured error.
+- **Rate limiting.** In-memory fixed window per (route, IP) in src/infra/rate-limit.ts: mock pharmacy 120/min,
+  cron routes 30/min (before the secret check), login 20/min (LOGIN_RATE_LIMIT_PER_MIN overrides it; the e2e
+  server raises it because every spec signs in from one address). Per instance and best effort: serverless
+  instances do not share counters, cold starts reset them, and x-forwarded-for is only trustworthy behind a
+  proxy that sets it (the rightmost entry is used). The outbox worker calls the mock pharmacy from one egress
+  address, so a drain of more than 120 sends in a minute would see 429 responses (retried like any error).
+- **Headers.** CSP is enforced (CSP_REPORT_ONLY=true switches it to report-only at build time). script-src keeps
+  `'unsafe-inline'` because no nonce middleware exists; dev adds `'unsafe-eval'`. A nonce-based CSP is a known
+  improvement, not done.
+- **Pooler.** postgres.js runs with `prepare: false`; no LISTEN/NOTIFY and no session advisory locks exist (the
+  event store uses a row lock in a transaction). Never tried against a real Supabase pooler.

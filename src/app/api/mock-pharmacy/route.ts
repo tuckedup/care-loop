@@ -1,3 +1,4 @@
+import { enforceRateLimit, LIMITS } from "@/infra/rate-limit";
 import { forcedScenario, MockPharmacyRequestSchema, simulate } from "./simulate";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,9 @@ function currentSeed(): number {
  * Callers must send an Idempotency-Key header (the outbox worker passes the outbox key).
  */
 export async function POST(request: Request): Promise<Response> {
+  // Per-instance best-effort throttle (see src/infra/rate-limit.ts).
+  const limited = enforceRateLimit(request, "mock-pharmacy", LIMITS.mockPharmacy);
+  if (limited) return limited;
   const text = await request.text();
   if (Buffer.byteLength(text) > MAX_BODY_BYTES) {
     return Response.json({ error: "payload_too_large" }, { status: 413 });

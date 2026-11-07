@@ -87,16 +87,65 @@ yourself; that path has never been exercised against the real API by this repo.
 
 ### Environment variables
 
-| Variable                                                                          | Purpose                                                                                                                      |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                                                    | Postgres connection string (default matches docker-compose)                                                                  |
-| `SESSION_SECRET`                                                                  | Signs the demo-auth cookie; at least 32 characters                                                                           |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                            | Enable the live AI path; empty means fixtures only and the AI path fails closed                                              |
-| `LANGFUSE_*`, `RESEND_API_KEY`                                                    | Optional tracing and email, skipped when unset                                                                               |
-| `REFILL_LIMIT`, `SAMPLE_RATE`, `SEED`                                             | Business config (refill limit, retrospective sampling share, deterministic seed)                                             |
-| `CRON_SECRET`, `DEMO_AUTH_ENABLED`, `PHARMACY_STALE_HOURS`, `NEXT_DIST_DIR`, etc. | Deployment and hardening settings, documented with the others in [Deploying](#deploying-to-vercel-not-deployed-by-this-repo) |
+`.env.example` is the template (placeholders only, no secrets). Never create or commit a real `.env`.
 
-See [.env.example](.env.example) for the full list and comments.
+| Variable                                                                            | Purpose                                                                                                                                      |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                      | Postgres connection string (default matches docker-compose; use the Supabase pooler URL when deployed)                                       |
+| `SESSION_SECRET`                                                                    | Signs the demo-auth cookie; at least 32 characters. In production the `.env.example` placeholder is refused and sessions fail closed         |
+| `DEMO_AUTH_ENABLED`                                                                 | Production only: the role switcher works only when this is exactly `true` (default deny)                                                     |
+| `CRON_SECRET`                                                                       | Bearer secret for `/api/cron/*`; unset means those routes return 401. Vercel Cron sends it automatically as `Authorization: Bearer <value>`  |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                              | Enable the live AI path; empty means fixtures only and the AI path fails closed                                                              |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `RESEND_API_KEY`     | Optional tracing and email, skipped when unset                                                                                               |
+| `REFILL_LIMIT`, `SAMPLE_RATE`, `SEED`                                               | Business config (refill limit, retrospective sampling share, deterministic seed)                                                             |
+| `PHARMACY_STALE_HOURS`                                                              | Hours before an accepted but unfilled renewal is flagged as stalled (default 72; a demo value, TODO: source needed)                          |
+| `NEXT_DIST_DIR`                                                                     | Alternate Next build directory so parallel dev servers and e2e runs do not share a cache                                                     |
+| `LOGIN_RATE_LIMIT_PER_MIN`, `CSP_REPORT_ONLY`                                       | Optional hardening knobs: login budget per IP (default 20; e2e only) and shipping the CSP as report-only                                     |
+| `MOCK_PHARMACY_FORCE`, `RISK_FIXTURE`, `SUMMARY_FIXTURE`, `VISIT_CLOCK_OFFSET_DAYS` | Dev and test only, **never set in production**: scripted e2e behaviour. Each is ignored unless `NODE_ENV` is exactly `development` or `test` |
+
+## Security posture
+
+HIPAA-aligned design, synthetic data. This is a demo, not a hardened production system.
+
+- Demo auth: a role switcher issues an HMAC-signed, httpOnly cookie. Anyone can pick any role, so it is
+  labelled "demo auth" in the UI. In a production build it is off unless `DEMO_AUTH_ENABLED=true`; with
+  it off, `/login` shows a disabled notice and no demo cookie is honoured. RBAC is enforced server-side.
+- Production guards (fail closed): a missing, short or `.env.example`-placeholder `SESSION_SECRET` makes
+  every session invalid and the switcher refuses to mint one. The dev and test switches above are ignored.
+- Security headers on every path: Content-Security-Policy (script-src needs `'unsafe-inline'` because the
+  App Router emits inline bootstrap scripts without a nonce middleware; everything else is locked down,
+  `frame-ancestors 'none'`), X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy,
+  HSTS in production, no `X-Powered-By`.
+- Rate limits: `/api/mock-pharmacy` (120 per minute per IP), the three cron routes (30 per minute, applied
+  before the secret check) and the login action (20 per minute). They are in-memory and **per instance,
+  best effort**: each serverless instance counts separately and a cold start resets the counters.
+- Known remaining gaps are listed under Known limitations and in [docs/DECISIONS.md](docs/DECISIONS.md).
+
+## Deploying to Vercel (not deployed by this repo)
+
+Nothing in this repo deploys itself and no deployment was made. If you deploy it yourself:
+
+1. Create a Postgres database (for example Supabase) and run `pnpm db:migrate` and `pnpm db:seed` against it
+   from your machine. Set `DATABASE_URL` in the Vercel project.
+2. Set `SESSION_SECRET` (long random string), `CRON_SECRET` (long random string) and, only if you accept
+   that anyone can pick a role, `DEMO_AUTH_ENABLED=true`. Add `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL`
+   only if you want the live AI path (untested by this repo); without them renewals escalate.
+3. `vercel.json` registers three crons: `/api/cron/outbox`, `/api/cron/decisions` and `/api/cron/visits`.
+   When `CRON_SECRET` is set, Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` automatically; each
+   route returns 401 without it. The committed schedules are once a day (05:00, 05:10 and 05:20 UTC)
+   because Hobby plans only allow daily cron jobs and a more frequent expression fails the deployment.
+   On a Pro plan change them in `vercel.json` to something like `* * * * *` for the outbox,
+   `*/5 * * * *` for decisions and `*/15 * * * *` for visits. With daily crons the outbox drains rarely;
+   the check-in action still evaluates a renewal immediately, but pharmacy transmission waits for the
+   next cron, or for any scheduler you point at the route with the bearer secret.
+4. `next.config.ts` sets the security headers and `outputFileTracingIncludes` so `/admin/evals` can read
+   `evals/results/*.json` from the serverless bundle.
+
+Supabase pooler notes: use the transaction-mode pooler URL. The client sets `prepare: false` (prepared
+statements are not supported in transaction mode) and a small pool. The app uses no LISTEN/NOTIFY and no
+session-level advisory locks; the event store serialises appends with a row lock inside one transaction,
+which is pooler safe. Run migrations over a direct or session connection. This has not been tried
+against a real Supabase pooler.
 
 ## Session ritual (how this repo is built)
 
@@ -151,10 +200,10 @@ it drifts from `evals/results/latest.json`.
 | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Run mode                               | fixtures (fixtures: synthetic-handwritten)                                                       |
 | Live model run                         | no                                                                                               |
-| Cases                                  | 150                                                                                              |
-| Risk cases                             | 85                                                                                               |
-| Cases that exercise the AI path        | 95                                                                                               |
-| Cases labelled ESCALATE                | 110                                                                                              |
+| Cases                                  | 153                                                                                              |
+| Risk cases                             | 88                                                                                               |
+| Cases that exercise the AI path        | 98                                                                                               |
+| Cases labelled ESCALATE                | 113                                                                                              |
 | Escalation recall (gated set)          | 100.0%                                                                                           |
 | Unsafe approvals                       | 0                                                                                                |
 | Auto-approve precision                 | 100.0%                                                                                           |
@@ -163,7 +212,7 @@ it drifts from `evals/results/latest.json`.
 | Citation validity                      | 100.0%                                                                                           |
 | AI-blocked cases / LLM calls on them   | 6 / 0                                                                                            |
 | Known-limitation probes (not gated)    | 3 probes the system still misses                                                                 |
-| Escalation recall including the probes | 97.3% (3 missed of 113 SPEC-labelled escalations)                                                |
+| Escalation recall including the probes | 97.4% (3 missed of 116 SPEC-labelled escalations)                                                |
 | Summary judge (fixture judgments)      | 15 cases, 8 judged, 7 fail-closed; hallucinations 3 major / 1 minor, omissions 4 major / 1 minor |
 | Gate                                   | pass                                                                                             |
 
@@ -177,9 +226,9 @@ Source: `evals/results/latest.json` (generated by `evals/run.eval.ts@1.1.0`). Th
   been used. Results demonstrate behaviour and regressions of this pipeline, not model performance.
 - **Eval cases are small, synthetic and hand-labelled** from the SPEC; they are not clinical validation.
   Some labels rest on implementation choices (listed in [docs/MODEL_CARD.md](docs/MODEL_CARD.md)).
-- **Three probes still fail.** `evals/known-limitations/` holds SPEC-labelled escalations the system
-  misses when the model is silent: mania described only in free text, severe side effects described only
-  in free text, and a patient admitting dishonest PHQ-9 answers. Recall over the gated set is 100%;
+- **Known-limitation probes still fail.** `evals/known-limitations/` holds SPEC-labelled escalations the
+  system misses when the model is silent (free-text mania, severe side effects and admitted dishonest
+  PHQ-9 answers, in wordings the phrase lists do not cover; the count is in the results table). Recall over the gated set is 100%;
   the honest figure including the probes is in the results table. In the default SHADOW autonomy mode a
   clinician approves every renewal; in RETRO and SAMPLED modes a model miss on such wording would be sent
   automatically. An owner decision is needed before enabling those modes anywhere real.

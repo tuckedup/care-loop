@@ -15,6 +15,10 @@ export default defineConfig({
   webServer: {
     command: process.env.CI ? "pnpm build && pnpm start" : "pnpm dev",
     url: baseURL,
+    // The demo role switcher is default-deny in production builds (CI runs pnpm build && pnpm start),
+    // so the e2e server must opt in explicitly. The login budget is raised because every spec signs in
+    // from the same address; both values are for this test server only.
+    env: { DEMO_AUTH_ENABLED: "true", LOGIN_RATE_LIMIT_PER_MIN: "10000" },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

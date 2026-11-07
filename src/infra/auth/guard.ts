@@ -3,6 +3,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { demoAuthEnabled } from "./production-guards";
 import { authorize, SESSION_COOKIE, verifySession, type Role, type Session } from "./session";
 
 export class AuthError extends Error {
@@ -16,6 +17,8 @@ export class AuthError extends Error {
 }
 
 export async function getSession(): Promise<Session | null> {
+  // Production default deny: with demo auth switched off no demo cookie is honoured.
+  if (!demoAuthEnabled()) return null;
   const store = await cookies();
   return verifySession(store.get(SESSION_COOKIE)?.value);
 }

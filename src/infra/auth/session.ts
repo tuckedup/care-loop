@@ -2,6 +2,7 @@
 // Format: v1.<base64url(JSON payload)>.<base64url(HMAC over "v1.<payload>")>
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { MIN_SECRET_LENGTH, usableSessionSecret } from "./production-guards";
 
 export const ROLES = ["patient", "clinician", "pharmacist", "admin"] as const;
 export type Role = (typeof ROLES)[number];
@@ -10,7 +11,6 @@ export const SESSION_COOKIE = "careloop_demo_session";
 export const SESSION_VERSION = 1;
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
 const MAX_CLOCK_SKEW_SECONDS = 60;
-const MIN_SECRET_LENGTH = 32;
 
 // Synthetic subject ids, one per demo role.
 export const DEMO_SUBJECTS: Record<Role, string> = {
@@ -29,8 +29,8 @@ export const sessionPayloadSchema = z.object({
 export type Session = z.infer<typeof sessionPayloadSchema>;
 
 export function getSecret(env: Record<string, string | undefined> = process.env): string | null {
-  const s = env.SESSION_SECRET;
-  return s && s.length >= MIN_SECRET_LENGTH ? s : null;
+  // Fail closed: missing/short secrets, and in production the .env.example placeholder, give null.
+  return usableSessionSecret(env);
 }
 
 function mac(data: string, secret: string): Buffer {

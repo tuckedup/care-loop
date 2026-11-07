@@ -29,7 +29,7 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 - Metrics: escalation recall (must be 1.0), auto-approve precision, citation validity (must be 1.0),
   CREOLA-style summary labels from an LLM judge.
-- Snapshot of `evals/results/latest.json` (fixtures mode, `liveModelRun: false`; the README table is generated from the same file and tested against it): 150 cases, of which 85 are risk cases and 95 exercise the AI path (6 are blocked from it with zero LLM calls). Escalation recall is 1.0 over the GATED set (110 escalation-labelled cases) with 0 unsafe approvals. The three non-gated known-limitation probes are still missed, so recall including them is 110/113 SPEC-labelled escalations, about 0.973 (the `knownLimitations` block carries the exact figure). Citation validity is 1.0 over the 28 model-produced signals checked (69 tripwire signals are counted separately). The summary judge ran 15 hand-written cases (8 judged, 7 fail-closed as labelled). These show the pipeline handles those canned responses, not how any real model behaves; no sensitivity or specificity is claimed.
+- Snapshot of `evals/results/latest.json` (fixtures mode, `liveModelRun: false`; the README table is generated from the same file and tested against it): 153 cases, of which 88 are risk cases and 98 exercise the AI path (6 are blocked from it with zero LLM calls). Escalation recall is 1.0 over the GATED set (113 escalation-labelled cases) with 0 unsafe approvals. The three non-gated known-limitation probes are still missed, so recall including them is 113/116 SPEC-labelled escalations, about 0.974 (the `knownLimitations` block carries the exact figure). Citation validity is 1.0 over the 28 model-produced signals checked (86 tripwire signals are counted separately). The summary judge ran 15 hand-written cases (8 judged, 7 fail-closed as labelled). These show the pipeline handles those canned responses, not how any real model behaves; no sensitivity or specificity is claimed.
 - Results: written to `evals/results/latest.json` by `pnpm eval` (synthetic-handwritten fixtures only; see Implementation notes). They show the pipeline handles those canned responses, not how any real model behaves.
 
 ## Known limitations
@@ -189,9 +189,18 @@ than hidden:
   only). After review the detector was extended and they were relabelled to carry
   `LLM_RISK_SIGNAL` as well. `ai-dose-flag-set-model-silent` was relabelled the same way after the
   tripwire gained dose-change phrases.
-- Five probes (passive ideation, buried intent, dose change, pregnancy hint, request for a human, in
-  free text with a silent model) were failing known limitations; after review the tripwire gained
-  phrase families for them and they were promoted into the gated set.
+- Eight probes (passive ideation, buried intent, dose change, pregnancy hint, request for a human,
+  mania, severe side effect, and an admission of clicking zeros, each in free text with a silent
+  model) were failing known limitations; after the two reviews the tripwire gained phrase families
+  for them and they were promoted into the gated set. The mania, side-effect and zeros cases are
+  CLINICAL-INTENT labels where the SPEC rule needs a structured answer (R11 a positive mania
+  screen, R10 the severe flag) that is not given; their `labeledFrom` says so.
+- After the second review the stale layer notes of `ai-passive-hope-not-wake-up`,
+  `ai-buried-si-long-paragraph`, `ai-contradiction-zeros-admits-inaccuracy`, `ai-mania-free-text-no-sleep`,
+  `ai-mania-spending-spree` and `ai-injection-spanish-with-severe-side-effect` were corrected (a
+  tripwire phrase now also matches their text), `ai-side-effect-flag-true-model-silent` was relabelled
+  to carry `LLM_RISK_SIGNAL`, and `scripts/evals-count.test.ts` now fails if a `labeledFrom` claims
+  that no tripwire phrase matches while the tripwire does.
 - Reason-code sets and "which layer catches it" notes are partly implementation-specific; see the
   list below and each case's `labeledFrom`, which says IMPLEMENTATION-SPECIFIC where it applies.
   Cases whose label depends on an implementation choice rather than SPEC text: the three

@@ -2,6 +2,8 @@ import { repairUnfinishedSignings } from "@/domain/visit/handlers";
 import { getSql } from "@/infra/db/client";
 import { isCronAuthorized } from "@/infra/outbox/cron-auth";
 
+import { enforceRateLimit, LIMITS } from "@/infra/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -9,6 +11,9 @@ export const dynamic = "force-dynamic";
  * (a crash between the two appends). Idempotent. Missing/invalid CRON_SECRET => 401 (fail closed).
  */
 export async function GET(request: Request): Promise<Response> {
+  // Per-instance best-effort throttle, applied before the secret check to slow guessing.
+  const limited = enforceRateLimit(request, "cron-visits", LIMITS.cron);
+  if (limited) return limited;
   if (!isCronAuthorized(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }

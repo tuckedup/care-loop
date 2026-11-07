@@ -7,6 +7,12 @@ release schedule in docs/SPEC.md. All data is synthetic.
 
 ### Added (toward v1.0)
 
+- Deploy config and hardening (F069): `vercel.json` crons (daily, Hobby-safe) for the outbox, decisions and
+  visits routes, security headers and a CSP in `next.config.ts`, `outputFileTracingIncludes` for
+  `/admin/evals`, per-instance in-memory rate limits (mock pharmacy, cron routes, login), production guards
+  (placeholder or short `SESSION_SECRET` fails closed, demo auth default-deny via `DEMO_AUTH_ENABLED`),
+  env var and Supabase pooler docs, `scripts/hardening.test.ts`. Nothing was deployed.
+
 - README: what CareLoop is and is not, synthetic-data banner, architecture diagram, run instructions,
   session ritual, commands, verification workflow, known limitations, and an eval results table that
   `scripts/readme-results.ts` regenerates from `evals/results/latest.json` (a test fails on drift).

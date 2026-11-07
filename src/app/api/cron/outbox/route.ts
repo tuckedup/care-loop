@@ -8,10 +8,15 @@ import { sweepStalledRenewals } from "@/infra/outbox/stalled";
 import { mulberry32 } from "@/infra/outbox/rng";
 import { runOnce } from "@/infra/outbox/worker";
 
+import { enforceRateLimit, LIMITS } from "@/infra/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 /** Vercel Cron calls GET with `Authorization: Bearer $CRON_SECRET`. Missing secret => 401. */
 export async function GET(request: Request): Promise<Response> {
+  // Per-instance best-effort throttle, applied before the secret check to slow guessing.
+  const limited = enforceRateLimit(request, "cron-outbox", LIMITS.cron);
+  if (limited) return limited;
   if (!isCronAuthorized(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
