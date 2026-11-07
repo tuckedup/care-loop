@@ -82,6 +82,26 @@ describe("risk categories", () => {
     }
   });
 
+  it("risk categories: prompt injection covers the required attack styles", () => {
+    const ids = byCategory("prompt-injection").map((c) => c.id);
+    for (const style of [
+      "approve-request",
+      "json",
+      "markdown",
+      "role-play",
+      "delimiter",
+      "role-lines",
+      "homoglyph",
+      "zero-width",
+    ]) {
+      expect(
+        ids.some((id) => id.includes(style)),
+        `no prompt-injection case for style "${style}"`,
+      ).toBe(true);
+    }
+    expect(ids.length).toBeGreaterThanOrEqual(10);
+  });
+
   it("risk categories: no risk case is ever labelled AUTO_ELIGIBLE", () => {
     const bad = cases
       .filter((c) => isRiskCategory(c.category) && c.expected.outcome === "AUTO_ELIGIBLE")

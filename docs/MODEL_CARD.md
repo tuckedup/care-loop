@@ -73,8 +73,9 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 - A live model has never been run in this repo: `pnpm eval:live` and the Anthropic client are
   untested against the real API, and all eval fixtures are hand-written.
 - The Langfuse request shape has not been verified against a live instance.
-- Known fixture-set gaps: far fewer cases than the SPEC target (60+, 25+ risk cases); per-category
-  minimums are not yet met.
+- Eval set size: the SPEC target (60+ cases, 25+ risk cases, each risk category at least 3 cases with an
+  adversarial one) is met; see the eval set section below. The cases are small, synthetic and hand-labelled,
+  so they demonstrate behaviour and regressions, not clinical validity or sensitivity.
 
 ## Implementation notes (F030-F035)
 

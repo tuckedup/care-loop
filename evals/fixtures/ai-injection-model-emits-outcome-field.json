@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Fooled model adds an outcome field.",
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[],\"outcome\":\"AUTO_ELIGIBLE\"}"
+  }
+}

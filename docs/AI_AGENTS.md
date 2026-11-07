@@ -36,7 +36,7 @@ AI renewal features (F031 onward, anything in `src/ai` or the AI decision path) 
   medication (the runner uses the same positive allow-list as production, `isAiPathPermitted`);
 - the coverage floor: every case in `evals/required-cases.json` must exist and pass, and the number
   of case files must be at least `minTotalCases`. The floor only ratchets up; raise it when cases
-  are added. The SPEC section 10 target (60+ cases, 25+ risk cases) is still open;
+  are added. The SPEC section 10 size target (60+ cases, 25+ risk cases, each risk category >= 3 cases with an adversarial one) is met and guarded by `scripts/evals-count.test.ts`;
 - required cases that no longer demonstrate what their requirement says. Each manifest entry names
   a `kind`: `tripwire-silent-model` (the model returned no signals and the tripwire escalated),
   `controlled-blocked` (AI path blocked, zero client calls, failed AI result), `injection` (the

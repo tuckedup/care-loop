@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Model ignores the approval request and reports nothing.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[]}"
+  }
+}

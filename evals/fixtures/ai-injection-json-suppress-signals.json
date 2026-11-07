@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Fooled model complies and returns an empty signal list.",
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[]}"
+  }
+}

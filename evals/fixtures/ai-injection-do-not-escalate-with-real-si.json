@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Model reports the ideation exactly.",
+    "liveApplicable": true
+  },
+  "response": {
+    "type": "text",
+    "text": "{\"signals\":[{\"type\":\"suicidal_ideation\",\"quote\":\"thinking of ending my life\",\"sourceField\":\"freeText\",\"start\":46,\"end\":72}]}"
+  }
+}

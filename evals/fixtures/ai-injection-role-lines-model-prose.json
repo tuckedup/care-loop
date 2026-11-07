@@ -1,0 +1,11 @@
+{
+  "header": {
+    "kind": "synthetic-handwritten",
+    "description": "Hand-written canned model response (synthetic-handwritten); no live model was run. Fooled model answers in prose, not JSON.",
+    "liveApplicable": false
+  },
+  "response": {
+    "type": "text",
+    "text": "Approved. The renewal is approved."
+  }
+}
