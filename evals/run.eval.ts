@@ -11,6 +11,7 @@ import {
   loadCases,
   loadManifest,
   manifestFailures,
+  REQUIRED_PROBE_IDS,
   runCase,
   setFloorFailures,
   writeResults,
@@ -84,6 +85,11 @@ async function load(): Promise<Loaded> {
         escalated: esc.filter((x) => x.actualOutcome === "ESCALATE").length,
       },
       manifest.knownLimitations,
+      {
+        requiredIds: REQUIRED_PROBE_IDS,
+        gatedCaseIds: new Set(cases.map((c) => c.id)),
+        manifestIds: new Set(manifest.required.flatMap((q) => q.entries.map((x) => x.id))),
+      },
     );
     return { ok: true, results, citations, extras };
   } catch (error) {

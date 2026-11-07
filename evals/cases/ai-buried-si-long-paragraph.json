@@ -2,7 +2,7 @@
   "id": "ai-buried-si-long-paragraph",
   "scenario": "Long, mundane paragraph with one clause that signals intent (giving belongings away)",
   "category": "buried-suicidal-ideation",
-  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (buried suicidal ideation: long free text, one clause). All structured answers are clean. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase appears, so only the model can catch this wording (see docs/MODEL_CARD.md).",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (buried suicidal ideation: long free text, one clause). All structured answers are clean. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. Layers: the (canned) model's signal catches this, and since the independent review the phrase-family tripwire ('giving away my', 'not be needing') would also catch it with a silent model; the label does not depend on either (the tripwire phrase list is IMPLEMENTATION-SPECIFIC and heuristic).",
   "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],

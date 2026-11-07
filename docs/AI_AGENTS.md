@@ -74,6 +74,12 @@ Further gate requirements (F063-F067 and the independent review):
   `evals/known-limitations` (SPEC-labelled escalations the system misses), the failing ids, and a recall
   that includes them. `escalationRecall` alone is over the gated set. A probe that now escalates
   fails the gate (promote it into `evals/cases`).
+- Manifest and probe ratchets that regenerating pins cannot undo: `REQUIRED_CASE_IDS`
+  (`evals/required-ids.ts`) and `REQUIRED_KIND_MINIMUMS` (`evals/lib.ts`) are committed in code, so
+  removing a required entry or a whole requirement block fails `pnpm eval`; `REQUIRED_PROBE_IDS` must
+  exist as pinned probes unless promoted (same id gated and in the manifest). Raising these is free,
+  lowering them is a reviewed code change; `scripts/evals-count.test.ts` keeps them equal to the
+  manifest. `EVAL_MANIFEST_PATH` and `EVAL_PROBES_DIR` are further guarded test-only overrides.
 - Coverage floors inside the gate (`setFloorFailures`): the committed `HISTORICAL_MIN_TOTAL_CASES`,
   25 risk cases, and every risk category with at least 3 cases including an adversarial one; the
   manifest `minTotalCases` may not be below the historical floor.

@@ -16,7 +16,13 @@ import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { runAiStage } from "../evals/ai-runner";
 import type { JudgeEvalMetrics } from "../evals/judge-metrics";
-import { KNOWN_LIMITATIONS_NOTE, type KnownLimitationsBlock } from "../evals/known-limits-metrics";
+import {
+  KNOWN_LIMITATIONS_NOTE,
+  knownLimitationsGateFailures,
+  type KnownLimitationsBlock,
+} from "../evals/known-limits-metrics";
+import { probePins, runKnownLimitations } from "../evals/known-limits";
+import { REQUIRED_CASE_IDS } from "../evals/required-ids";
 import { computePins, loadExtraPins, serialize } from "./eval-pins";
 import {
   computeMetrics,
@@ -27,6 +33,8 @@ import {
   overridesAllowed,
   loadCases,
   GENERATED_BY,
+  REQUIRED_KIND_MINIMUMS,
+  REQUIRED_PROBE_IDS,
   type CaseResult,
   type CitationStats,
 } from "../evals/lib";
@@ -188,6 +196,7 @@ const goodLimits: KnownLimitationsBlock = {
   escalationRecallIncludingKnownLimitations: 0.9,
   specLabelledEscalations: 30,
   specLabelledEscalationsMissed: 3,
+  missingRequired: [],
   pinFailures: [],
   liveModelRun: false,
 };
@@ -938,5 +947,114 @@ describe("known limitations, coverage floors and judge pins in the gate", () => 
     expect(latest.knownLimitations.count).toBe(latest.knownLimitations.failingIds.length);
     expect(latest.knownLimitations.escalationRecallIncludingKnownLimitations).toBeLessThan(1);
     expect(latest.summaryJudge.liveJudgeRun).toBe(false);
+  });
+});
+
+describe("manifest and probe ratchets (attacks that eval:pins alone cannot repair)", () => {
+  const manifestFile = join(root, "evals", "required-cases.json");
+  const writeManifest = (m: unknown) => {
+    const f = join(mk(), "required-cases.json");
+    writeFileSync(f, JSON.stringify(m, null, 2));
+    return f;
+  };
+  const silentIds = () =>
+    loadManifest()
+      .required.filter((r) => r.kind === "tripwire-silent-model")
+      .flatMap((r) => r.entries.map((e) => e.id));
+
+  it("the committed ratchet matches the manifest and the kind minimums are met", () => {
+    const m = loadManifest();
+    const ids = new Set(m.required.flatMap((r) => r.entries.map((e) => e.id)));
+    expect([...ids].sort()).toEqual([...REQUIRED_CASE_IDS].sort());
+    expect(manifestFailures(m, loadCases(casesSrc), [])).toEqual([]);
+    for (const [kind, min] of Object.entries(REQUIRED_KIND_MINIMUMS)) {
+      const n = m.required.filter((r) => r.kind === kind).reduce((a, r) => a + r.entries.length, 0);
+      expect(n, kind).toBeGreaterThanOrEqual(min);
+    }
+  });
+
+  it("attack: deleting ONE required entry fails pnpm eval (no pin regeneration needed to notice)", async () => {
+    const m = JSON.parse(readFileSync(manifestFile, "utf8"));
+    const victim = silentIds()[0]!;
+    for (const r of m.required)
+      r.entries = r.entries.filter((e: { id: string }) => e.id !== victim);
+    m.required = m.required.filter((r: { entries: unknown[] }) => r.entries.length > 0);
+    const r = await runEval(casesSrc, fixturesSrc, { EVAL_MANIFEST_PATH: writeManifest(m) });
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(new RegExp(`required manifest entry removed: ${victim}`));
+  }, 120_000);
+
+  it("attack: deleting a whole requirement block and regenerating the pins still fails", async () => {
+    const m = JSON.parse(readFileSync(manifestFile, "utf8"));
+    m.required = m.required.filter((r: { kind: string }) => r.kind !== "tripwire-silent-model");
+    const regenerated = computePins(m, loadCases(casesSrc), loadExtraPins());
+    const r = await runEval(casesSrc, fixturesSrc, {
+      EVAL_MANIFEST_PATH: writeManifest(regenerated),
+    });
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/manifest has 0 'tripwire-silent-model' entries; at least 27 required/);
+    expect(r.out).toMatch(/required manifest entry removed/);
+  }, 120_000);
+
+  it("attack: deleting two of the three probes (pins regenerated) fails; promotion is the only way out", async () => {
+    const probesSrc = join(root, "evals", "known-limitations");
+    const keep = mk();
+    cpSync(
+      join(probesSrc, `${REQUIRED_PROBE_IDS[0]}.json`),
+      join(keep, `${REQUIRED_PROBE_IDS[0]}.json`),
+    );
+    const none = await runKnownLimitations(
+      false,
+      { escalationCases: 0, escalated: 0 },
+      probePins(keep),
+      { requiredIds: REQUIRED_PROBE_IDS, gatedCaseIds: new Set(), manifestIds: new Set() },
+      keep,
+    );
+    expect(none.missingRequired).toEqual([REQUIRED_PROBE_IDS[1], REQUIRED_PROBE_IDS[2]]);
+    expect(knownLimitationsGateFailures(none).join()).toMatch(
+      /required known-limitation probe missing \(deleted, not promoted\)/,
+    );
+    // promotion direction: the id exists as a gated case AND in the manifest
+    const promoted = await runKnownLimitations(
+      false,
+      { escalationCases: 0, escalated: 0 },
+      probePins(keep),
+      {
+        requiredIds: REQUIRED_PROBE_IDS,
+        gatedCaseIds: new Set([REQUIRED_PROBE_IDS[1]!, REQUIRED_PROBE_IDS[2]!]),
+        manifestIds: new Set([REQUIRED_PROBE_IDS[1]!, REQUIRED_PROBE_IDS[2]!]),
+      },
+      keep,
+    );
+    expect(promoted.missingRequired).toEqual([]);
+    expect(knownLimitationsGateFailures(promoted)).toEqual([]);
+    // a case that is gated but NOT in the manifest is not a promotion
+    const half = await runKnownLimitations(
+      false,
+      { escalationCases: 0, escalated: 0 },
+      probePins(keep),
+      {
+        requiredIds: REQUIRED_PROBE_IDS,
+        gatedCaseIds: new Set([REQUIRED_PROBE_IDS[1]!, REQUIRED_PROBE_IDS[2]!]),
+        manifestIds: new Set(),
+      },
+      keep,
+    );
+    expect(half.missingRequired.length).toBe(2);
+  }, 120_000);
+
+  it("process level: a probes directory missing required probes fails pnpm eval", async () => {
+    const probes = mk();
+    const r = await runEval(casesSrc, fixturesSrc, { EVAL_PROBES_DIR: probes });
+    expect(r.status).not.toBe(0);
+    expect(r.out).toMatch(/required known-limitation probe missing/);
+  }, 120_000);
+
+  it("the probe floor ids exist as pinned probes today", () => {
+    const pins = new Set((loadManifest().knownLimitations ?? []).map((p) => p.id));
+    for (const id of REQUIRED_PROBE_IDS) {
+      expect(readdirSync(join(root, "evals", "known-limitations"))).toContain(`${id}.json`);
+      expect(pins.has(id), id).toBe(true);
+    }
   });
 });

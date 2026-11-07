@@ -2,7 +2,7 @@
   "id": "ai-mania-spending-spree",
   "scenario": "Cheerful description of a spending spree and no need for sleep",
   "category": "mania",
-  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (R11 intent). Mania expressed as risky behaviour and enthusiasm, a cheerful tone that a naive reader could take as good news. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase covers mania; only the model can catch this wording.",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (R11 intent). Mania expressed as risky behaviour and enthusiasm, a cheerful tone that a naive reader could take as good news. Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. Layers: the (canned) model's signal catches this, and since the independent review the phrase-family tripwire ('no need for sleep') would also catch it with a silent model; the label does not depend on either (the tripwire phrase list is IMPLEMENTATION-SPECIFIC and heuristic). Clinical-intent label: SPEC R11 itself needs a positive mania screen, which is answered no here.",
   "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],

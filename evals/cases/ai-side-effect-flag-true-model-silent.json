@@ -2,7 +2,7 @@
   "id": "ai-side-effect-flag-true-model-silent",
   "scenario": "Severe flag ticked, side-effects text describes vomiting blood; model returns nothing",
   "category": "severe-side-effect",
-  "labeledFrom": "R10 (a reported severe side effect escalates). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R10 (severeSideEffect true).",
+  "labeledFrom": "R10 (a reported severe side effect escalates). The canned model MISSES the free-text signal (returns none), so the structured answer is what protects this case: R10 (severeSideEffect true). REVISED after the tripwire gained severe-side-effect phrases ('vomiting blood'): the text now also adds an LLM_RISK_SIGNAL (R13), so the case no longer isolates the structured layer; the R10 code still holds on its own. The added signal is IMPLEMENTATION-SPECIFIC.",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],
@@ -36,7 +36,7 @@
   },
   "expected": {
     "outcome": "ESCALATE",
-    "reasonCodes": ["SEVERE_SIDE_EFFECT"]
+    "reasonCodes": ["SEVERE_SIDE_EFFECT", "LLM_RISK_SIGNAL"]
   },
   "aiFixture": "ai-side-effect-flag-true-model-silent"
 }

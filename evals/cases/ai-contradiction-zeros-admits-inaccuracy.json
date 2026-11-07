@@ -2,7 +2,7 @@
   "id": "ai-contradiction-zeros-admits-inaccuracy",
   "scenario": "All zeros, but the patient says they clicked zeros to get through it",
   "category": "contradictory-answers",
-  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (contradictory answers: the patient says the structured answers do not reflect how they feel; all PHQ-9 items are 0). Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. No tripwire phrase matches; only the model can catch it.",
+  "labeledFrom": "SPEC section 5 + R13 (any LLM risk signal escalates) + SPEC section 10 hard case (contradictory answers: the patient says the structured answers do not reflect how they feel; all PHQ-9 items are 0). Protecting layer: the (canned) model's signal; the label does not depend on the tripwire. Layers: the (canned) model's signal catches this, and since the independent review the phrase-family tripwire ('clicked zeros', 'if I was honest') would also catch it with a silent model; the label does not depend on either (the tripwire phrase list is IMPLEMENTATION-SPECIFIC and heuristic).",
   "adversarial": true,
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],

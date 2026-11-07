@@ -134,6 +134,40 @@ export const FAMILY_LEXICON: readonly LexiconEntry[] = [
     type: "suicidal_ideation",
     re: /\b(?:won'?t|will not) (?:be )?need(?:ing)? (?:them|it|any ?more)\b/g,
   },
+  // Signs of mania described in free text (R11 intent; the structured screen stays the rule).
+  { type: "mania_symptoms", re: /\bbarely (?:slept|sleeping)\b/g },
+  { type: "mania_symptoms", re: /\b(?:haven'?t|have not) slept\b/g },
+  { type: "mania_symptoms", re: /\bnot tired at all\b/g },
+  { type: "mania_symptoms", re: /\b(?:my )?(?:mind|thoughts) (?:is|are) racing\b/g },
+  { type: "mania_symptoms", re: /\bracing thoughts\b/g },
+  { type: "mania_symptoms", re: /\bno need (?:for|to) sleep\b/g },
+  { type: "mania_symptoms", re: /\b(?:don'?t|do not) need (?:any )?sleep\b/g },
+  // Severe side effects described in free text (R10 intent; the structured flag stays the rule).
+  {
+    type: "severe_side_effect",
+    re: /\b(?:lips?|face|tongue|throat) (?:\w+ )?(?:swollen|swelling)\b/g,
+  },
+  {
+    type: "severe_side_effect",
+    re: /\b(?:swollen|swelling (?:of|in|around)?) (?:the |my )?(?:lips?|face|tongue|throat)\b/g,
+  },
+  { type: "severe_side_effect", re: /\bhives\b/g },
+  { type: "severe_side_effect", re: /\b(?:trouble|difficulty) breathing\b/g },
+  { type: "severe_side_effect", re: /\b(?:can'?t|cannot|can not) breathe\b/g },
+  { type: "severe_side_effect", re: /\b(?:spreading rash|rash spreading)\b/g },
+  { type: "severe_side_effect", re: /\bchest pain\b/g },
+  { type: "severe_side_effect", re: /\b(?:passed out|vomiting blood|seizures?)\b/g },
+  // The patient says their questionnaire answers were not honest (contradictory answers).
+  { type: "other_safety_concern", re: /\bclicked (?:all )?(?:zeros?|0s)\b/g },
+  {
+    type: "other_safety_concern",
+    re: /\b(?:did ?n'?t|did not|wasn'?t|was not) (?:answer|answering) (?:honestly|truthfully)\b/g,
+  },
+  {
+    type: "other_safety_concern",
+    re: /\b(?:lied|lying) (?:on|in|about) (?:the|those|these|my) (?:questions?|quiz|survey|answers?)\b/g,
+  },
+  { type: "other_safety_concern", re: /\bif i (?:was|were) (?:being )?(?:really )?honest\b/g },
 ];
 
 const BS = String.fromCharCode(92) + "b"; // the regex word-boundary token, written as text

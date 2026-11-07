@@ -1,0 +1,43 @@
+{
+  "id": "limit-mania-paraphrase-silent-model",
+  "scenario": "Mania described in other words; model silent",
+  "category": "mania",
+  "adversarial": true,
+  "labeledFrom": "R11 intent (signs of mania escalate; CLINICAL-INTENT label, the SPEC screen is answered no) + R13. KNOWN LIMITATION, not a passing case: the label is what the SPEC intent requires, but the canned model returns no signal and no tripwire phrase or structured answer covers this PARAPHRASE, so the system AUTO_ELIGIBLEs. It documents that the phrase families are small lists: other wordings of the same risks stay uncovered. Kept out of evals/cases so the gate stays honest; scripts/evals-count.test.ts asserts that it STILL fails.",
+  "input": {
+    "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "gad7": [0, 0, 0, 0, 0, 0, 0],
+    "sideEffects": "",
+    "severeSideEffect": false,
+    "pregnancy": "no",
+    "maniaScreen": false,
+    "freeText": "Feeling unstoppable lately, I only need a couple of hours of rest, so many plans, and I bought three cars on a whim.",
+    "requestedHuman": false,
+    "requestedChange": "none"
+  },
+  "med": {
+    "rxcui": "4493",
+    "name": "fluoxetine",
+    "doseMg": 20,
+    "frequency": "daily",
+    "controlledSchedule": null,
+    "formularyId": "fluoxetine"
+  },
+  "history": {
+    "identityVerified": true,
+    "activeOrder": {
+      "status": "active",
+      "intent": "order",
+      "rxcui": "4493"
+    },
+    "renewalsSinceLastVisit": 0,
+    "refillLimit": 2,
+    "priorPhq9Total": null,
+    "monitoring": null
+  },
+  "expected": {
+    "outcome": "ESCALATE",
+    "reasonCodes": ["LLM_RISK_SIGNAL"]
+  },
+  "aiFixture": "ai-benign-no-signals"
+}

@@ -2,14 +2,44 @@
 // the system is known to miss. They are NOT part of the gated set; this runner reports them in
 // latest.json (knownLimitations) so the headline recall cannot hide them, and flags any probe that
 // now escalates as stale (it must be promoted into evals/cases).
+import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runAiStage } from "./ai-runner";
-import { caseHash, committedFixturesDir, loadCases, runCase } from "./lib";
+import {
+  caseHash,
+  committedFixturesDir,
+  loadCases,
+  overrideValue,
+  runCase,
+  type REQUIRED_PROBE_IDS,
+} from "./lib";
+import type { EvalCase } from "./schema";
 import { KNOWN_LIMITATIONS_NOTE, type KnownLimitationsBlock } from "./known-limits-metrics";
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const knownLimitationsDir = () => join(here, "known-limitations");
+export const knownLimitationsDir = () =>
+  overrideValue("EVAL_PROBES_DIR") ?? join(here, "known-limitations");
+
+/** Probes may all be promoted, which leaves the directory empty. */
+export function loadProbes(dir: string = knownLimitationsDir()): EvalCase[] {
+  let files: string[] = [];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+  } catch {
+    return [];
+  }
+  return files.length === 0 ? [] : loadCases(dir);
+}
+
+export interface ProbeFloor {
+  /** Committed REQUIRED_PROBE_IDS. */
+  requiredIds: typeof REQUIRED_PROBE_IDS;
+  /** Ids of the loaded gated cases (evals/cases). */
+  gatedCaseIds: ReadonlySet<string>;
+  /** Ids listed in the manifest. */
+  manifestIds: ReadonlySet<string>;
+}
 
 export interface PinEntry {
   id: string;
@@ -36,16 +66,17 @@ export function comparePins(
 }
 
 export function probePins(dir: string = knownLimitationsDir()): PinEntry[] {
-  return loadCases(dir).map((c) => ({ id: c.id, sha256: caseHash(c, committedFixturesDir()) }));
+  return loadProbes(dir).map((c) => ({ id: c.id, sha256: caseHash(c, committedFixturesDir()) }));
 }
 
 export async function runKnownLimitations(
   live: boolean,
   gated: { escalationCases: number; escalated: number },
   pinned: readonly PinEntry[] | undefined,
+  floor: ProbeFloor,
   dir: string = knownLimitationsDir(),
 ): Promise<KnownLimitationsBlock> {
-  const probes = loadCases(dir);
+  const probes = loadProbes(dir);
   const failingIds: string[] = [];
   const staleIds: string[] = [];
   let probesEscalated = 0;
@@ -59,6 +90,10 @@ export async function runKnownLimitations(
       failingIds.push(c.id);
     }
   }
+  const have = new Set(probes.map((c) => c.id));
+  const missingRequired = floor.requiredIds.filter(
+    (id) => !have.has(id) && !(floor.gatedCaseIds.has(id) && floor.manifestIds.has(id)),
+  );
   const total = gated.escalationCases + probes.length;
   return {
     note: KNOWN_LIMITATIONS_NOTE,
@@ -72,6 +107,7 @@ export async function runKnownLimitations(
       total === 0 ? null : (gated.escalated + probesEscalated) / total,
     specLabelledEscalations: total,
     specLabelledEscalationsMissed: failingIds.length,
+    missingRequired,
     pinFailures: comparePins(
       "known-limitation probe",
       pinned,

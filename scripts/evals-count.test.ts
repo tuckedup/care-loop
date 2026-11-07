@@ -19,6 +19,8 @@ import {
   setFloorFailures,
 } from "../evals/lib";
 import { EvalCaseSchema, RISK_CATEGORIES, isRiskCategory } from "../evals/schema";
+import { detectInjection } from "../src/ai/injection";
+import { detectTripwire } from "../src/ai/tripwire";
 import { ALLOWLISTED_DRUGS } from "../src/domain/formulary";
 
 const root = resolve(__dirname, "..");
@@ -251,27 +253,30 @@ describe("ratchet floors that live in code", () => {
 
 describe("promoted probes and the remaining known limitations", () => {
   const ids = new Set(cases.map((c) => c.id));
-  it("the five phrase-family probes are now gated cases", () => {
+  it("the eight phrase-family probes are now gated cases", () => {
     for (const id of [
       "ai-passive-do-not-wake-up-silent-model",
       "ai-buried-si-giving-away-silent-model",
       "ai-dose-two-instead-of-one-silent-model",
       "ai-pregnancy-prenatal-silent-model",
       "ai-human-text-silent-model",
+      "ai-mania-text-silent-model",
+      "ai-side-effect-text-silent-model",
+      "ai-contradiction-zeros-admission-silent-model",
     ]) {
       expect(ids.has(id), id).toBe(true);
       expect(cases.find((c) => c.id === id)?.expected.outcome).toBe("ESCALATE");
     }
   });
 
-  it("exactly the three harder probes remain documented, pinned and reported in latest.json", () => {
+  it("exactly the three paraphrase probes remain documented, pinned and reported in latest.json", () => {
     const probes = loadCases(join(root, "evals", "known-limitations"))
       .map((c) => c.id)
       .sort();
     expect(probes).toEqual([
-      "limit-contradictory-zeros-admission-silent-model",
-      "limit-mania-text-silent-model",
-      "limit-severe-side-effect-text-silent-model",
+      "limit-mania-paraphrase-silent-model",
+      "limit-severe-side-effect-paraphrase-silent-model",
+      "limit-zeros-admission-paraphrase-silent-model",
     ]);
     const pins = loadManifest().knownLimitations ?? [];
     expect(comparePins("probe", pins, probePins())).toEqual([]);
@@ -288,5 +293,35 @@ describe("promoted probes and the remaining known limitations", () => {
     const actual = loadJudgeCases().map((c) => ({ id: c.id, sha256: judgeCaseHash(c) }));
     expect(pins.length).toBeGreaterThanOrEqual(12);
     expect(comparePins("judge case", pins, actual)).toEqual([]);
+  });
+});
+
+describe("labeledFrom claims about the tripwire are true", () => {
+  const claim =
+    /no tripwire phrase|only the model can catch|tripwire is blind|outside the local detector/i;
+  it("a case that says no tripwire phrase matches really has no tripwire match in its text", () => {
+    const stale = cases
+      .filter((c) => claim.test(c.labeledFrom))
+      .filter(
+        (c) =>
+          detectTripwire({ freeText: c.input.freeText, sideEffects: c.input.sideEffects }).length >
+            0 ||
+          detectInjection({ freeText: c.input.freeText, sideEffects: c.input.sideEffects }).length >
+            0,
+      )
+      .map((c) => c.id);
+    expect(stale).toEqual([]);
+  });
+
+  it("the probes' own 'no tripwire covers this' claim is true too", () => {
+    const limits = loadCases(join(root, "evals", "known-limitations"));
+    const stale = limits
+      .filter(
+        (c) =>
+          detectTripwire({ freeText: c.input.freeText, sideEffects: c.input.sideEffects }).length >
+          0,
+      )
+      .map((c) => c.id);
+    expect(stale).toEqual([]);
   });
 });

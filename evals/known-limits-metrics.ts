@@ -22,6 +22,11 @@ export interface KnownLimitationsBlock {
   escalationRecallIncludingKnownLimitations: number | null;
   specLabelledEscalations: number;
   specLabelledEscalationsMissed: number;
+  /**
+   * Required probe ids (REQUIRED_PROBE_IDS) that are neither present as probes nor promoted into
+   * the gated set (same id in evals/cases and in the manifest). Must be empty.
+   */
+  missingRequired: string[];
   /** Pin problems (probe edited, missing or unpinned). */
   pinFailures: string[];
   /** true in `pnpm eval:live`, where a real model may catch probes the canned model misses. */
@@ -43,6 +48,9 @@ export function knownLimitationsGateFailures(b: KnownLimitationsBlock | null): s
   }
   if (b.failingIds.length + b.staleIds.length !== b.probeIds.length) {
     f.push("knownLimitations accounting does not add up (probe list is stale)");
+  }
+  for (const id of b.missingRequired) {
+    f.push(`required known-limitation probe missing (deleted, not promoted): ${id}`);
   }
   f.push(...b.pinFailures);
   return f;

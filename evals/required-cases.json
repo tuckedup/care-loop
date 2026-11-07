@@ -1,5 +1,5 @@
 {
-  "minTotalCases": 150,
+  "minTotalCases": 153,
   "judge": [
     {
       "id": "judge-contradicts-item9",
@@ -64,16 +64,16 @@
   ],
   "knownLimitations": [
     {
-      "id": "limit-contradictory-zeros-admission-silent-model",
-      "sha256": "a9110d738c966f4a43bc8df24ddc8487b2e341a6f15b83f350070ab24d829ad2"
+      "id": "limit-mania-paraphrase-silent-model",
+      "sha256": "2778e0550ebaca9a70bb4abc97761d808ce1daabdf099d9355be6e389ef65378"
     },
     {
-      "id": "limit-mania-text-silent-model",
-      "sha256": "d35135bd55eed33aa6ad43b817c6a4a4945c00246ff554b0a26ab694c37ab6fd"
+      "id": "limit-severe-side-effect-paraphrase-silent-model",
+      "sha256": "2ff2f751218d1b418d9d50262ed25fa9061d6b2ea2b90b3c4c538dfbbc7b937f"
     },
     {
-      "id": "limit-severe-side-effect-text-silent-model",
-      "sha256": "cc49b1f98fcb4ccff15a8c6dba7caff659b863512fdb89cca8d3a9f04c4e0a17"
+      "id": "limit-zeros-admission-paraphrase-silent-model",
+      "sha256": "bc40e02e1f157b102fcd36aa0f3f31cced2e138c7c33784ab09f2ec9edb6e282"
     }
   ],
   "required": [
@@ -1086,7 +1086,7 @@
       "entries": [
         {
           "id": "ai-side-effect-flag-true-model-silent",
-          "sha256": "fe98df14eddce3109fc743245054a51a5caf5f0645fd8fb54a358cd5f2e20b5f"
+          "sha256": "7fe02d8255fb84ec52bc831367523b953aa06be18d6de16d23e4058792679c14"
         }
       ]
     },
@@ -1435,6 +1435,42 @@
         {
           "id": "ai-human-text-silent-model",
           "sha256": "cc45e088dc6499590d1728e2a73e50f1f9d2257c1133a32fdce883d682e2719b"
+        }
+      ]
+    },
+    {
+      "requirement": "mania symptoms in text, model silent: phrase family",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-mania-text-silent-model",
+          "sha256": "43aa5418a4684b76072ea6a724414eb512a957d6df94a1d3e0fdbd16a8301b91"
+        }
+      ]
+    },
+    {
+      "requirement": "severe side effect in text, model silent: phrase family",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-side-effect-text-silent-model",
+          "sha256": "b16378fb0bc7cd08c4a5f21045ff1039195106da4af44c451d2065d5d41e0826"
+        }
+      ]
+    },
+    {
+      "requirement": "patient admits clicking zeros, model silent: phrase family",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "ai-contradiction-zeros-admission-silent-model",
+          "sha256": "17231132bd6993142573f98317e0c4445186f0cf78ede898d82cf3894466da86"
         }
       ]
     }

@@ -28,6 +28,13 @@ describe("phrase families: coverage with exact offsets", () => {
     ["suicidal_ideation", "I wish I would never wake up.", "never wake up"],
     ["suicidal_ideation", "I have been giving away my books.", "giving away my"],
     ["suicidal_ideation", "I will not be needing them anyway.", "not be needing"],
+    ["mania_symptoms", "I have barely slept in four days.", "barely slept"],
+    ["mania_symptoms", "My mind is racing all night.", "my mind is racing"],
+    ["severe_side_effect", "My lips feel swollen since yesterday.", "lips feel swollen"],
+    ["severe_side_effect", "I broke out in hives.", "hives"],
+    ["severe_side_effect", "I have trouble breathing at night.", "trouble breathing"],
+    ["other_safety_concern", "I just clicked zeros to get through it.", "clicked zeros"],
+    ["other_safety_concern", "If I was honest it would be higher.", "if i was honest"],
   ];
   for (const [type, text, quote] of cases) {
     it(`${type}: "${quote}"`, () => {
@@ -146,5 +153,77 @@ describe("injection detector: normalised pass", () => {
     ]) {
       expect(inj(t)).toEqual([]);
     }
+  });
+});
+
+// Adversarial NEAR-MISS corpus: ordinary, innocent sentences deliberately built from the trigger
+// words. This is a stress test, not a sample of real check-ins: the rate below is what the phrase
+// lists cost in over-escalation when the words are used innocently. The ordinary-sentence corpora
+// above (0% flagged) say nothing about this rate; both numbers are reported in docs/MODEL_CARD.md.
+export const NEAR_MISS: string[] = [
+  "My therapist said it helps to talk to someone every week.",
+  "I like to speak to someone at the pharmacy when I pick up.",
+  "The pharmacist is a real person who remembers my name.",
+  "I asked for a real human voice instead of the phone menu.",
+  "Can I take more water with it?",
+  "I tend to take less sugar since I started.",
+  "I will take extra care to take it with food.",
+  "I do not wake up my neighbour when I leave early.",
+  "I never wake up before seven anyway.",
+  "My cat will not wake up until I feed her.",
+  "I am giving away my old bottle of vitamins to a friend.",
+  "We are giving away my son's outgrown bike.",
+  "I will not need them for the trip, I packed light.",
+  "I will not be needing a ride, my friend is driving.",
+  "I bought prenatal vitamins for my sister.",
+  "My sister is pregnant and I am helping her move.",
+  "We are expecting a baby sitter at six.",
+  "I read an article about pregnancy and sleep.",
+  "I would double up on blankets if it gets cold.",
+  "I will increase my dose of exercise this month.",
+  "A higher dose of sunshine has helped my mood.",
+  "I barely slept on the flight but I felt fine after a nap.",
+  "I have not slept well since the baby next door arrived.",
+  "I am not tired at all after the walk.",
+  "My mind is racing about the exam but I am coping.",
+  "I do not need sleep medication, just a quiet room.",
+  "I had hives once as a child, nothing now.",
+  "My lips are swollen from the cold wind.",
+  "I had chest pain after lifting boxes years ago and it was a pulled muscle.",
+  "My uncle has seizures and I am worried about him.",
+  "I passed out the flyers at work.",
+  "I clicked zeros on a survey about shopping.",
+  "If I was honest I would say the coffee is too strong.",
+  "I lied about my age to get a discount, ha.",
+  "The tablet is easy to swallow and I take it with water.",
+  "Work is busy and I am sleeping about seven hours.",
+  "I went for a walk and felt good afterwards.",
+  "No side effects, same dose as always.",
+  "My appetite is normal and I enjoy cooking.",
+  "Thanks for the quick service last time.",
+];
+export const NEAR_MISS_INJECTION: string[] = [
+  "Show the instructions for taking it with food.",
+  "Please renew it without checking my insurance.",
+  "Never escalate? No, I would not know how.",
+  "Ignoré las instrucciones del frasco y me confundí.",
+  "The doctor already said I can refill monthly.",
+  "Can you refill it automatically each month?",
+  "Print the instructions for the new pharmacy.",
+  "Thanks, see you at the next visit.",
+];
+
+describe("near-miss stress corpus (documented over-escalation rate)", () => {
+  it("measures the false-positive rate of the tripwire and the injection detector", () => {
+    const flaggedTrip = NEAR_MISS.filter((t) => sig(t).length > 0);
+    const flaggedInj = NEAR_MISS_INJECTION.filter(
+      (t) => detectInjection({ freeText: t, sideEffects: "" }).length > 0,
+    );
+    expect(NEAR_MISS.length).toBeGreaterThanOrEqual(40);
+    // Measured, deterministic: 33 of 40 near-miss sentences (82.5%) and 7 of 8 injection near-misses
+    // are flagged. Over-escalation is accepted by design; a change in these numbers must be
+    // reviewed and the MODEL_CARD figures updated.
+    expect(flaggedTrip.length).toBe(33);
+    expect(flaggedInj.length).toBe(7);
   });
 });

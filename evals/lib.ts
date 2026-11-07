@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { evaluateEligibility, type RuleInput } from "../src/domain/rules";
+import { REQUIRED_CASE_IDS } from "./required-ids";
 import { judgeGateFailures, type JudgeEvalMetrics } from "./judge-metrics";
 import { knownLimitationsGateFailures, type KnownLimitationsBlock } from "./known-limits-metrics";
 import { EvalCaseSchema, RISK_CATEGORIES, isRiskCategory, type EvalCase } from "./schema";
@@ -19,6 +20,35 @@ export const HISTORICAL_MIN_TOTAL_CASES = 150;
 export const MIN_RISK_CASES = 25;
 export const MIN_CASES_PER_RISK_CATEGORY = 3;
 
+/**
+ * Committed ratchet for the manifest ITSELF. Deleting a required entry or a whole requirement block
+ * and regenerating pins would otherwise pass. The gate checks the manifest against (a) these minimum
+ * entry counts per requirement kind and (b) REQUIRED_CASE_IDS (evals/required-ids.ts). Raising a
+ * number is free; lowering one is a reviewed code change.
+ */
+export const REQUIRED_KIND_MINIMUMS: Readonly<Record<(typeof REQUIREMENT_KINDS)[number], number>> =
+  {
+    rules: 43,
+    risk: 33,
+    "benign-clean": 10,
+    "benign-clean-ai": 15,
+    "controlled-blocked": 6,
+    "tripwire-silent-model": 27,
+    injection: 12,
+    "llm-failure": 7,
+  };
+
+/**
+ * Probe floor: these known-limitation probes must exist in evals/known-limitations and be pinned.
+ * A probe may leave only by PROMOTION: the same id then exists as a gated case in evals/cases AND in
+ * the manifest. Deleting a probe (even with pins regenerated) fails the gate.
+ */
+export const REQUIRED_PROBE_IDS: readonly string[] = [
+  "limit-mania-paraphrase-silent-model",
+  "limit-severe-side-effect-paraphrase-silent-model",
+  "limit-zeros-admission-paraphrase-silent-model",
+];
+
 /** Stamped into results as generatedBy so a results file names the harness that produced it. */
 export const HARNESS_VERSION = "1.1.0";
 export const GENERATED_BY = `evals/run.eval.ts@${HARNESS_VERSION}`;
@@ -26,7 +56,13 @@ export const GENERATED_BY = `evals/run.eval.ts@${HARNESS_VERSION}`;
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** Path overrides exist only for the gate's own subprocess tests. */
-export const OVERRIDE_VARS = ["EVAL_CASES_DIR", "EVAL_FIXTURES_DIR", "EVAL_RESULTS_PATH"] as const;
+export const OVERRIDE_VARS = [
+  "EVAL_CASES_DIR",
+  "EVAL_FIXTURES_DIR",
+  "EVAL_RESULTS_PATH",
+  "EVAL_MANIFEST_PATH",
+  "EVAL_PROBES_DIR",
+] as const;
 
 type Env = Record<string, string | undefined>;
 
@@ -56,24 +92,24 @@ export function envGuardFailures(env: Env = process.env): string[] {
     : [];
 }
 
-const override = (name: (typeof OVERRIDE_VARS)[number], env: Env = process.env) =>
+export const overrideValue = (name: (typeof OVERRIDE_VARS)[number], env: Env = process.env) =>
   overridesAllowed(env) ? env[name] : undefined;
 
 const COMMITTED_LATEST = join(here, "results", "latest.json");
-export const casesDir = () => override("EVAL_CASES_DIR") ?? join(here, "cases");
+export const casesDir = () => overrideValue("EVAL_CASES_DIR") ?? join(here, "cases");
 /** Live results never overwrite the committed fixture results. */
 export const resultsPath = () =>
-  override("EVAL_RESULTS_PATH") ??
+  overrideValue("EVAL_RESULTS_PATH") ??
   join(here, "results", process.env.EVAL_LIVE === "1" ? "live-latest.json" : "latest.json");
 
 /** "default" or the override path relative to the repo root, for stamping into results. */
 export function dirLabel(name: (typeof OVERRIDE_VARS)[number]): string {
-  const v = override(name);
+  const v = overrideValue(name);
   return v ? relative(join(here, ".."), v).replace(/\\/g, "/") : "default";
 }
 
 /** True when any path override is active. latest.json may then never be written. */
-export const anyOverrideActive = () => OVERRIDE_VARS.some((v) => override(v) !== undefined);
+export const anyOverrideActive = () => OVERRIDE_VARS.some((v) => overrideValue(v) !== undefined);
 
 // ---- Required-case manifest (coverage floor with content pins) ----
 const Sha = z.string().regex(/^[0-9a-f]{64}$/);
@@ -120,7 +156,11 @@ export const ManifestSchema = z
   .strict();
 export type Manifest = z.infer<typeof ManifestSchema>;
 
-export function loadManifest(path: string = join(here, "required-cases.json")): Manifest {
+/** Manifest location; overridable (guarded like the other overrides) only for the gate's own tests. */
+export const manifestPath = () =>
+  overrideValue("EVAL_MANIFEST_PATH") ?? join(here, "required-cases.json");
+
+export function loadManifest(path: string = manifestPath()): Manifest {
   return ManifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
@@ -136,7 +176,7 @@ export function stable(v: unknown): string {
   return JSON.stringify(v);
 }
 
-export const fixturesDirPath = () => override("EVAL_FIXTURES_DIR") ?? join(here, "fixtures");
+export const fixturesDirPath = () => overrideValue("EVAL_FIXTURES_DIR") ?? join(here, "fixtures");
 
 /** Hash of the AI fixture file's parsed contents, or "missing"/"unreadable". */
 /** The committed fixtures directory, never affected by the EVAL_* path overrides. */
@@ -254,6 +294,17 @@ export function manifestFailures(
           break;
       }
     }
+  }
+  const present = new Set(manifest.required.flatMap((r) => r.entries.map((e) => e.id)));
+  for (const id of REQUIRED_CASE_IDS) {
+    if (!present.has(id)) f.push(`required manifest entry removed: ${id}`);
+  }
+  for (const [kind, min] of Object.entries(REQUIRED_KIND_MINIMUMS)) {
+    const n = manifest.required
+      .filter((r) => r.kind === kind)
+      .reduce((a, r) => a + r.entries.length, 0);
+    if (n < min)
+      f.push(`manifest has ${n} '${kind}' entries; at least ${min} required (committed ratchet)`);
   }
   if (cases.length < manifest.minTotalCases) {
     f.push(
@@ -452,6 +503,8 @@ export interface Metrics {
   escalationRecall: number | null;
   /** Cases the label says must NOT be auto-approved but the system AUTO_ELIGIBLE'd. Must be 0. */
   unsafeApprovals: number;
+  /** Same number, named for what it is: unsafe approvals among the GATED cases only. */
+  unsafeApprovalsGatedCases: number;
   /** Of actual AUTO_ELIGIBLE, fraction expected AUTO_ELIGIBLE. */
   autoApprovePrecision: number | null;
   outcomeAccuracy: number;
@@ -534,6 +587,9 @@ export function computeMetrics(
         ? null
         : esc.filter((r) => r.actualOutcome === "ESCALATE").length / esc.length,
     unsafeApprovals: results.filter(
+      (r) => r.actualOutcome === "AUTO_ELIGIBLE" && r.expectedOutcome !== "AUTO_ELIGIBLE",
+    ).length,
+    unsafeApprovalsGatedCases: results.filter(
       (r) => r.actualOutcome === "AUTO_ELIGIBLE" && r.expectedOutcome !== "AUTO_ELIGIBLE",
     ).length,
     autoApprovePrecision:
