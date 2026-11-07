@@ -21,10 +21,9 @@ compliance, EPCS certification, a real e-prescribing network, or achieved clinic
   - F059 autonomy modes, F060 retrospective review, F062 retro auto-renew e2e: SAFETY-flagged, need a fresh
     `clinical-safety-reviewer`. Highest-risk hunk: the change to `checkTransmittable` in
     `src/domain/pharmacy-queue.ts` (a system approval stamped RETRO/SAMPLED may now transmit).
-  - F063-F066 (eval harness, 145 cases / 80 risk): safety-flagged; need review including re-deriving a sample
-    of labels from SPEC section 4.
-- **In progress when this was written**: F067 (CREOLA-style judge: `src/ai/judge.ts`, `evals/judge-*.ts`,
-  `evals/fixtures/judge/`, `evals/judge-cases/` are uncommitted/untracked), plus three agents (a safety review
+  - F063-F067 (eval harness, 145 cases / 80 risk, CREOLA-style judge: all COMMITTED, last commit `ef395a3`):
+    safety-flagged; need a fresh review including re-deriving a sample of labels from SPEC section 4.
+- **In progress when this was written**: F067 was finished and committed (`ef395a3`); three agents (a safety review
   of F059/F060/F062, a verifier for F043/F058/F061, the evals builder). Their results will be in the task
   notifications of the session that spawned them, not in the repo. Re-run anything that is not in `git log`.
 - **Not started**: F068 (README + docs complete), F069 (Vercel config + hardening), F070 (v1.0 release gate).
@@ -172,9 +171,9 @@ run but without a further independent safety review of that last delta (recorded
 
 ## 7. What to continue, in order
 
-1. `git status`; commit or discard the uncommitted F067 work after finishing it (judge: Zod schema, injectable
-   client, fail closed => `judge_failed`, fixtures under `evals/fixtures/judge/*`, a test that no `src/app` or
-   `src/domain` module imports the judge, MODEL_CARD note that labels come from fixtures).
+1. `git status` (should be clean apart from `tsconfig.json` if Next touched it: `git checkout tsconfig.json`).
+   F067 is committed. Stale `.rev-tmp*` and `.next-*` directories from reviewers/agents break `pnpm lint` and
+   `pnpm typecheck`: delete them (`rm -rf .rev-tmp* .next-*`) before judging the baseline.
 2. Run `pnpm test`, `pnpm eval`, `pnpm eval:pins -- --check`, typecheck, lint, format on a quiet machine.
 3. Independent review then flip: F059/F060/F062 (fresh `clinical-safety-reviewer`, focus on the transmit gate change
    and the autonomy cross product), F063-F067 (reviewer re-derives a sample of eval labels from SPEC section 4; list
@@ -189,6 +188,16 @@ run but without a further independent safety review of that last delta (recorded
    CHANGELOG v1.0, tell the owner to tag.
 
 ## 8. Known gaps and owner decisions
+
+- **IMPORTANT RISK (eval finding, unresolved):** 8 non-gated probes in `evals/known-limitations/` are labelled
+  ESCALATE from the SPEC but the system returns AUTO_ELIGIBLE: passive ideation ("hope I just do not wake up"),
+  giving belongings away, mania described only in free text, "two instead of one" dose change with the box left
+  at none, "prenatal vitamins", asking for a human in text with the box unticked, swollen lips/rash with the severe
+  box unticked, admitting to clicking zeros on the PHQ-9. Cause: the canned model is silent and no tripwire phrase
+  or structured answer covers the wording, so only a real model could catch it. SHADOW mode (default) still has a
+  clinician approve every renewal; in RETRO/SAMPLED a model miss on such wording leads to AUTO-SEND. Owner decision
+  needed before enabling RETRO/SAMPLED anywhere: broaden deterministic checks, require a live-model eval, or keep
+  auto-approval off. `evals-count.test.ts` asserts each probe still fails so the list cannot go stale.
 
 - Tagging v0.1.0/v0.2.0/v0.3.0 and the git identity used for commits (local config is `tuckedup` /
   `atulpandey231945@gmail.com`).
