@@ -355,3 +355,33 @@ export const auditView = pgTable(
   },
   (t) => [index("audit_view_recorded_idx").on(t.recorded)],
 );
+
+// Projection renewal_metrics (F060/F061): one row per renewal with the facts the admin dashboard
+// and the retrospective review list need (decision time, escalation reasons, auto-approval,
+// sampling and the retro review outcome). Rebuildable from the event log.
+export const renewalMetrics = pgTable(
+  "renewal_metrics",
+  {
+    renewalId: text("renewal_id").primaryKey(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    // approved / denied / follow_up_required (gated like the clinician queue).
+    decision: text("decision"),
+    decidedBy: text("decided_by"),
+    autonomyMode: text("autonomy_mode"),
+    escalated: boolean("escalated").notNull().default(false),
+    reasonCodes: jsonb("reason_codes").notNull().default([]),
+    reviewStarted: boolean("review_started").notNull().default(false),
+    autoApprovedAt: timestamp("auto_approved_at", { withTimezone: true }),
+    sampled: boolean("sampled").notNull().default(false),
+    sampleReason: text("sample_reason"),
+    retroReviewerId: text("retro_reviewer_id"),
+    retroConcur: boolean("retro_concur"),
+    retroReviewedAt: timestamp("retro_reviewed_at", { withTimezone: true }),
+    lastPosition: bigint("last_position", { mode: "bigint" }).notNull().default(sql`0`),
+  },
+  (t) => [
+    index("renewal_metrics_sampled_idx").on(t.sampled, t.autoApprovedAt),
+    index("renewal_metrics_decided_idx").on(t.decidedAt),
+  ],
+);

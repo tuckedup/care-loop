@@ -1,6 +1,11 @@
 import type { Db, StoredEvent } from "@/infra/event-store/types";
 
-export type AnomalyCode = "INVALID_EVENT" | "STREAM_RENEWAL_MISMATCH" | "AUDIT_ENTRY_MISSING";
+export type AnomalyCode =
+  | "INVALID_EVENT"
+  | "STREAM_RENEWAL_MISMATCH"
+  | "AUDIT_ENTRY_MISSING"
+  /** F060: a clinician did not concur with an auto-approval (visible alert on the admin pages). */
+  | "RETRO_NON_CONCURRENCE";
 
 /**
  * Record an event a projection refused to apply. Runs in the projection's transaction, so it
