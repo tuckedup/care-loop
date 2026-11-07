@@ -282,3 +282,11 @@ and approved-not-sent sweeps run only from cron/script (no scheduler config yet:
 two appends (retry converges); audit chain cannot detect a DB superuser rewriting the whole chain + head.
 Use NEXT_DIST_DIR + own DATABASE_URL (..._e2e) + PORT for concurrent e2e. Next.js auto-edits tsconfig.json
 when NEXT_DIST_DIR is set: `git checkout tsconfig.json` afterwards.
+
+## 2026-11-07 — Handoff written
+
+See docs/HANDOFF.md: status snapshot (56/70 flagged), how to run/verify, e2e isolation + env gates, repo map,
+invariants, review workflow and history, ordered continuation plan (finish F067 -> independent reviews of
+F043/F058-F067 -> F068-F070), known gaps/owner decisions, gotchas and a resume prompt.
+In flight at the time: safety review of F059/F060/F062, verifier for F043/F058/F061, evals builder on F067
+(uncommitted src/ai/judge.ts, evals/judge-*, evals/fixtures/judge, evals/judge-cases).
