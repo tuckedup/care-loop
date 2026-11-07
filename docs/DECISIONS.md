@@ -355,15 +355,27 @@ the audit chain is tamper-EVIDENT, not a compliance certification.
 - **Note signing.** `signVisitNote` is allowed only for the clinician the visit was booked with
   (the VisitBooked.clinicianId); a booking without a clinician fails closed. It appends
   VisitNoteSigned + CalendarSlotCreated{slotId,start,end} in one append (visit stream), then
-  FollowUpTaskCreated in `task-fu-<noteId>` (a second append: one stream per append). Every call
+  FollowUpTaskCreated in `task-fu-<visitId>` (a second append: one stream per append; the task id
+  is derived from the visit id, never the note id). Every call
   converges, so a retry after a crash between the two appends still ends with exactly one task and
-  one slot. The follow-up slot is the visit slot shifted by 28 days (synthetic placeholder; TODO: source needed). The note
+  one slot. The follow-up slot is the first FREE grid slot at or after the visit slot shifted by 28 days
+  (synthetic placeholder; TODO: source needed; booked visits and calendar slots count as held).
+  Signing is refused before the visit starts (injected clock). The note
   text is not stored in this demo; the note id is derived from the visit id so a double submit is
   the same note. FHIR Task status is "requested" (visit_schedule projection; no event carries it).
 - **Counter reset.** Nothing new was needed in the rules: renewals-since-last-visit is derived from
   events and a VisitNoteSigned on a visit booked for the patient resets it. An end-to-end test
   proves it with the real R06 path: held at the limit, still held after booking alone, released
   after signing, held again one approval later.
+- **Reset scope (explicit choice).** The count is per patient AND prescription. A visit booked for
+  a renewal (patient follow-up `fu-<renewalId>` or clinician `cv-<renewalId>`) resets the count
+  only for THAT renewal's prescription: attribution looks the renewal up among the patient's
+  requests, and an unknown renewal is not attributable. A visit with no renewal (visit history, as
+  in the seed) is a general visit and resets all of the patient's prescriptions. TODO: clinical
+  confirmation of this scope. A clinician-booked visit also writes its booking into the visit
+  stream (second append after the renewal-side BookVisit; both idempotent, so retrying the action
+  converges) so that note and booking sit in one visit stream. One visit per renewal in either
+  booking order: the second booking is refused (ALREADY_BOOKED).
 - **e2e and the AI step.** With no API key the AI step fails closed (R13 LLM_FAILURE), which
   outranks R06, so a UI run would always escalate. `RISK_FIXTURE=synthetic-handwritten` (honoured
   only when NODE_ENV is exactly development or test, same gate as SUMMARY_FIXTURE) swaps in a

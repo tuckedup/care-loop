@@ -203,19 +203,69 @@ export async function bookClinicianVisit(
   input: { renewalId: string; start: string; end: string },
 ) {
   const visitId = `cv-${input.renewalId}`;
+  const streamId = visitStreamId(visitId);
   const renewal = replay(
     reviewAggregate,
     (await loadStream(sql, renewalStreamId(input.renewalId))).events,
   );
-  const clash = (await allBookedVisits(sql)).some(
-    (b) =>
-      b.visitId === visitId &&
-      (b.patientId !== renewal.patientId || b.renewalId !== input.renewalId),
-  );
-  if (clash || (await loadStream(sql, visitStreamId(visitId))).version > 0) {
+  if (!renewal.requested || renewal.patientId === null) {
+    throw new DomainError("RENEWAL_NOT_FOUND", "renewal not found");
+  }
+  const patientId = renewal.patientId;
+  const all = await allBookedVisits(sql);
+  // One visit per renewal, whichever side booked first: a patient booking (fu-<renewal>) blocks a
+  // clinician booking for the same renewal (ALREADY_BOOKED); the reverse is refused the same way
+  // by bookFollowUpVisit.
+  if (all.some((b) => b.renewalId === input.renewalId && b.visitId !== visitId)) {
+    throw new DomainError("ALREADY_BOOKED", "a visit is already booked for this renewal");
+  }
+  if (
+    all.some(
+      (b) =>
+        b.visitId === visitId && (b.patientId !== patientId || b.renewalId !== input.renewalId),
+    )
+  ) {
     throw new DomainError("VISIT_ID_CONFLICT", "that visit id is already in use");
   }
-  return bookRenewalVisit(sql, actor, { ...input, visitId });
+  // 1. The renewal-side booking (and the denial it implies when not already a follow-up).
+  const result = await bookRenewalVisit(sql, actor, { ...input, visitId });
+  // 2. The booking record in the visit's own stream, so the note can be signed and attributed to
+  //    this patient (note + booking in the same visit stream). Idempotent; a retry of the whole
+  //    action converges if the process dies between the two appends (the renewal side is
+  //    idempotent too). Two appends because appendToStream writes one stream per transaction.
+  await withConcurrencyRetry(async () => {
+    const { events, version } = await loadStream(sql, streamId);
+    if (version > 0) {
+      const existing = replay(visitAggregate, events);
+      if (existing.patientId !== patientId || existing.renewalId !== input.renewalId) {
+        throw new DomainError("VISIT_ID_CONFLICT", "that visit id is already in use");
+      }
+      return null;
+    }
+    return appendToStream(
+      sql,
+      streamId,
+      0,
+      [
+        makeEvent("VisitBooked", {
+          v: 1,
+          visitId,
+          patientId,
+          start: input.start,
+          end: input.end,
+          clinicianId: actor.id,
+          renewalId: input.renewalId,
+        }),
+      ],
+      {
+        actor: actor.id,
+        role: actor.role,
+        action: "clinician:BookVisit.visitStream",
+        detail: { renewalId: input.renewalId, visitId },
+      },
+    );
+  });
+  return result;
 }
 
 async function noteIdUsedElsewhere(db: Reader, noteId: string, streamId: string) {

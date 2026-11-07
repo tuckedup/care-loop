@@ -169,16 +169,17 @@ export function monitoringFrom(
 /** A recorded event with its global position, as read from the store. */
 export interface PositionedEvent<T = unknown> {
   position: bigint;
-  /** Stream the event was read from (visit booking/note attribution); optional for old callers. */
-  streamId?: string;
   data: T;
 }
+
+/** An event together with the stream it was read from (required for visit attribution). */
+export type StreamedEvent<T> = PositionedEvent<T> & { streamId: string };
 
 export interface HistoryFacts {
   requests: PositionedEvent<EventData<"RenewalRequested">>[];
   approvals: PositionedEvent<EventData<"RenewalApproved">>[];
-  visitsBooked: PositionedEvent<EventData<"VisitBooked">>[];
-  notesSigned: PositionedEvent<EventData<"VisitNoteSigned">>[];
+  visitsBooked: StreamedEvent<EventData<"VisitBooked">>[];
+  notesSigned: StreamedEvent<EventData<"VisitNoteSigned">>[];
   /** Check-ins and denials of the patient's renewals (in-flight counting). Optional for tests. */
   checkIns?: PositionedEvent<{ renewalId: string }>[];
   denials?: PositionedEvent<{ renewalId: string }>[];
@@ -202,21 +203,35 @@ export function countRenewalsSinceLastVisit(
 ): number {
   // A note resets the counter only if it was signed in the visit's OWN stream (visit-<visitId>) and
   // that same stream holds a booking for THIS patient. A VisitBooked written elsewhere (for example
-  // a renewal stream with a copied visit id) never vouches for someone else's note.
+  // a renewal stream with a copied visit id) never vouches for someone else's note. A missing or
+  // different stream means "not attributable" (no fallback).
+  //
+  // Scope: a visit booked FOR a renewal resets the count only for that renewal's prescription
+  // (looked up among this patient's requests; unknown renewal => not attributable). A visit with
+  // no renewal (visit history, e.g. seeded) is a general visit and resets all the patient's
+  // prescriptions. TODO: clinical confirmation of this scope.
   const visitStream = (visitId: string) => `visit-${visitId}`;
-  const attributable = new Set(
+  const rxOfRenewal = new Map(
+    facts.requests
+      .filter((r) => r.data.patientId === patientId)
+      .map((r) => [r.data.renewalId, r.data.prescriptionId] as const),
+  );
+  const resetsThisRx = new Set(
     facts.visitsBooked
-      .filter(
-        (v) =>
-          v.data.patientId === patientId &&
-          (v.streamId ?? visitStream(v.data.visitId)) === visitStream(v.data.visitId),
-      )
+      .filter((v) => v.data.patientId === patientId && v.streamId === visitStream(v.data.visitId))
+      .filter((v) => {
+        const renewalId = v.data.renewalId;
+        return renewalId === undefined || rxOfRenewal.get(renewalId) === prescriptionId;
+      })
       .map((v) => v.data.visitId),
   );
   let lastVisit = -1n;
   for (const n of facts.notesSigned) {
-    const inOwnStream = (n.streamId ?? visitStream(n.data.visitId)) === visitStream(n.data.visitId);
-    if (inOwnStream && attributable.has(n.data.visitId) && n.position > lastVisit) {
+    if (
+      n.streamId === visitStream(n.data.visitId) &&
+      resetsThisRx.has(n.data.visitId) &&
+      n.position > lastVisit
+    ) {
       lastVisit = n.position;
     }
   }

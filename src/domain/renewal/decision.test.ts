@@ -95,6 +95,7 @@ describe("history helpers (pure)", () => {
   it("resets on the patient's own VisitNoteSigned only", () => {
     const visit = (visitId: string, patientId: string) => ({
       position: 10n,
+      streamId: `visit-${visitId}`,
       data: {
         v: 1 as const,
         visitId,
@@ -105,6 +106,7 @@ describe("history helpers (pure)", () => {
     });
     const note = (visitId: string, position: bigint) => ({
       position,
+      streamId: `visit-${visitId}`,
       data: { v: 1 as const, visitId, noteId: "n", clinicianId: "c" },
     });
     const own = facts({ visitsBooked: [visit("v1", "p1")], notesSigned: [note("v1", 3n)] });

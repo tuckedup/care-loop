@@ -186,11 +186,14 @@ export async function loadVisitData(sql: Sql, renewalId: string): Promise<VisitD
       }
     });
     for (const b of bookedEvents) {
-      if (b.e.type === "VisitBooked") {
+      // A clinician booking is recorded twice (renewal stream and visit stream): show it once.
+      if (b.e.type !== "VisitBooked") continue;
+      const booked = b.e.data;
+      if (!visits.some((v) => v.visitId === booked.visitId)) {
         visits.push({
-          visitId: b.e.data.visitId,
-          start: b.e.data.start,
-          end: b.e.data.end,
+          visitId: booked.visitId,
+          start: booked.start,
+          end: booked.end,
           eventId: b.id,
         });
       }
