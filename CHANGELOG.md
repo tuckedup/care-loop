@@ -5,6 +5,34 @@ release schedule in docs/SPEC.md. All data is synthetic.
 
 ## [Unreleased]
 
+## v0.2 - rules, AI risk screen, clinician queue
+
+All data is synthetic. Tagging `v0.2.0` is the owner's step (agents do not tag).
+
+### Added
+
+- Deterministic eligibility rules (R01-R13, drug-specific and pipeline checks) as pure functions in
+  `src/domain/rules`. Controlled substances never enter the AI path (a test proves it).
+- AI risk-signal layer (`src/ai`): local tripwire and injection scans, schema-validated LLM
+  extraction that can only ADD escalation signals, fail-closed on any error, timeout or invalid
+  output; eval gate (`pnpm eval`, hand-written synthetic fixtures; no live model run is claimed).
+- Decision pipeline: check-in -> evaluation -> escalate / system-deny / follow-up. No system approval
+  exists in this release: every approval is an attributable clinician decision.
+- `renewal_queue` and `phq9_trend` projections; an escalated renewal completes only through a
+  clinician decision that is attributable to a started review.
+- Clinician UI: queue (escalated first, reason codes), renewal view with PHQ-9 trend, cited AI visit
+  summary (advisory, never an approval), start review / approve / deny / book follow-up.
+- E2E: patient PHQ-9 item 9 >= 1 -> under review -> clinician starts review and approves -> patient
+  sees the approval, then the pharmacy flow (`e2e/item9-escalation.spec.ts`).
+
+### Known limits
+
+- Tripwire lexicon and eval fixtures are non-validated and synthetic-handwritten; the live Anthropic
+  client has not been run against the real service in CI.
+- Demo authentication only. HIPAA-aligned design, synthetic data.
+
+## v0.1 - event store and patient flow
+
 ### Added
 
 - Project scaffold: Next.js App Router, TypeScript strict, Tailwind, Drizzle, Vitest,
