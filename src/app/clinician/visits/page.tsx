@@ -1,3 +1,4 @@
+import { signingNow } from "@/domain/visit/clock";
 import { getSession } from "@/infra/auth/guard";
 import { getSql } from "@/infra/db/client";
 import {
@@ -11,6 +12,9 @@ import { syncProjections } from "../_lib/data";
 export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
+  VISIT_NOT_STARTED: "A note can only be signed once the visit has started.",
+  NOTE_ID_CONFLICT: "That note id is already used by another visit.",
+  TASK_CONFLICT: "A conflicting follow-up task already exists.",
   NOT_VISIT_CLINICIAN: "Only the clinician this visit was booked with can sign its note.",
   VISIT_ALREADY_SIGNED: "This visit already has a signed note.",
   VISIT_NOT_FOUND: "That visit was not found.",
@@ -44,6 +48,7 @@ export default async function VisitsPage({
     listFollowUpTasks(sql),
   ]);
   const canSign = session?.role === "clinician";
+  const now = signingNow(new Date());
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
@@ -84,15 +89,31 @@ export default async function VisitsPage({
                   {v.status === "note_signed" ? "Note signed" : "Booked"}
                 </span>
                 {v.status === "booked" && canSign && v.clinicianId === session?.sub ? (
-                  <form action={signVisitNoteAction}>
-                    <input type="hidden" name="visitId" value={v.visitId} />
-                    <button
-                      type="submit"
-                      className="rounded border border-slate-400 px-3 py-1.5 text-sm font-medium dark:border-slate-600"
-                    >
-                      Sign visit note
-                    </button>
-                  </form>
+                  Date.parse(v.start) <= now.getTime() ? (
+                    <form action={signVisitNoteAction}>
+                      <input type="hidden" name="visitId" value={v.visitId} />
+                      <button
+                        type="submit"
+                        className="rounded border border-slate-400 px-3 py-1.5 text-sm font-medium dark:border-slate-600"
+                      >
+                        Sign visit note
+                      </button>
+                    </form>
+                  ) : (
+                    <span data-testid={`sign-locked-${v.visitId}`} className="text-sm">
+                      <button
+                        type="button"
+                        disabled
+                        aria-describedby={`sign-help-${v.visitId}`}
+                        className="rounded border border-slate-400 px-3 py-1.5 text-sm font-medium opacity-50 dark:border-slate-600"
+                      >
+                        Sign visit note
+                      </button>
+                      <span id={`sign-help-${v.visitId}`} className="ml-2">
+                        Available once the visit has started ({fmt(v.start)}).
+                      </span>
+                    </span>
+                  )
                 ) : null}
               </div>
             </li>

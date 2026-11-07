@@ -22,7 +22,9 @@ describe("server actions: RBAC", () => {
     startReview: async () => void calls.start++,
     approveRenewal: async () => void calls.approve++,
     denyRenewal: async () => void calls.deny++,
-    bookVisit: async () => void calls.book++,
+  }));
+  vi.mock("@/domain/visit/handlers", () => ({
+    bookClinicianVisit: async () => void calls.book++,
   }));
 
   const attempts = async () => {
@@ -34,7 +36,6 @@ describe("server actions: RBAC", () => {
       () =>
         m.bookVisitAction({
           renewalId: "r1",
-          visitId: "v1",
           start: "2026-12-01T10:00:00Z",
           end: "2026-12-01T10:30:00Z",
         }),

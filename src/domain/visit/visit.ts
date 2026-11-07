@@ -10,14 +10,15 @@ import { DomainError, type Aggregate } from "../aggregate";
 import type { DomainEvent } from "../events";
 import { invalidCommand } from "../patient/patient";
 import { ActorRoleSchema } from "../renewal/review";
-import { canonicalInstant, followUpSlotFor, validateSlot } from "./slots";
+import { canonicalInstant, followUpSlotFor, validateGridSlot, validateSlot } from "./slots";
 
 const id = z.string().min(1).max(200);
 
 export const visitStreamId = (visitId: string) => `visit-${visitId}`;
 /** One patient-booked follow-up visit per renewal, so the stream id enforces it. */
 export const followUpVisitId = (renewalId: string) => `fu-${renewalId}`;
-export const followUpSlotId = (noteId: string) => `slot-${noteId}`;
+/** One follow-up slot per visit (not per note id, so ids can never collide across visits). */
+export const followUpSlotId = (visitId: string) => `slot-${visitId}`;
 
 export const BookFollowUpVisitSchema = z.object({
   visitId: id,
@@ -34,6 +35,12 @@ export const SignVisitNoteSchema = z.object({
   noteId: id,
   clinicianId: id,
   actorRole: ActorRoleSchema,
+  /** Injected clock (ISO instant); a note can only be signed once the visit has started. */
+  now: z.iso.datetime({ offset: true }),
+  /** Chosen by the handler (first free grid slot); default is the visit slot + the follow-up gap. */
+  followUp: z
+    .object({ start: z.string().min(1).max(40), end: z.string().min(1).max(40) })
+    .optional(),
 });
 
 export type BookFollowUpVisit = { type: "BookFollowUpVisit" } & z.input<
@@ -142,10 +149,17 @@ export function decideVisit(state: VisitState, command: VisitCommand): DomainEve
         if (state.noteId === c.noteId) return []; // idempotent retry of the same note
         throw new DomainError("VISIT_ALREADY_SIGNED", "this visit already has a signed note");
       }
-      const slot = followUpSlotFor({
-        start: canonicalInstant(state.start),
-        end: canonicalInstant(state.end),
-      });
+      // A signed note resets the refill counter, so it is tied to a visit that has actually begun:
+      // signing before the visit start is refused (the clock is injected, never read here).
+      if (Date.parse(c.now) < Date.parse(state.start)) {
+        throw new DomainError("VISIT_NOT_STARTED", "the visit has not started yet");
+      }
+      const slot = c.followUp
+        ? validateGridSlot(c.followUp.start, c.followUp.end)
+        : followUpSlotFor({
+            start: canonicalInstant(state.start),
+            end: canonicalInstant(state.end),
+          });
       return [
         {
           type: "VisitNoteSigned",
@@ -153,7 +167,7 @@ export function decideVisit(state: VisitState, command: VisitCommand): DomainEve
         },
         {
           type: "CalendarSlotCreated",
-          data: { v: 1, slotId: followUpSlotId(c.noteId), start: slot.start, end: slot.end },
+          data: { v: 1, slotId: followUpSlotId(c.visitId), start: slot.start, end: slot.end },
         },
       ];
     }

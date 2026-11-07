@@ -2,7 +2,7 @@
 // Clinician command buttons. All gating here is for EXPLANATION only: every command is
 // re-validated server-side (RBAC from the session, same-reviewer rule, aggregate refusals).
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   approveRenewalAction,
   bookVisitAction,
@@ -35,7 +35,6 @@ export function ReviewPanel(p: ReviewPanelProps) {
   const [reason, setReason] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const visitId = useRef<string | null>(null);
 
   const run = (label: string, fn: () => Promise<ReviewActionResult>) =>
     startTransition(async () => {
@@ -153,12 +152,9 @@ export function ReviewPanel(p: ReviewPanelProps) {
             onSubmit={(e) => {
               e.preventDefault();
               if (bookInvalid !== null) return;
-              visitId.current ??= `visit-${crypto.randomUUID()}`;
-              const id = visitId.current;
               run("Book visit", () =>
                 bookVisitAction({
                   renewalId: p.renewalId,
-                  visitId: id,
                   start: new Date(start).toISOString(),
                   end: new Date(end).toISOString(),
                 }),

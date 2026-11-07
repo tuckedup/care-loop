@@ -9,8 +9,8 @@ import { invalidCommand } from "../patient/patient";
 const id = z.string().min(1).max(200);
 
 export const taskStreamId = (taskId: string) => `task-${taskId}`;
-/** One follow-up task per signed note. */
-export const followUpTaskId = (noteId: string) => `fu-${noteId}`;
+/** One follow-up task per visit (derived from the visit id so it cannot collide across visits). */
+export const followUpTaskId = (visitId: string) => `fu-${visitId}`;
 
 export const CreateFollowUpTaskSchema = z.object({ taskId: id, patientId: id, visitId: id });
 export type CreateFollowUpTask = { type: "CreateFollowUpTask" } & z.input<

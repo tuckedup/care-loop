@@ -95,7 +95,12 @@ describe("audit_view projection", () => {
       { renewalId: a.renewalId, ...generateSlots(NOW)[5]! },
       NOW,
     );
-    await signVisitNote(db.sql, doc, { visitId: `fu-${a.renewalId}`, noteId: "note-av" });
+    await signVisitNote(
+      db.sql,
+      doc,
+      { visitId: `fu-${a.renewalId}`, noteId: "note-av" },
+      new Date("2027-01-15T12:00:00Z"),
+    );
     const b = await seedConfirmedRenewal(db.sql);
     await evaluateRenewal(db.sql, b.renewalId, {
       ai: aiDepsFor(spyClient()),

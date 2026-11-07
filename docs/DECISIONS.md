@@ -322,7 +322,7 @@ the audit chain is tamper-EVIDENT, not a compliance certification.
   VisitNoteSigned + CalendarSlotCreated{slotId,start,end} in one append (visit stream), then
   FollowUpTaskCreated in `task-fu-<noteId>` (a second append: one stream per append). Every call
   converges, so a retry after a crash between the two appends still ends with exactly one task and
-  one slot. The follow-up slot is the visit slot shifted by 28 days (synthetic placeholder). The note
+  one slot. The follow-up slot is the visit slot shifted by 28 days (synthetic placeholder; TODO: source needed). The note
   text is not stored in this demo; the note id is derived from the visit id so a double submit is
   the same note. FHIR Task status is "requested" (visit_schedule projection; no event carries it).
 - **Counter reset.** Nothing new was needed in the rules: renewals-since-last-visit is derived from
@@ -358,3 +358,28 @@ the audit chain is tamper-EVIDENT, not a compliance certification.
   non-event bookkeeping before it (outbox done/dead) is included. The page is admin only, shows
   FHIR AuditEvent-shaped JSON (not a conformant FHIR server, no terminology URIs) and a chain badge
   from verifyAuditChain, which reads the whole log on every load (fine for a demo).
+
+### Amendment after the F051/F052 safety review
+
+- **No signing before the visit starts.** SignVisitNote carries an injected `now` and is refused
+  (VISIT_NOT_STARTED) unless now >= the visit start: a signed note resets the refill counter, so it
+  is tied to a visit that has actually begun. The clinician page shows a disabled button with the
+  reason until then. e2e cannot wait for a slot, so `VISIT_CLOCK_OFFSET_DAYS` shifts the clock used
+  only for signing, honoured only when NODE_ENV is exactly development or test (default deny,
+  tested); booking never uses it.
+- **Counter attribution.** A VisitNoteSigned resets a patient's counter only if it was written in
+  the visit's own stream (`visit-<visitId>`) and that same stream holds a VisitBooked for THAT
+  patient; a VisitBooked elsewhere (for example a renewal stream with a copied visit id) never
+  vouches for another patient's note. The clinician BookVisit no longer accepts a client visit id
+  (derived `cv-<renewalId>` on the server) and any booking whose visit id already exists in another
+  stream or for another patient/renewal is refused (VISIT_ID_CONFLICT).
+- **Crash repair.** `repairUnfinishedSignings` (cron `/api/cron/visits`, CRON_SECRET fail-closed, or
+  `pnpm exec tsx scripts/visits-repair.ts`) completes signed notes that lack the follow-up task,
+  with a system actor `visit-repair`; idempotent. A conflicting task stream is reported, not guessed.
+- **Atomic id checks.** Task and calendar-slot ids derive from the visit id (not the note id); a
+  note id used by another visit, a conflicting task stream, or a taken follow-up slot is refused
+  inside the signing transaction, so nothing is written.
+- **Calendar slots are held time.** The slot picker and booking check both booked visits and
+  CalendarSlotCreated slots, and the follow-up slot is the first free grid slot at/after the
+  default gap. TODO: source needed for the 28-day follow-up gap (demo scheduling placeholder, not a
+  clinical value).

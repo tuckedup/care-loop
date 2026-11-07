@@ -12,8 +12,9 @@ import { seededIdentity, streamTypes } from "./support/followup";
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 test.skip(
-  process.env.RISK_FIXTURE !== "synthetic-handwritten",
-  "needs RISK_FIXTURE=synthetic-handwritten on the app server",
+  process.env.RISK_FIXTURE !== "synthetic-handwritten" || !process.env.VISIT_CLOCK_OFFSET_DAYS,
+  "needs RISK_FIXTURE=synthetic-handwritten and VISIT_CLOCK_OFFSET_DAYS=60 on the app server " +
+    "(the dev/test-only clock offset lets a booked visit count as started; production ignores it)",
 );
 
 const PATIENT = "patient-refill-limit";
@@ -63,28 +64,27 @@ test("3. the clinician sees the booked visit and signs the note: Task and calend
   await page.goto("/clinician/visits");
   const visit = page.getByTestId(`visit-${visitId}`);
   await expect(visit).toHaveAttribute("data-status", "booked");
-  const noteId = `note-${visitId}`;
   // Before signing there is no task and no calendar slot for this visit.
-  await expect(page.getByTestId(`task-fu-${noteId}`)).toHaveCount(0);
-  await expect(page.getByTestId(`slot-slot-${noteId}`)).toHaveCount(0);
+  await expect(page.getByTestId(`task-fu-${visitId}`)).toHaveCount(0);
+  await expect(page.getByTestId(`slot-slot-${visitId}`)).toHaveCount(0);
 
   await visit.getByRole("button", { name: "Sign visit note" }).click();
   await expect(page.getByTestId(`visit-${visitId}`)).toHaveAttribute("data-status", "note_signed");
   await expect(page.getByTestId(`visit-${visitId}`).getByRole("button")).toHaveCount(0);
 
   // FHIR-Task-style: status "requested". Calendar slot visible.
-  const task = page.getByTestId(`task-fu-${noteId}`);
+  const task = page.getByTestId(`task-fu-${visitId}`);
   await expect(task).toBeVisible();
   await expect(task).toHaveAttribute("data-status", "requested");
   await expect(task).toContainText(PATIENT);
-  await expect(page.getByTestId(`slot-slot-${noteId}`)).toBeVisible();
+  await expect(page.getByTestId(`slot-slot-${visitId}`)).toBeVisible();
 
   expect(await streamTypes(`visit-${visitId}`)).toEqual([
     "VisitBooked",
     "VisitNoteSigned",
     "CalendarSlotCreated",
   ]);
-  expect(await streamTypes(`task-fu-${noteId}`)).toEqual(["FollowUpTaskCreated"]);
+  expect(await streamTypes(`task-fu-${visitId}`)).toEqual(["FollowUpTaskCreated"]);
 
   // A reload (the retry/idempotency path of the UI) neither duplicates the task nor the slot.
   await page.reload();

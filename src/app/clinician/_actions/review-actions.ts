@@ -5,7 +5,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { DomainError } from "@/domain/aggregate";
-import { approveRenewal, bookVisit, denyRenewal, startReview } from "@/domain/clinician/handlers";
+import { approveRenewal, denyRenewal, startReview } from "@/domain/clinician/handlers";
+import { bookClinicianVisit } from "@/domain/visit/handlers";
 import { requireRole } from "@/infra/auth/guard";
 import { getSql } from "@/infra/db/client";
 
@@ -15,7 +16,6 @@ const Id = z.string().min(1).max(200);
 const RenewalInput = z.object({ renewalId: Id });
 const DenyInput = RenewalInput.extend({ reason: z.string().trim().min(1).max(500) });
 const BookInput = RenewalInput.extend({
-  visitId: Id,
   start: z.iso.datetime({ offset: true }),
   end: z.iso.datetime({ offset: true }),
 });
@@ -56,11 +56,11 @@ export async function denyRenewalAction(
   return run(DenyInput, { renewalId, reason }, (actor, i) => denyRenewal(getSql(), actor, i));
 }
 
+// The visit id is derived on the server (bookClinicianVisit); a client-supplied one is ignored.
 export async function bookVisitAction(input: {
   renewalId: string;
-  visitId: string;
   start: string;
   end: string;
 }): Promise<ReviewActionResult> {
-  return run(BookInput, input, (actor, i) => bookVisit(getSql(), actor, i));
+  return run(BookInput, input, (actor, i) => bookClinicianVisit(getSql(), actor, i));
 }

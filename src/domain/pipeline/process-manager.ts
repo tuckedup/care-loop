@@ -67,16 +67,19 @@ async function loadHistory(
 ): Promise<HistoryFacts & { checkIns: CheckInFact[]; unreliable: string[] }> {
   const unreliable: string[] = [];
   const read = async (type: string, where: string, param: unknown) => {
-    const rows = await sql.unsafe<{ global_position: string; type: string; data: unknown }[]>(
-      `SELECT global_position, type, data FROM events WHERE type = $1 AND ${where}
+    const rows = await sql.unsafe<
+      { global_position: string; stream_id: string; type: string; data: unknown }[]
+    >(
+      `SELECT global_position, stream_id, type, data FROM events WHERE type = $1 AND ${where}
        ORDER BY global_position ASC`,
       [type, param] as never[],
     );
-    const out: { position: bigint; event: DomainEvent }[] = [];
+    const out: { position: bigint; streamId: string; event: DomainEvent }[] = [];
     for (const r of rows) {
       try {
         out.push({
           position: BigInt(r.global_position),
+          streamId: r.stream_id,
           event: parseEvent({ type: r.type, data: r.data }),
         });
       } catch {
@@ -120,7 +123,7 @@ async function loadHistory(
   const visitsBooked: HistoryFacts["visitsBooked"] = [];
   for (const r of await read("VisitBooked", `data->>'patientId' = $2`, patientId)) {
     if (r.event.type === "VisitBooked") {
-      visitsBooked.push({ position: r.position, data: r.event.data });
+      visitsBooked.push({ position: r.position, streamId: r.streamId, data: r.event.data });
     }
   }
   const notesSigned: HistoryFacts["notesSigned"] = [];
@@ -128,7 +131,7 @@ async function loadHistory(
   if (visitIds.length > 0) {
     for (const r of await read("VisitNoteSigned", `data->>'visitId' = ANY($2::text[])`, visitIds)) {
       if (r.event.type === "VisitNoteSigned") {
-        notesSigned.push({ position: r.position, data: r.event.data });
+        notesSigned.push({ position: r.position, streamId: r.streamId, data: r.event.data });
       }
     }
   }

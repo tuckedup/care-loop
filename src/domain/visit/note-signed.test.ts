@@ -30,6 +30,8 @@ import {
 } from "./visit";
 
 const NOW = new Date("2026-11-06T12:00:00Z");
+/** Injected clock after every offered slot: the visits have started. */
+const LATE = new Date("2027-01-15T12:00:00Z");
 const code = (p: Promise<unknown>) =>
   p.then(
     () => "OK",
@@ -56,6 +58,7 @@ const sign = (over: Partial<Parameters<typeof decideVisit>[1]> = {}) =>
     noteId: "n1",
     clinicianId: "c1",
     actorRole: "clinician",
+    now: LATE.toISOString(),
     ...over,
   }) as Parameters<typeof decideVisit>[1];
 
@@ -65,7 +68,7 @@ describe("SignVisitNote (pure)", () => {
     expect(events.map((e) => e.type)).toEqual(["VisitNoteSigned", "CalendarSlotCreated"]);
     expect(events[0]!.data).toMatchObject({ visitId: "v1", noteId: "n1", clinicianId: "c1" });
     const expected = followUpSlotFor({ start: booked.start, end: booked.end });
-    expect(events[1]!.data).toMatchObject({ slotId: followUpSlotId("n1"), ...expected });
+    expect(events[1]!.data).toMatchObject({ slotId: followUpSlotId("v1"), ...expected });
     expect(Date.parse(expected.start) - Date.parse(booked.start)).toBe(
       FOLLOW_UP_INTERVAL_DAYS * 86_400_000,
     );
@@ -93,7 +96,7 @@ describe("SignVisitNote (pure)", () => {
   });
 
   it("same note id again decides nothing; a different note on a signed visit is refused", () => {
-    const signed = { ...booked, noteId: "n1", slotId: followUpSlotId("n1") };
+    const signed = { ...booked, noteId: "n1", slotId: followUpSlotId("v1") };
     expect(decideVisit(signed, sign())).toEqual([]);
     expect(() => decideVisit(signed, sign({ noteId: "n2" }))).toThrow(DomainError);
   });
@@ -129,7 +132,12 @@ async function bookedVisit() {
 describe("signVisitNote", () => {
   it("creates the note event, a calendar slot and a follow-up task", async () => {
     const v = await bookedVisit();
-    const r = await signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-a" });
+    const r = await signVisitNote(
+      db.sql,
+      clinician,
+      { visitId: v.visitId, noteId: "note-a" },
+      LATE,
+    );
     expect(r.signed?.events.map((e) => e.type)).toEqual(["VisitNoteSigned", "CalendarSlotCreated"]);
     expect(r.task?.events.map((e) => e.type)).toEqual(["FollowUpTaskCreated"]);
     expect(await types(visitStreamId(v.visitId))).toEqual([
@@ -137,7 +145,7 @@ describe("signVisitNote", () => {
       "VisitNoteSigned",
       "CalendarSlotCreated",
     ]);
-    const taskId = followUpTaskId("note-a");
+    const taskId = followUpTaskId(v.visitId);
     const [task] = await readStream(db.sql, taskStreamId(taskId));
     expect(task!.data).toMatchObject({ taskId, patientId: v.patientId, visitId: v.visitId });
     // Audited with the clinician as actor on both appends.
@@ -157,16 +165,16 @@ describe("signVisitNote", () => {
     const v = await bookedVisit();
     const input = { visitId: v.visitId, noteId: "note-idem" };
     await Promise.all([
-      signVisitNote(db.sql, clinician, input),
-      signVisitNote(db.sql, clinician, input),
+      signVisitNote(db.sql, clinician, input, LATE),
+      signVisitNote(db.sql, clinician, input, LATE),
     ]);
-    const again = await signVisitNote(db.sql, clinician, input);
+    const again = await signVisitNote(db.sql, clinician, input, LATE);
     expect(again.signed).toBeNull();
     expect(again.task).toBeNull();
     const t = await types(visitStreamId(v.visitId));
     expect(t.filter((x) => x === "VisitNoteSigned")).toHaveLength(1);
     expect(t.filter((x) => x === "CalendarSlotCreated")).toHaveLength(1);
-    expect(await types(taskStreamId(followUpTaskId("note-idem")))).toEqual(["FollowUpTaskCreated"]);
+    expect(await types(taskStreamId(followUpTaskId(v.visitId)))).toEqual(["FollowUpTaskCreated"]);
   });
 
   it("a retry after a lost task append still creates exactly one task", async () => {
@@ -187,14 +195,19 @@ describe("signVisitNote", () => {
         }),
         makeEvent("CalendarSlotCreated", {
           v: 1,
-          slotId: followUpSlotId("note-crash"),
+          slotId: followUpSlotId(v.visitId),
           ...followUpSlotFor(v.slot),
         }),
       ],
       { actor: clinician.id, role: "clinician", action: "test:partial" },
     );
-    expect(await types(taskStreamId(followUpTaskId("note-crash")))).toEqual([]);
-    const r = await signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-crash" });
+    expect(await types(taskStreamId(followUpTaskId(v.visitId)))).toEqual([]);
+    const r = await signVisitNote(
+      db.sql,
+      clinician,
+      { visitId: v.visitId, noteId: "note-crash" },
+      LATE,
+    );
     expect(r.signed).toBeNull();
     expect(r.task?.events.map((e) => e.type)).toEqual(["FollowUpTaskCreated"]);
   });
@@ -210,22 +223,22 @@ describe("signVisitNote", () => {
         "FORBIDDEN",
       );
     }
-    expect(await code(signVisitNote(db.sql, clinician, { visitId: "nope", noteId: "n" }))).toBe(
-      "VISIT_NOT_FOUND",
-    );
-    expect(await types(visitStreamId(v.visitId))).toEqual(["VisitBooked"]);
-    expect(await types(taskStreamId(followUpTaskId("note-x")))).toEqual([]);
-    // A second, different note on a signed visit is refused and creates no second task/slot.
-    await signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-first" });
     expect(
-      await code(signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-2" })),
+      await code(signVisitNote(db.sql, clinician, { visitId: "nope", noteId: "n" }, LATE)),
+    ).toBe("VISIT_NOT_FOUND");
+    expect(await types(visitStreamId(v.visitId))).toEqual(["VisitBooked"]);
+    expect(await types(taskStreamId(followUpTaskId(v.visitId)))).toEqual([]);
+    // A second, different note on a signed visit is refused and creates no second task/slot.
+    await signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-first" }, LATE);
+    expect(
+      await code(signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-2" }, LATE)),
     ).toBe("VISIT_ALREADY_SIGNED");
-    expect(await types(taskStreamId(followUpTaskId("note-2")))).toEqual([]);
+    expect(await types(taskStreamId(followUpTaskId(v.visitId)))).toEqual(["FollowUpTaskCreated"]);
   });
 
   it("visit_schedule projection shows the visit, slot and requested task; rebuild is identical", async () => {
     const v = await bookedVisit();
-    await signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-proj" });
+    await signVisitNote(db.sql, clinician, { visitId: v.visitId, noteId: "note-proj" }, LATE);
     await runAllProjections(db.sql, registerAllProjections());
     const snapshot = async () => ({
       visits: await listVisits(db.sql),
@@ -240,13 +253,13 @@ describe("signVisitNote", () => {
       clinicianId: clinician.id,
       patientId: v.patientId,
     });
-    const slot = before.slots.find((x) => x.slotId === followUpSlotId("note-proj"))!;
+    const slot = before.slots.find((x) => x.slotId === followUpSlotId(v.visitId))!;
     expect(slot).toMatchObject({
       visitId: v.visitId,
       clinicianId: clinician.id,
       ...followUpSlotFor(v.slot),
     });
-    expect(before.tasks.find((x) => x.taskId === followUpTaskId("note-proj"))).toMatchObject({
+    expect(before.tasks.find((x) => x.taskId === followUpTaskId(v.visitId))).toMatchObject({
       status: "requested",
       visitId: v.visitId,
     });
@@ -285,10 +298,15 @@ describe("signing resets the renewals-since-visit counter (R06 end to end)", () 
     expect(await types(renewalStreamId(c.renewalId))).toContain("FollowUpRequired");
 
     // The clinician signs the note: the counter resets.
-    await signVisitNote(db.sql, clinician, {
-      visitId: followUpVisitId(b.renewalId),
-      noteId: "note-reset",
-    });
+    await signVisitNote(
+      db.sql,
+      clinician,
+      {
+        visitId: followUpVisitId(b.renewalId),
+        noteId: "note-reset",
+      },
+      LATE,
+    );
 
     // Renewal D, at the former limit, passes R06: no FollowUpRequired (it awaits a clinician).
     const d = await again();

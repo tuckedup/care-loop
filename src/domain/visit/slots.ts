@@ -9,7 +9,10 @@ export const FIRST_SLOT_HOUR_UTC = 9;
 /** Exclusive end of the working day: the last slot ends at this hour. */
 export const LAST_SLOT_END_HOUR_UTC = 17;
 export const BOOKING_HORIZON_DAYS = 28;
-/** Default gap between a signed visit and the follow-up calendar slot (synthetic placeholder). */
+/**
+ * Default gap between a signed visit and the follow-up calendar slot (synthetic placeholder).
+ * TODO: source needed for a real follow-up interval; this is demo scheduling, not a clinical value.
+ */
 export const FOLLOW_UP_INTERVAL_DAYS = 28;
 
 const MS_MIN = 60_000;
@@ -29,7 +32,7 @@ export function canonicalInstant(iso: string): string {
   return new Date(t).toISOString();
 }
 
-function onGrid(startMs: number): boolean {
+export function onGrid(startMs: number): boolean {
   const d = new Date(startMs);
   const day = d.getUTCDay();
   if (day === 0 || day === 6) return false;
@@ -96,4 +99,31 @@ export function followUpSlotFor(visit: Slot): Slot {
     start: new Date(Date.parse(visit.start) + shift).toISOString(),
     end: new Date(Date.parse(visit.end) + shift).toISOString(),
   };
+}
+
+/** A grid slot (on the grid, exactly SLOT_MINUTES) without the future/horizon checks. */
+export function validateGridSlot(start: string, end: string): Slot {
+  const s = Date.parse(start);
+  const e = Date.parse(end);
+  if (!Number.isFinite(s) || !Number.isFinite(e) || !onGrid(s) || e - s !== SLOT_MINUTES * MS_MIN) {
+    throw new DomainError("INVALID_SLOT", "not an offered appointment slot");
+  }
+  return { start: new Date(s).toISOString(), end: new Date(e).toISOString() };
+}
+
+/**
+ * First grid slot at or after `wanted` that overlaps nothing in `taken`. The follow-up slot would
+ * otherwise be able to land on a visit or slot someone else already holds.
+ */
+export function firstFreeSlot(wanted: Slot, taken: readonly Slot[]): Slot {
+  let t = Date.parse(wanted.start);
+  for (let i = 0; i < 4000; i++, t += SLOT_MINUTES * MS_MIN) {
+    if (!onGrid(t)) continue;
+    const cand = {
+      start: new Date(t).toISOString(),
+      end: new Date(t + SLOT_MINUTES * MS_MIN).toISOString(),
+    };
+    if (!taken.some((x) => overlaps(cand, x))) return cand;
+  }
+  throw new DomainError("NO_FOLLOW_UP_SLOT", "no free follow-up slot found");
 }

@@ -169,6 +169,8 @@ export function monitoringFrom(
 /** A recorded event with its global position, as read from the store. */
 export interface PositionedEvent<T = unknown> {
   position: bigint;
+  /** Stream the event was read from (visit booking/note attribution); optional for old callers. */
+  streamId?: string;
   data: T;
 }
 
@@ -198,10 +200,23 @@ export function countRenewalsSinceLastVisit(
   prescriptionId: string,
   currentRenewalId: string,
 ): number {
-  const visitPatient = new Map(facts.visitsBooked.map((v) => [v.data.visitId, v.data.patientId]));
+  // A note resets the counter only if it was signed in the visit's OWN stream (visit-<visitId>) and
+  // that same stream holds a booking for THIS patient. A VisitBooked written elsewhere (for example
+  // a renewal stream with a copied visit id) never vouches for someone else's note.
+  const visitStream = (visitId: string) => `visit-${visitId}`;
+  const attributable = new Set(
+    facts.visitsBooked
+      .filter(
+        (v) =>
+          v.data.patientId === patientId &&
+          (v.streamId ?? visitStream(v.data.visitId)) === visitStream(v.data.visitId),
+      )
+      .map((v) => v.data.visitId),
+  );
   let lastVisit = -1n;
   for (const n of facts.notesSigned) {
-    if (visitPatient.get(n.data.visitId) === patientId && n.position > lastVisit) {
+    const inOwnStream = (n.streamId ?? visitStream(n.data.visitId)) === visitStream(n.data.visitId);
+    if (inOwnStream && attributable.has(n.data.visitId) && n.position > lastVisit) {
       lastVisit = n.position;
     }
   }

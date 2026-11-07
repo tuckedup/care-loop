@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { DomainError } from "@/domain/aggregate";
+import { signingNow } from "@/domain/visit/clock";
 import { signVisitNote } from "@/domain/visit/handlers";
 import { requireRole } from "@/infra/auth/guard";
 import { getSql } from "@/infra/db/client";
@@ -23,6 +24,7 @@ export async function signVisitNoteAction(formData: FormData): Promise<void> {
       getSql(),
       { role: "clinician", id: session.sub },
       { visitId, noteId: `note-${visitId}` },
+      signingNow(new Date()),
     );
   } catch (e) {
     if (!(e instanceof DomainError)) throw e;

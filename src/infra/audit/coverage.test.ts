@@ -512,7 +512,12 @@ describe("audit coverage: every event written by a real scenario has an audit en
       { renewalId: b.renewalId, ...slot },
       NOW,
     );
-    await signVisitNote(db.sql, clinician, { visitId: `fu-${b.renewalId}`, noteId: "note-cov" });
+    await signVisitNote(
+      db.sql,
+      clinician,
+      { visitId: `fu-${b.renewalId}`, noteId: "note-cov" },
+      new Date("2027-01-15T12:00:00Z"),
+    );
     // outbox worker (system actor)
     await db.sql.begin(async (tx) => {
       await insertOutboxInTx(tx, [
