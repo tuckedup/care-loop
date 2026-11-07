@@ -10,6 +10,7 @@ const config = [
     ignores: [
       ".next/**",
       ".next-*/**",
+      ".rev-tmp*/**",
       "node_modules/**",
       "next-env.d.ts",
       "playwright-report/**",

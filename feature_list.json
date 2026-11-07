@@ -642,7 +642,7 @@
       "pnpm e2e e2e/item9-escalation.spec.ts",
       "pnpm test"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F044",
@@ -858,7 +858,7 @@
       "pnpm typecheck",
       "pnpm lint"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F059",
@@ -907,7 +907,7 @@
       "pnpm e2e e2e/admin-dashboard.spec.ts",
       "pnpm e2e e2e/admin-evals.spec.ts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F062",

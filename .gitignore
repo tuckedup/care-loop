@@ -38,3 +38,4 @@ pnpm-debug.log*
 .claude/scheduled_tasks.lock
 evals/results/live-latest.json
 .next-*/
+.rev-tmp*/

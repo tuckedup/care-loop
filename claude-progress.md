@@ -307,3 +307,14 @@ reads as SHADOW but makes setAutonomyMode throw (admin cannot recover via UI); r
 system approval of any stamp, and evolveReview marks a forged non-escalated system approval decided (would stop
 a clinician deciding it); SAMPLED leaves the unsampled share without retro review (documented); a /clinician
 nav link to retro-review is missing (layout out of scope for the builder).
+
+## 2026-11-07 — F043, F058, F061 passing; tooling ignores scratch dirs
+
+Verifier PASS (HEAD 0d5c39a): item9-escalation e2e (default 2 passed/1 gated skip; gated 3 passed), full unit suite
+(97 files / 1640 tests), full e2e default 50 passed / 19 gated skips, dashboard + evals-page e2e, idempotency-key
+scan test is non-vacuous (known call sites pinned, exceptions pinned at 2: src/ai/client.ts and tracing.ts),
+98% concurrence appears only as a TARGET label, CHANGELOG v0.2/v0.3 accurate. Caveat: running the WHOLE e2e with
+RISK_FIXTURE set makes 3 specs (clinician-queue:52, patient-status:22, v0.1-patient-flow:17) fail because they
+assume the AI is unavailable (expect 'escalated', get 'evaluated'): run the default suite and the gated specs
+separately, never everything with the fixture env at once.
+Tooling: eslint, tsc, vitest, prettier and git now ignore `.rev-tmp*` (reviewer scratch dirs) and `.next-*`.

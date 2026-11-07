@@ -32,5 +32,5 @@
     "next-env.d.ts",
     ".next-ui/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", ".rev-tmp*"]
 }

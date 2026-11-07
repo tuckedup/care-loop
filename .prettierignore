@@ -15,3 +15,4 @@ docs/sources.md
 .claude
 evals/required-cases.json
 .next-*
+.rev-tmp*

@@ -12,6 +12,6 @@ export default defineConfig({
     hookTimeout: 60_000,
     maxWorkers: 4,
     include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
-    exclude: ["node_modules", ".next", "e2e"],
+    exclude: ["node_modules", ".next", ".next-*", ".rev-tmp*", "e2e"],
   },
 });
