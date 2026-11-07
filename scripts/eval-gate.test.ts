@@ -24,6 +24,7 @@ import {
   manifestFailures,
   overridesAllowed,
   loadCases,
+  GENERATED_BY,
   type CaseResult,
   type CitationStats,
 } from "../evals/lib";
@@ -247,6 +248,54 @@ describe("eval gate (unit)", () => {
     expect(m.liveModelRun).toBe(false);
     expect(cm([result({})], "live", cites(1, 1)).liveModelRun).toBe(true);
   });
+
+  it("results carry case counts, per-category breakdown and the generating script version", () => {
+    const m = cm(
+      [
+        result({ id: "a", category: "pregnancy", usedAi: false }),
+        result({ id: "b", category: "pregnancy", usedAi: true }),
+        result({
+          id: "c",
+          usedAi: false,
+          category: "clean-formulary",
+          expectedOutcome: "AUTO_ELIGIBLE",
+          actualOutcome: "AUTO_ELIGIBLE",
+        }),
+      ],
+      "fixtures",
+      cites(1, 1),
+    );
+    expect(m.totalCases).toBe(3);
+    expect(m.riskCases).toBe(2);
+    expect(m.aiCases).toBe(1);
+    expect(m.generatedBy).toBe(GENERATED_BY);
+    expect(m.generatedBy).toMatch(/^evals\/run\.eval\.ts@\d+\.\d+\.\d+$/);
+    expect(m.byCategory.pregnancy).toMatchObject({
+      cases: 2,
+      risk: true,
+      escalationCases: 2,
+      escalated: 2,
+    });
+    expect(m.byCategory["clean-formulary"]).toMatchObject({
+      cases: 1,
+      risk: false,
+      unsafeApprovals: 0,
+    });
+    expect(m.escalationRecall).toBe(1);
+    expect(m.autoApprovePrecision).toBe(1);
+    expect(m.outcomeAccuracy).toBe(1);
+    expect(m.reasonCodeAccuracy).toBe(1);
+  });
+
+  it("a per-category unsafe approval is counted and fails the gate", () => {
+    const m = cm(
+      [result({ category: "pregnancy", actualOutcome: "AUTO_ELIGIBLE" })],
+      "fixtures",
+      cites(1, 1),
+    );
+    expect(m.byCategory.pregnancy).toMatchObject({ unsafeApprovals: 1, escalated: 0 });
+    expect(gateFailures(m).join()).toMatch(/recall 0|unsafe auto-approval/);
+  });
 });
 
 describe("pnpm eval process exit code", () => {
@@ -321,6 +370,12 @@ describe("pnpm eval process exit code", () => {
     expect(written.totalCases).toBeGreaterThanOrEqual(8);
     expect(written.fixtureKind).toBe("synthetic-handwritten");
     expect(written.liveModelRun).toBe(false);
+    expect(written.generatedBy).toBe(GENERATED_BY);
+    expect(written.riskCases).toBeGreaterThan(0);
+    expect(written.outcomeAccuracy).toBe(1);
+    expect(written.reasonCodeAccuracy).toBe(1);
+    expect(written.autoApprovePrecision).toBe(1);
+    expect(Object.keys(written.byCategory).length).toBeGreaterThan(5);
   }, 120_000);
 });
 

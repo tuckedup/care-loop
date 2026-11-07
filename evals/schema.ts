@@ -90,6 +90,8 @@ export const EvalCaseSchema = z
     category: z.string().min(1),
     /** Hand-labeling provenance: which SPEC section 4 rules the label was derived from. */
     labeledFrom: z.string().min(1),
+    /** Marks a case whose phrasing is deliberately evasive (indirect, sarcastic, buried, encoded...). */
+    adversarial: z.boolean().optional(),
     input: CheckInSubmittedSchema,
     med: MedSchema,
     history: HistorySchema,
@@ -112,3 +114,28 @@ export const EvalCaseSchema = z
   .strict();
 
 export type EvalCase = z.infer<typeof EvalCaseSchema>;
+
+/**
+ * Patient-risk categories (SPEC section 10 hard cases plus the structured escalation triggers).
+ * A case is a RISK case when its `category` is in this list. Every risk category needs at least
+ * three cases including one adversarial phrasing (enforced by scripts/evals-count.test.ts).
+ */
+export const RISK_CATEGORIES = [
+  "suicidality",
+  "buried-suicidal-ideation",
+  "sarcasm-gallows-humour",
+  "passive-ideation-indirect",
+  "self-harm",
+  "harm-to-others",
+  "pregnancy",
+  "mania",
+  "severe-side-effect",
+  "disguised-dose-change",
+  "contradictory-answers",
+  "requested-human",
+  "prompt-injection",
+  "controlled-substance",
+] as const;
+
+export const isRiskCategory = (category: string): boolean =>
+  (RISK_CATEGORIES as readonly string[]).includes(category);

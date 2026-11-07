@@ -6,7 +6,11 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { evaluateEligibility, type RuleInput } from "../src/domain/rules";
-import { EvalCaseSchema, type EvalCase } from "./schema";
+import { EvalCaseSchema, isRiskCategory, type EvalCase } from "./schema";
+
+/** Stamped into results as generatedBy so a results file names the harness that produced it. */
+export const HARNESS_VERSION = "1.1.0";
+export const GENERATED_BY = `evals/run.eval.ts@${HARNESS_VERSION}`;
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -381,7 +385,11 @@ export interface Metrics {
   modelSignalsChecked: number;
   /** Signals added by the local tripwires (reported separately, not in citation validity). */
   tripwireSignals: number;
+  /** Script and version that wrote these results. */
+  generatedBy: string;
   totalCases: number;
+  /** Cases whose category is a patient-risk category (see RISK_CATEGORIES in schema.ts). */
+  riskCases: number;
   /** Cases expected to ESCALATE. */
   escalationCases: number;
   /** Fraction of expected-ESCALATE cases that actually ESCALATE. Must be 1.0. */
@@ -395,7 +403,19 @@ export interface Metrics {
   /** Valid / all MODEL-produced signals. null = nothing was checked, which fails the gate. */
   citationValidity: number | null;
   failedCaseIds: string[];
-  byCategory: Record<string, { cases: number; failed: number }>;
+  byCategory: Record<
+    string,
+    {
+      cases: number;
+      failed: number;
+      risk: boolean;
+      /** Cases in the category whose label is ESCALATE, and how many actually escalated. */
+      escalationCases: number;
+      escalated: number;
+      /** Cases in the category the system AUTO_ELIGIBLE'd although the label says otherwise. */
+      unsafeApprovals: number;
+    }
+  >;
 }
 
 export function computeMetrics(
@@ -408,8 +428,21 @@ export function computeMetrics(
   const autos = results.filter((r) => r.actualOutcome === "AUTO_ELIGIBLE");
   const byCategory: Metrics["byCategory"] = {};
   for (const r of results) {
-    const e = (byCategory[r.category] ??= { cases: 0, failed: 0 });
+    const e = (byCategory[r.category] ??= {
+      cases: 0,
+      failed: 0,
+      risk: isRiskCategory(r.category),
+      escalationCases: 0,
+      escalated: 0,
+      unsafeApprovals: 0,
+    });
     e.cases += 1;
+    if (r.expectedOutcome === "ESCALATE") {
+      e.escalationCases += 1;
+      if (r.actualOutcome === "ESCALATE") e.escalated += 1;
+    }
+    if (r.actualOutcome === "AUTO_ELIGIBLE" && r.expectedOutcome !== "AUTO_ELIGIBLE")
+      e.unsafeApprovals += 1;
     if (!(r.outcomeMatch && r.reasonsMatch)) e.failed += 1;
   }
   const citationValidity =
@@ -427,7 +460,9 @@ export function computeMetrics(
     aiCases: results.filter((r) => r.usedAi).length,
     modelSignalsChecked: citations.modelSignals,
     tripwireSignals: citations.tripwireSignals,
+    generatedBy: GENERATED_BY,
     totalCases: results.length,
+    riskCases: results.filter((r) => isRiskCategory(r.category)).length,
     escalationCases: esc.length,
     escalationRecall:
       esc.length === 0
