@@ -137,6 +137,12 @@ describe("refill-limit patient history (database)", () => {
         "EligibilityEvaluated",
         "ClinicianReviewStarted",
         "RenewalApproved",
+        // Seeded history ends Filled (direct events; no outbox rows): see docs/DECISIONS.md.
+        "PharmacySelected",
+        "RxRenewalQueued",
+        "RxRenewalTransmitted",
+        "PharmacyStatusReceived",
+        "RxFillReceived",
       ]);
     }
     const approvals = await a.sql.unsafe<{ data: { by: string; clinicianId: string } }[]>(
