@@ -65,14 +65,12 @@ test("status reads rx_status: requested, verified, then under review after check
 test("seeded history appears for its owner only", async ({ page, context }) => {
   await loginAsPatient(context, "patient-refill-limit");
   await page.goto("/patient/status");
-  // Seeded history: two renewals a clinician approved after starting review. They predate any
-  // transmission (no RxRenewalQueued), so the patient is never told they were sent.
-  await expect(page.locator("li[data-status='approved']")).toHaveCount(2);
-  await expect(
-    page.locator("li[data-status='approved'] [data-testid='renewal-status']"),
-  ).toHaveText([
-    "Approved: waiting to be sent to your pharmacy",
-    "Approved: waiting to be sent to your pharmacy",
+  // Seeded history: two renewals a clinician approved after starting review, long since sent and
+  // filled (a terminal state, not "waiting to be sent" forever).
+  await expect(page.locator("li[data-status='filled']")).toHaveCount(2);
+  await expect(page.locator("li[data-status='filled'] [data-testid='renewal-status']")).toHaveText([
+    "Filled",
+    "Filled",
   ]);
   await expect(page.locator("li[data-status='checked_in']")).toHaveCount(0);
   await expect(page.getByText("fluoxetine").first()).toBeVisible();

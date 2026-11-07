@@ -8,7 +8,7 @@ import { appendToStream, type AuditContext } from "@/infra/audit";
 import { withConcurrencyRetry } from "@/infra/event-store";
 import { loadStream } from "../aggregate-handler";
 import { makeEvent, type DomainEvent } from "../events";
-import { FILL_AFTER_SUPERSEDE_CODE } from "../pharmacy-stall";
+import { CANCEL_AFTER_FILL_CODE, FILL_AFTER_SUPERSEDE_CODE } from "../pharmacy-stall";
 import { renewalStreamId } from "./renewal";
 
 const id = z.string().min(1).max(200);
@@ -121,6 +121,7 @@ export function decidePharmacyResponse(
   const queued = queuedEvent !== undefined;
   const queuedRx = queuedEvent?.type === "RxRenewalQueued" ? queuedEvent.data.prescriptionId : null;
   let cancelled = history.some((e) => e.type === "RxCancelAcknowledged");
+  let filled = history.some((e) => e.type === "RxFillReceived");
   const seen = seenIds(history);
   const accepted = input.httpStatus >= 200 && input.httpStatus < 300;
 
@@ -167,6 +168,7 @@ export function decidePharmacyResponse(
             // A fill for a SUPERSEDED renewal: record it (it happened) and flag it for a person.
             // It never re-opens the renewal (filled is terminal) and is never silently ignored.
             out.push({ type: "RxFillReceived", data: { v: 1, renewalId, messageId: m.messageId } });
+            filled = true;
             out.push({
               type: "PharmacyErrorReceived",
               data: {
@@ -179,10 +181,26 @@ export function decidePharmacyResponse(
             });
           } else if (!cancelled) {
             out.push({ type: "RxFillReceived", data: { v: 1, renewalId, messageId: m.messageId } });
+            filled = true;
           }
         }
         break;
       case "CancelRx":
+        if (filled) {
+          // Too late: the prescription was filled. Record the anomaly once (alerted), but never
+          // append a cancel acknowledgement that would read as a status change.
+          out.push({
+            type: "PharmacyErrorReceived",
+            data: {
+              v: 1,
+              renewalId,
+              messageId: `${m.messageId}:after-fill`,
+              code: CANCEL_AFTER_FILL_CODE,
+              retryable: false,
+            },
+          });
+          break;
+        }
         cancelled = true;
         out.push({
           type: "RxCancelAcknowledged",

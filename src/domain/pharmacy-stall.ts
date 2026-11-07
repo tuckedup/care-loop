@@ -16,6 +16,8 @@ export const SUPERSEDABLE_CODES: readonly string[] = [STALLED_CODE, UNCONFIRMED_
 export const APPROVED_NOT_SENT_CODE = "APPROVED_NOT_SENT";
 /** A fill arrived for a renewal that had been superseded: possible double fill, needs a person. */
 export const FILL_AFTER_SUPERSEDE_CODE = "FILL_AFTER_SUPERSEDE";
+/** A cancel acknowledgement arrived for a prescription that had already been filled. */
+export const CANCEL_AFTER_FILL_CODE = "CANCEL_AFTER_FILL";
 export const DEFAULT_STALE_HOURS = 72;
 
 /** PHARMACY_STALE_HOURS (hours); anything unusable falls back to the default. */

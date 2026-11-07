@@ -1,41 +1,13 @@
 import Link from "next/link";
-import { resultStateFor, type ResultState } from "../../../_lib/renewal-service";
+import { RESULT_COPY, resultStateFor } from "../../../_lib/status-copy";
 import { loadRenewalForStep } from "../../../_lib/session";
-
-const COPY: Record<ResultState, { title: string; body: string; tone: string }> = {
-  approved: {
-    title: "Approved",
-    body: "Your renewal was approved and is being sent to your pharmacy.",
-    tone: "border-green-300 bg-green-50 text-green-900",
-  },
-  under_review: {
-    title: "Under review",
-    body: "Your check-in was received. Your care team will review your renewal. You do not need to do anything else right now.",
-    tone: "border-slate-300 bg-slate-50 text-slate-900",
-  },
-  approved_waiting: {
-    title: "Approved, waiting to be sent to your pharmacy",
-    body: "Your renewal was approved. It has not been sent to your pharmacy yet. Your care team will be alerted if this takes too long.",
-    tone: "border-green-300 bg-green-50 text-green-900",
-  },
-  pharmacy_problem: {
-    title: "There was a problem sending your prescription",
-    body: "There was a problem sending your prescription to the pharmacy. Your care team has been notified and will follow up.",
-    tone: "border-amber-300 bg-amber-50 text-amber-900",
-  },
-  follow_up_needed: {
-    title: "Follow-up needed",
-    body: "Your care team needs to see you before this medication can be renewed. We will contact you about booking a visit.",
-    tone: "border-amber-300 bg-amber-50 text-amber-900",
-  },
-};
 
 export default async function ResultPage({ params }: { params: Promise<{ renewalId: string }> }) {
   const { renewalId } = await params;
   const { renewal } = await loadRenewalForStep(renewalId, "result");
   // State comes from the rx_status projection (fed by the decision pipeline and clinician commands); unknown => under review.
-  const state = resultStateFor(renewal.status);
-  const copy = COPY[state];
+  const state = resultStateFor(renewal.status, renewal.pharmacyStatus);
+  const copy = RESULT_COPY[state];
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">

@@ -93,34 +93,7 @@ export function nextStepFor(status: string): NextStep {
   return "result";
 }
 
-export type ResultState =
-  "approved" | "approved_waiting" | "under_review" | "follow_up_needed" | "pharmacy_problem";
-
-/**
- * Maps the rx_status projection value to what the patient sees. Anything not explicitly known
- * to be an approval or a follow-up is "under review" (the safe default).
- */
-export function resultStateFor(status: string): ResultState {
-  switch (status) {
-    case "approved":
-      // An approval with no RxRenewalQueued behind it: never tell the patient it was sent.
-      return "approved_waiting";
-    case "queued":
-    case "transmitted":
-    case "pharmacy_status":
-    case "filled":
-      return "approved";
-    case "denied":
-    case "follow_up_required":
-      return "follow_up_needed";
-    case "pharmacy_error":
-    case "cancelled":
-      // Never "approved/sent": something went wrong after the approval and people were alerted.
-      return "pharmacy_problem";
-    default:
-      return "under_review";
-  }
-}
+export { resultStateFor, type ResultState } from "./status-copy";
 
 /** The renewal if it exists AND belongs to the patient; otherwise null (no existence leak). */
 export async function getOwnedRenewal(

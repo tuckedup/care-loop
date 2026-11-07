@@ -247,8 +247,19 @@ monitoring.
   `RxRenewalQueued` (deterministic idempotency key `rx-renewal:<renewalId>`, messageId
   `rxmsg-<renewalId>`) in one append; `handleCommandWithOutbox` writes the
   `pharmacy.RxRenewalResponse` outbox row in the same transaction as the events and audit entry.
-  Without a pharmacy nothing is queued (fail closed; never guess). Existing approval guards
-  (REJECT / R01-R03 / controlled / follow-up refused) are untouched.
+  Existing approval guards (REJECT / R01-R03 / controlled / follow-up refused) are untouched.
+- **NO_CONFIRMED_PHARMACY.** `Approve` is refused in the DOMAIN (not just the disabled button) when
+  no pharmacy was confirmed or the renewal names no prescription, so an approval that could never be
+  sent is impossible for every caller. The patient flow requires a `PharmacySelected` before a
+  check-in is accepted, so a clinician does not meet this state in normal use. Seed history approvals
+  are written directly as events ending in a filled chain (PharmacySelected, RxRenewalQueued,
+  RxRenewalTransmitted, status, RxFillReceived; no outbox rows) so they read "Filled" and still count
+  toward the refill limit.
+- **APPROVED_NOT_SENT.** Defence in depth: a renewal approved with a confirmed pharmacy that has no
+  RxRenewalQueued after 15 minutes (demo configuration, TODO: source needed, not a clinical value) is
+  swept into a non-retryable PharmacyErrorReceived{APPROVED_NOT_SENT}: alert for clinician and
+  pharmacist. The normal path cannot produce it (queued in the same append). Until then the patient
+  sees "approved, waiting to be sent", never "sent".
 - **Transmit guard.** The handler re-derives approval, rules outcome, medication schedule (rx-*
   stream) and the patient-confirmed pharmacy from the streams, and refuses (dead-letter) otherwise.
   Controlled substances therefore cannot be transmitted even if queued.
@@ -274,26 +285,50 @@ monitoring.
   pharmacy.RxRenewalResponse a queued renewal whose send is refused, fatal or out of retries gets a
   terminal PharmacyErrorReceived{TRANSMIT_DEAD_LETTERED}: rx_status shows a problem, clinician and
   pharmacist see an alert, the patient sees "there was a problem sending your prescription", and the
-  patient may renew again. A forged row for a renewal that was never queued gets no event (nothing
-  was promised); it stays visible as a dead outbox row.
-- **Stalled renewals.** A renewal in queued/transmitted/pharmacy_status with no fill after
-  PHARMACY_STALE_HOURS (default 72; demo config, TODO: source needed for a real value, not a
+  patient may renew again. A message that WAS transmitted but later reaped to dead, or whose retries
+  were exhausted by network failures or timeouts (the pharmacy may have received the request), is
+  labelled TRANSMIT_UNCONFIRMED instead ("sent but never confirmed") and stays supersedable, so a new
+  renewal can never silently duplicate it; only answers that prove non-receipt (e.g. busy) end as
+  TRANSMIT_DEAD_LETTERED. A forged row for a renewal that was never queued gets no event (nothing was
+  promised); it stays visible as a dead outbox row.
+- **Stalled renewals and SUPERSEDE.** A renewal in queued/transmitted/pharmacy_status with no fill
+  after PHARMACY_STALE_HOURS (default 72; demo config, TODO: source needed for a real value, not a
   clinical threshold) is swept (clock injected at the cron/script edge) into a non-retryable
-  PharmacyErrorReceived{STALLED_NO_FILL}: alert, no longer blocks a new renewal. The duplicate-SEND
-  guard still counts it as unsettled, so it is never sent twice; a late fill still wins.
+  PharmacyErrorReceived{STALLED_NO_FILL}: alert, and it no longer blocks the patient starting a new
+  renewal. STALLED_NO_FILL and TRANSMIT_UNCONFIRMED renewals stay UNSETTLED for the duplicate-send
+  guard (the pharmacy may still hold them), so nothing is sent twice silently. They are resolved by
+  SUPERSEDE: when a clinician approves a newer renewal R2, the approve handler finds earlier
+  unfilled renewals of the prescription that are stalled/unconfirmed (injected clock), and the SAME
+  transaction that queues R2 carries `supersedes` on R2's RxRenewalQueued and enqueues a
+  pharmacy.CancelRx per superseded renewal (key `rx-cancel:<R1>:<R2>`). rx_status shows R1
+  `cancel_requested`, then `cancelled` on the pharmacy's acknowledgement, and the guard treats R1
+  as settled-by-supersede. At SEND time the cancel handler re-checks R1: if it has meanwhile been
+  filled or cancelled, no CancelRx is sent (the message completes and the reason is audited). A fill
+  or cancel acknowledgement that arrives after the other is never a silent status change:
+  FILL_AFTER_SUPERSEDE (a fill for a superseded renewal) and CANCEL_AFTER_FILL (a cancel
+  acknowledgement for a filled one) are recorded once and alerted. Precedence in rx_status: filled
+  is final, a cancel acknowledgement that came first stays cancelled, a fatal error yields to either.
+  A fresh (not stalled) earlier renewal still blocks R2: R2 is dead-lettered with an alert.
 - **Race-safe start + deterministic duplicates.** startRenewal checks inside the append transaction
   (the audit chain-head row lock serialises writers; no session-level locks): a competing open
   renewal is resumed, an in-flight one refuses. If two renewals of one prescription are queued
   anyway, the earliest RxRenewalQueued position sends; the later is dead-lettered WITH the alert.
-- **Hardening.** Mock outcomes depend on (seed, idempotency key / messageId), not the attempt;
+- **Hardening.** Mock outcomes (fatal / OK / fill / duplicate / escalation) depend only on (seed,
+  idempotency key / messageId); only a RETRYABLE error also depends on the attempt, drawn from
+  (key, attempt) with a 50% chance of persisting (demo tuning), so a retry can recover and every
+  (key, attempt) is still deterministic;
   MOCK_PHARMACY_FORCE is honoured only when NODE_ENV is exactly development or test; pharmacy answers
   are capped (64 KiB, 50 messages) and over-cap is a fatal parse error; pharmacy_alerts is keyed on
   (renewal_id, message_id) (migration 0013); terminal rx_status outcomes (filled, cancelled, fatal
   error) are not overwritten by late Status/Transmitted/retryable messages (fill still beats a fatal
   error, cancel beats all); the Langfuse call carries an Idempotency-Key.
-- **Known gaps.** The patient result page maps cancelled to the same "problem sending" copy. A dead
-  letter for a renewal that is escalated but not yet decided is not possible (nothing is queued
-  before approval).
+- **Patient copy** comes from one table (`status-copy.ts`) covered by a per-status test: "filled"
+  says filled, a retryable error says we are retrying (and claims no notification), only
+  non-retryable errors and cancellations say the care team has been notified (an alert row exists),
+  `cancel_requested` says the earlier request is being replaced by a newer one.
+- **Known gaps.** Superseding relies on the pharmacy honouring CancelRx (the mock always
+  acknowledges); a CancelRx that cannot be delivered is dead-lettered with a CANCEL_DEAD_LETTERED
+  alert on the superseded renewal. Seeded history reads "Filled" without any real transmission.
 
 ## ADR: Follow-up visits, audit coverage, verification and the audit view (F051-F057)
 

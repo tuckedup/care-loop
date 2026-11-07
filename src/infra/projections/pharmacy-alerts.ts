@@ -42,6 +42,9 @@ function errorMessage(code: string): string {
   if (code === "CANCEL_DEAD_LETTERED") {
     return "A cancellation (for a prescription replaced by a newer approved renewal) could not be delivered. Please contact the pharmacy to cancel the older prescription.";
   }
+  if (code === "CANCEL_AFTER_FILL") {
+    return "The pharmacy acknowledged a cancellation for a prescription that had already been filled. The fill stands: please review.";
+  }
   if (code === "FILL_AFTER_SUPERSEDE") {
     return "The pharmacy filled a prescription that had been replaced by a newer approved renewal. This may be a double fill: please review.";
   }

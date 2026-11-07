@@ -1,26 +1,7 @@
 import Link from "next/link";
 import { listOwnedRenewals, nextStepFor } from "../_lib/renewal-service";
 import { requirePatient, stepPath } from "../_lib/session";
-
-// Patient-friendly wording for every rx_status value. Unknown values fall back to "Under review".
-const LABELS: Record<string, string> = {
-  requested: "Started: identity not yet verified",
-  identity_verified: "Identity verified: check-in needed",
-  checked_in: "Under review",
-  evaluated: "Under review",
-  escalated: "Under review by your care team",
-  in_review: "Being reviewed by your care team",
-  approved: "Approved: waiting to be sent to your pharmacy",
-  cancel_requested: "Replaced by a newer renewal",
-  denied: "Follow-up needed",
-  queued: "Approved: sending to pharmacy",
-  transmitted: "Sent to pharmacy",
-  pharmacy_status: "Pharmacy is processing",
-  pharmacy_error: "Pharmacy problem: your care team is working on it",
-  filled: "Filled",
-  cancelled: "Cancelled by the pharmacy: your care team will contact you",
-  follow_up_required: "Follow-up visit needed",
-};
+import { statusLabel } from "../_lib/status-copy";
 
 export default async function StatusPage() {
   const { patientId, sql } = await requirePatient();
@@ -44,7 +25,7 @@ export default async function StatusPage() {
             >
               <p className="font-medium">{r.drugName ?? r.prescriptionId}</p>
               <p className="text-sm" data-testid="renewal-status">
-                {LABELS[r.status] ?? "Under review"}
+                {statusLabel(r.status, r.pharmacyStatus)}
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-400">
                 Last update{" "}

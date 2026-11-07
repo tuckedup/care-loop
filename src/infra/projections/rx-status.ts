@@ -162,7 +162,8 @@ export function reduceRxStatus(
     case "RxFillReceived":
       return base("filled");
     case "RxCancelAcknowledged":
-      return base("cancelled");
+      // Precedence: a fill is final. A cancel acknowledgement never regresses it.
+      return current !== null && current.status === "filled" ? current : base("cancelled");
     case "FollowUpRequired":
       return base("follow_up_required");
     default:

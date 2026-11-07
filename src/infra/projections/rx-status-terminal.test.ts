@@ -37,7 +37,7 @@ function* permutations<T>(xs: T[]): Generator<T[]> {
 }
 
 describe("rx_status terminal outcomes stick (pure, all 5040 orderings)", () => {
-  it("never leaves a terminal outcome except fatal -> filled/cancelled and filled -> cancelled", () => {
+  it("precedence: filled is final (a later cancel ack never regresses it); cancelled stays; fatal yields only to a fill or cancel", () => {
     let checked = 0;
     for (const order of permutations(NAMES)) {
       let row: RxStatusRow | null = reduceRxStatus(null, requested, {
@@ -53,8 +53,7 @@ describe("rx_status terminal outcomes stick (pure, all 5040 orderings)", () => {
         });
         if (isTerminalPharmacyOutcome(before)) {
           if (before.status === "cancelled") expect(row!.status).toBe("cancelled");
-          else if (before.status === "filled")
-            expect(["filled", "cancelled"]).toContain(row!.status);
+          else if (before.status === "filled") expect(row!.status).toBe("filled");
           else expect(["pharmacy_error", "filled", "cancelled"]).toContain(row!.status);
           // progress / retryable events never change a terminal row at all
           if (["queued", "transmitted", "status", "retryable", "fatal"].includes(name)) {
@@ -131,4 +130,81 @@ describe("rebuild equals incremental for sampled orderings (DB)", () => {
     for (const r of rows)
       expect(`${r.status}|${r.pharmacy_status}`).toBe(incremental[r.renewal_id]);
   }, 120_000);
+});
+
+describe("supersede / cancel / fill orderings (DB, all 24)", () => {
+  let db2: TestDb;
+  beforeAll(async () => {
+    db2 = await createTestDb();
+  }, 60_000);
+  afterAll(async () => {
+    await db2.drop();
+  });
+  const ctx = { actor: "t", role: "system", action: "t" } as const;
+
+  it("final status follows the precedence rules and a rebuild equals the incremental result", async () => {
+    const parts = ["supersede", "status", "fill", "ack"];
+    const expected: Record<string, string> = {};
+    let n = 0;
+    for (const order of permutations(parts)) {
+      const id = `ord-${n}`;
+      const by = `ord-by-${n}`;
+      n++;
+      const mk = (e: DomainEvent, rid = id) =>
+        makeEvent(e.type, { ...(e.data as object), renewalId: rid } as never);
+      await appendToStream(db2.sql, `renewal-${id}`, 0, [mk(requested), mk(PHARMACY.queued!)], ctx);
+      let v = 2;
+      // Simulate the documented precedence.
+      let s = "queued";
+      for (const p of order) {
+        if (p === "supersede") {
+          // The newer renewal's queued event (its own stream) names this one in `supersedes`.
+          await appendToStream(
+            db2.sql,
+            `renewal-${by}`,
+            0,
+            [
+              mk(requested, by),
+              makeEvent("RxRenewalQueued", {
+                v: 1,
+                renewalId: by,
+                prescriptionId: "rx",
+                idempotencyKey: `k-${by}`,
+                pharmacyId: "1234567",
+                messageId: `m-${by}`,
+                supersedes: [{ renewalId: id, pharmacyId: "1234567" }],
+              }),
+            ],
+            ctx,
+          );
+          if (s !== "filled" && s !== "cancelled") s = "cancel_requested";
+        } else {
+          const ev =
+            p === "status" ? PHARMACY.status! : p === "fill" ? PHARMACY.fill! : PHARMACY.cancel!;
+          await appendToStream(db2.sql, `renewal-${id}`, v++, [mk(ev)], ctx);
+          if (p === "status") {
+            if (s === "queued") s = "pharmacy_status";
+          } else if (p === "fill") {
+            if (s !== "cancelled") s = "filled";
+          } else if (s !== "filled") s = "cancelled";
+        }
+        await runAllProjections(db2.sql, registerAllProjections());
+      }
+      expected[id] = s;
+    }
+    const read = async () =>
+      Object.fromEntries(
+        (
+          await db2.sql.unsafe<{ renewal_id: string; status: string }[]>(
+            `SELECT renewal_id, status FROM rx_status WHERE renewal_id LIKE 'ord-%' AND renewal_id NOT LIKE 'ord-by-%'`,
+          )
+        ).map((r) => [r.renewal_id, r.status]),
+      );
+    expect(await read()).toEqual(expected);
+    await rebuildProjections(db2.sql, registerAllProjections(), { names: ["rx_status"] });
+    expect(await read()).toEqual(expected);
+    // The core invariant: once a fill precedes a cancel ack, the renewal is filled.
+    expect(Object.values(expected)).toContain("filled");
+    expect(Object.values(expected)).toContain("cancelled");
+  }, 180_000);
 });

@@ -51,7 +51,7 @@ describe("pure helpers", () => {
     // An approval with nothing queued behind it is never reported as sent.
     expect(resultStateFor("approved")).toBe("approved_waiting");
     expect(resultStateFor("queued")).toBe("approved");
-    expect(resultStateFor("filled")).toBe("approved");
+    expect(resultStateFor("filled")).toBe("filled");
     expect(resultStateFor("pharmacy_error")).toBe("pharmacy_problem");
     expect(resultStateFor("follow_up_required")).toBe("follow_up_needed");
     expect(resultStateFor("denied")).toBe("follow_up_needed");

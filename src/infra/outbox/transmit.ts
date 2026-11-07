@@ -11,7 +11,7 @@ import type { Sql } from "postgres";
 import { replay } from "@/domain/aggregate";
 import { loadStream } from "@/domain/aggregate-handler";
 import { makeEvent, type DomainEvent } from "@/domain/events";
-import { appendToStream } from "@/infra/audit";
+import { appendToStream, auditedTransaction } from "@/infra/audit";
 import { withConcurrencyRetry } from "@/infra/event-store";
 import { checkTransmittable, rxCancelKey } from "@/domain/pharmacy-queue";
 import { SUPERSEDABLE_CODES, UNCONFIRMED_CODE } from "@/domain/pharmacy-stall";
@@ -172,10 +172,15 @@ export function createTransmitDeadLetterHook(sql: Sql): DeadLetterHook {
             (!e.data.retryable || e.data.messageId === messageId)),
       );
       if (handled) return;
-      // Sent but never confirmed (e.g. a leased message reaped to dead) is NOT "could not be sent".
-      const wasTransmitted = events.some(
-        (e) => e.type === "RxRenewalTransmitted" && e.data.idempotencyKey === m.idempotencyKey,
-      );
+      // Sent but never confirmed (a leased message reaped to dead) is NOT "could not be sent".
+      // Retries exhausted by network failures or timeouts are the same: the pharmacy may have
+      // received the request, so the renewal stays supersedable (UNCONFIRMED), never silently
+      // duplicated under a new key. Only answers that prove it was NOT received (e.g. busy) stay
+      // TRANSMIT_DEAD_LETTERED.
+      const wasTransmitted =
+        events.some(
+          (e) => e.type === "RxRenewalTransmitted" && e.data.idempotencyKey === m.idempotencyKey,
+        ) || /pharmacy request failed/.test(m.lastError ?? "");
       await appendToStream(
         sql,
         renewalStreamId(renewalId),
@@ -244,7 +249,28 @@ export function createCancelHandler(deps: TransmitDeps): OutboxHandler {
     ) {
       throw new NonRetryableError("REFUSED: the renewal was never sent to this pharmacy");
     }
-    if (old.some((e) => e.type === "RxCancelAcknowledged")) return; // already cancelled
+    // Re-checked at SEND time (findSupersedable ran earlier, outside this transaction): a renewal
+    // that has meanwhile been filled or cancelled needs no CancelRx, and cancelling a filled
+    // prescription must never be attempted. The message completes; the reason is audited.
+    const ended = old.some((e) => e.type === "RxFillReceived")
+      ? "target already filled"
+      : old.some((e) => e.type === "RxCancelAcknowledged")
+        ? "target already cancelled"
+        : null;
+    if (ended !== null) {
+      await auditedTransaction(
+        deps.sql,
+        {
+          actor: "outbox-worker",
+          role: "system",
+          action: "pharmacy:cancel-skipped",
+          detail: { renewalId: payload.renewalId, supersededBy: newerId, reason: ended },
+        },
+        renewalStreamId(payload.renewalId),
+        async () => ({ result: null, detail: { reason: ended } }),
+      );
+      return;
+    }
     const signal = AbortSignal.any([message.signal, AbortSignal.timeout(deps.timeoutMs ?? 10_000)]);
     let response: Response;
     try {

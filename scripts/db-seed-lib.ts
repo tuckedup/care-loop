@@ -132,7 +132,10 @@ export async function runSeed(sql: Sql, opts: { seed: number }): Promise<SeedSum
         await seedRenewalRequest(sql, patient, r);
         summary.renewalsCreated++;
       } else summary.skipped++;
-      if (r.approvedBy) await seedApproval(sql, patient.patientId, r.renewalId, r.approvedBy);
+      if (r.approvedBy) {
+        await seedApproval(sql, patient.patientId, r.renewalId, r.approvedBy);
+        await seedFillHistory(sql, r, plan.pharmacies[0]!);
+      }
     }
   }
 
@@ -188,6 +191,61 @@ async function seedApproval(sql: Sql, patientId: string, renewalId: string, clin
       ctx("seed:RenewalApproved"),
     );
   }
+}
+
+/**
+ * Seed HISTORY end state: an approved renewal that was long ago sent and filled, so it reads
+ * "Filled" (terminal) instead of "approved, waiting to be sent" forever. Written directly as
+ * events (no outbox row: nothing is sent), deterministic ids, idempotent (skipped once a fill
+ * exists). The approval event stays, so the refill-limit counter still counts it.
+ */
+async function seedFillHistory(
+  sql: Sql,
+  r: SeedPriorRenewal,
+  pharmacy: { id: string; name: string; address: string; phone: string },
+) {
+  const stream = renewalStreamId(r.renewalId);
+  const { events, version } = await loadStream(sql, stream);
+  if (events.some((e) => e.type === "RxFillReceived")) return;
+  const key = `rx-renewal:${r.renewalId}`;
+  const messageId = `seedmsg-${r.renewalId}`;
+  await appendToStream(
+    sql,
+    stream,
+    version,
+    [
+      makeEvent("PharmacySelected", {
+        v: 1,
+        renewalId: r.renewalId,
+        pharmacyId: pharmacy.id,
+        name: pharmacy.name,
+        address: pharmacy.address,
+        phone: pharmacy.phone,
+      }),
+      makeEvent("RxRenewalQueued", {
+        v: 1,
+        renewalId: r.renewalId,
+        prescriptionId: r.prescriptionId,
+        idempotencyKey: key,
+        pharmacyId: pharmacy.id,
+        messageId,
+      }),
+      makeEvent("RxRenewalTransmitted", {
+        v: 1,
+        renewalId: r.renewalId,
+        messageId,
+        idempotencyKey: key,
+      }),
+      makeEvent("PharmacyStatusReceived", {
+        v: 1,
+        renewalId: r.renewalId,
+        messageId: `${messageId}:status`,
+        status: "OK",
+      }),
+      makeEvent("RxFillReceived", { v: 1, renewalId: r.renewalId, messageId: `${messageId}:fill` }),
+    ],
+    ctx("seed:FillHistory"),
+  );
 }
 
 async function seedRenewalRequest(sql: Sql, patient: SeedPatient, r: SeedPriorRenewal) {

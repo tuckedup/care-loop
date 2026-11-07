@@ -248,6 +248,103 @@ describe("item 2: supersede semantics", () => {
     ).toHaveLength(1);
   });
 
+  it("the reviewer's sequence: R1 filled after R2 queued its CancelRx => NO CancelRx sent, R1 stays filled, R2 still sent, one alert", async () => {
+    const { r1, r2 } = await r1Stalled();
+    await approveRenewal(db.sql, clinician, { renewalId: r2.renewalId, now: later(73) });
+    const cancelKey = `rx-cancel:${r1.renewalId}:${r2.renewalId}`;
+    expect(await outbox("pharmacy.CancelRx", cancelKey)).toHaveLength(1);
+    // R1's fill arrives BEFORE the worker gets to the CancelRx.
+    await consumePharmacyResponse(
+      db.sql,
+      {
+        renewalId: r1.renewalId,
+        messageId: `rxmsg-${r1.renewalId}`,
+        idempotencyKey: `rx-renewal:${r1.renewalId}`,
+        httpStatus: 200,
+        body: { messages: [{ type: "RxFill", messageId: `${r1.renewalId}:fill` }] },
+      },
+      { actor: "t", role: "system", action: "t" },
+    );
+    const p = pharmacy();
+    await work(p.fetch);
+    expect(p.calls.filter((c) => c.type === "CancelRx")).toHaveLength(0); // never cancel a filled Rx
+    expect(p.calls.filter((c) => c.type === "RxRenewalResponse").map((c) => c.renewalId)).toEqual([
+      r2.renewalId,
+    ]);
+    const [row] = await outbox("pharmacy.CancelRx", cancelKey);
+    expect(row!.status).toBe("done"); // completed, not dead
+    const [skip] = await db.sql.unsafe(
+      `SELECT detail FROM audit_log WHERE action = 'pharmacy:cancel-skipped' AND entity = $1`,
+      [`renewal-${r1.renewalId}`],
+    );
+    expect(skip!.detail.reason).toBe("target already filled");
+    await sync();
+    expect((await rx(r1.renewalId)).status).toBe("filled");
+    expect(await streamTypes(db.sql, r1.renewalId)).not.toContain("RxCancelAcknowledged");
+    const alerts = await alertsFor(r1.renewalId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ code: "FILL_AFTER_SUPERSEDE", status: "open" });
+    expect((await rx(r2.renewalId)).status).toBe("pharmacy_status");
+  });
+
+  it("a cancel acknowledgement AFTER a fill is an alerted anomaly, never a status change", async () => {
+    const { r1 } = await r1Stalled();
+    const send = (body: unknown) =>
+      consumePharmacyResponse(
+        db.sql,
+        {
+          renewalId: r1.renewalId,
+          messageId: `rxcancel-${r1.renewalId}`,
+          idempotencyKey: `rx-cancel:${r1.renewalId}:x`,
+          httpStatus: 200,
+          body,
+          kind: "cancel",
+        },
+        { actor: "t", role: "system", action: "t" },
+      );
+    await consumePharmacyResponse(
+      db.sql,
+      {
+        renewalId: r1.renewalId,
+        messageId: `rxmsg-${r1.renewalId}`,
+        idempotencyKey: `rx-renewal:${r1.renewalId}`,
+        httpStatus: 200,
+        body: { messages: [{ type: "RxFill", messageId: `${r1.renewalId}:fill` }] },
+      },
+      { actor: "t", role: "system", action: "t" },
+    );
+    const ack = {
+      messages: [{ type: "CancelRx", messageId: `${r1.renewalId}:cancel`, acknowledged: true }],
+    };
+    await send(ack);
+    await send(ack); // redelivery: still one anomaly
+    await sync();
+    expect(await streamTypes(db.sql, r1.renewalId)).not.toContain("RxCancelAcknowledged");
+    expect((await rx(r1.renewalId)).status).toBe("filled");
+    const alerts = (await alertsFor(r1.renewalId)).filter((a) => a.code === "CANCEL_AFTER_FILL");
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.message).toMatch(/fill stands/);
+  });
+
+  it("retries exhausted by timeouts become UNCONFIRMED (supersedable), not 'could not be sent'", async () => {
+    const r = await approvedRenewal(db.sql);
+    const boom = async () => {
+      throw new Error("ETIMEDOUT");
+    };
+    const f = boom as unknown as typeof fetch;
+    for (let i = 0; i < 6; i++) {
+      await runOnce(db.sql, {
+        registry: createDefaultRegistry({ sql: db.sql, baseUrl: "http://p.test", fetch: f }),
+        rng: mulberry32(1),
+        now: () => new Date(Date.now() + 60_000 + (i + 1) * 3_600_000),
+        config: { backoffBaseMs: 1, backoffCapMs: 2 },
+      });
+    }
+    await sync();
+    expect((await rx(r.renewalId)).pharmacyStatus).toBe("ERROR:TRANSMIT_UNCONFIRMED");
+    expect((await alertsFor(r.renewalId))[0]).toMatchObject({ code: "TRANSMIT_UNCONFIRMED" });
+  });
+
   it("R3 after R2 works: R2 filled, R1 cancelled => R3 starts, is approved and is sent", async () => {
     const { r1, r2 } = await r1Stalled();
     await approveRenewal(db.sql, clinician, { renewalId: r2.renewalId, now: later(73) });
