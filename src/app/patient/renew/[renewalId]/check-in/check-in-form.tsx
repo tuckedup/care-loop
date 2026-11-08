@@ -3,6 +3,7 @@
 // fields with aria-describedby and aria-invalid, and an error summary that takes focus.
 // Validation is authoritative on the server (Zod); nothing here is trusted.
 import { useActionState, useEffect, useRef } from "react";
+import { Notice, buttonClass, inputClass } from "../../../../_components/ui";
 import {
   GAD7_ITEMS,
   initialCheckInState,
@@ -17,12 +18,15 @@ type Action = (prev: CheckInFormState, formData: FormData) => Promise<CheckInFor
 function FieldError({ id, message }: { id: string; message?: string | undefined }) {
   if (!message) return null;
   return (
-    <p id={`${id}-error`} className="mt-1 text-sm text-red-800 dark:text-red-300">
+    <p id={`${id}-error`} className="mt-2 text-sm font-medium text-red-800 dark:text-red-300">
       <span className="sr-only">Error: </span>
       {message}
     </p>
   );
 }
+
+const chipClass =
+  "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line-strong bg-canvas px-3 py-2 text-sm font-medium hover:border-brand-600 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-900 dark:has-[:checked]:bg-sunken dark:has-[:checked]:text-brand-300";
 
 function ScaleQuestion({
   name,
@@ -42,16 +46,17 @@ function ScaleQuestion({
     <fieldset
       id={id}
       aria-describedby={error ? `${id}-error` : undefined}
-      className="border-t border-slate-200 py-3 dark:border-slate-800"
+      className="mt-3 rounded-xl border border-line bg-surface p-4"
     >
-      <legend className="text-sm font-medium">
+      <legend className="px-1 text-sm font-semibold leading-6">
         {index + 1}. {text}
       </legend>
-      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {RESPONSE_OPTIONS.map((o) => (
-          <label key={o.value} className="flex items-center gap-2 text-sm">
+          <label key={o.value} className={chipClass}>
             <input
               type="radio"
+              className="h-4 w-4 accent-brand-700"
               name={id}
               value={o.value}
               defaultChecked={checked === o.value}
@@ -88,15 +93,16 @@ function YesNo({
     <fieldset
       id={name}
       aria-describedby={error ? `${name}-error` : undefined}
-      className="border-t border-slate-200 py-3 dark:border-slate-800"
+      className="mt-3 rounded-xl border border-line bg-surface p-4"
     >
-      <legend className="text-sm font-medium">{legend}</legend>
-      {help ? <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{help}</p> : null}
-      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+      <legend className="px-1 text-sm font-semibold leading-6">{legend}</legend>
+      {help ? <p className="mt-1 text-xs text-muted">{help}</p> : null}
+      <div className="mt-2 flex flex-wrap gap-2">
         {options.map((o) => (
-          <label key={o.value} className="flex items-center gap-2 text-sm">
+          <label key={o.value} className={chipClass}>
             <input
               type="radio"
+              className="h-4 w-4 accent-brand-700"
               name={name}
               value={o.value}
               defaultChecked={checked === o.value}
@@ -129,7 +135,7 @@ export function CheckInForm({ action }: { action: Action }) {
 
   return (
     // Remount after a failed submit so defaults (the re-filled answers) apply.
-    <form action={formAction} key={state.attempt} className="mt-6" data-testid="checkin-form">
+    <form action={formAction} key={state.attempt} className="mt-8" data-testid="checkin-form">
       <div
         ref={summaryRef}
         tabIndex={-1}
@@ -137,7 +143,7 @@ export function CheckInForm({ action }: { action: Action }) {
         data-testid="checkin-errors"
         className={
           errorKeys.length > 0 || state.formError
-            ? "mb-6 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900"
+            ? "mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"
             : "sr-only"
         }
       >
@@ -161,13 +167,15 @@ export function CheckInForm({ action }: { action: Action }) {
         ) : null}
       </div>
 
-      <p className="mb-4 rounded bg-slate-100 p-3 text-sm dark:bg-slate-900">
-        If you are thinking about harming yourself or are in crisis, call or text 988 (US) or your
-        local emergency number now. Do not wait for this form.
-      </p>
+      <div className="mb-8">
+        <Notice tone="warning" title="If you are in crisis, do not wait for this form">
+          If you are thinking about harming yourself or are in crisis, call or text 988 (US) or your
+          local emergency number now. Do not wait for this form.
+        </Notice>
+      </div>
 
-      <h2 className="text-lg font-semibold">Over the last 2 weeks (PHQ-9)</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <h2 className="font-display text-2xl font-semibold">Over the last 2 weeks (PHQ-9)</h2>
+      <p className="mt-1 text-sm text-muted">
         How often have you been bothered by the following problems?
       </p>
       {PHQ9_ITEMS.map((text, i) => (
@@ -181,8 +189,8 @@ export function CheckInForm({ action }: { action: Action }) {
         />
       ))}
 
-      <h2 className="mt-8 text-lg font-semibold">Over the last 2 weeks (GAD-7)</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <h2 className="mt-12 font-display text-2xl font-semibold">Over the last 2 weeks (GAD-7)</h2>
+      <p className="mt-1 text-sm text-muted">
         How often have you been bothered by the following problems?
       </p>
       {GAD7_ITEMS.map((text, i) => (
@@ -196,16 +204,17 @@ export function CheckInForm({ action }: { action: Action }) {
         />
       ))}
 
-      <h2 className="mt-8 text-lg font-semibold">About your medication</h2>
-      <fieldset id="sideEffects" className="border-t border-slate-200 py-3 dark:border-slate-800">
-        <legend className="text-sm font-medium">
+      <h2 className="mt-12 font-display text-2xl font-semibold">About your medication</h2>
+      <fieldset id="sideEffects" className="mt-3 rounded-xl border border-line bg-surface p-4">
+        <legend className="px-1 text-sm font-semibold leading-6">
           Any side effects since your last renewal? (select all that apply)
         </legend>
         <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
           {SIDE_EFFECT_OPTIONS.map((o) => (
-            <label key={o} className="flex items-center gap-2 text-sm">
+            <label key={o} className={chipClass}>
               <input
                 type="checkbox"
+                className="h-4 w-4 accent-brand-700"
                 name="sideEffects"
                 value={o}
                 defaultChecked={v?.sideEffects.includes(o) ?? false}
@@ -214,7 +223,7 @@ export function CheckInForm({ action }: { action: Action }) {
             </label>
           ))}
         </div>
-        <label htmlFor="sideEffectOther" className="mt-3 block text-sm">
+        <label htmlFor="sideEffectOther" className="mt-4 block text-sm font-semibold">
           Other side effect (optional)
         </label>
         <input
@@ -223,7 +232,7 @@ export function CheckInForm({ action }: { action: Action }) {
           type="text"
           maxLength={200}
           defaultValue={otherSideEffect}
-          className="mt-1 w-full rounded border border-slate-400 px-3 py-2 dark:bg-slate-900"
+          className={`${inputClass} mt-1`}
         />
         <FieldError id="sideEffects" message={errs.sideEffects} />
       </fieldset>
@@ -253,8 +262,8 @@ export function CheckInForm({ action }: { action: Action }) {
         error={errs.maniaScreen}
       />
 
-      <div className="border-t border-slate-200 py-3 dark:border-slate-800">
-        <label htmlFor="requestedChange" className="block text-sm font-medium">
+      <div className="mt-3 rounded-xl border border-line bg-surface p-4">
+        <label htmlFor="requestedChange" className="block text-sm font-semibold">
           Do you want to change anything about this medication?
         </label>
         <select
@@ -262,7 +271,7 @@ export function CheckInForm({ action }: { action: Action }) {
           name="requestedChange"
           defaultValue={v?.requestedChange ?? "none"}
           aria-describedby={errs.requestedChange ? "requestedChange-error" : undefined}
-          className="mt-1 rounded border border-slate-400 px-3 py-2 dark:bg-slate-900"
+          className={`${inputClass} mt-2`}
         >
           <option value="none">No change, renew as is</option>
           <option value="dose">Change the dose</option>
@@ -273,8 +282,8 @@ export function CheckInForm({ action }: { action: Action }) {
         <FieldError id="requestedChange" message={errs.requestedChange} />
       </div>
 
-      <div className="border-t border-slate-200 py-3 dark:border-slate-800">
-        <label htmlFor="freeText" className="block text-sm font-medium">
+      <div className="mt-3 rounded-xl border border-line bg-surface p-4">
+        <label htmlFor="freeText" className="block text-sm font-semibold">
           Anything else you want your care team to know? (optional)
         </label>
         <textarea
@@ -284,15 +293,16 @@ export function CheckInForm({ action }: { action: Action }) {
           maxLength={2000}
           defaultValue={v?.freeText ?? ""}
           aria-describedby={errs.freeText ? "freeText-error" : undefined}
-          className="mt-1 w-full rounded border border-slate-400 px-3 py-2 dark:bg-slate-900"
+          className={`${inputClass} mt-2`}
         />
         <FieldError id="freeText" message={errs.freeText} />
       </div>
 
-      <div className="border-t border-slate-200 py-3 dark:border-slate-800">
-        <label className="flex items-center gap-2 text-sm">
+      <div className="mt-3 rounded-xl border border-line bg-surface p-4">
+        <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
           <input
             type="checkbox"
+            className="h-5 w-5 accent-brand-700"
             name="requestedHuman"
             defaultChecked={v?.requestedHuman ?? false}
           />
@@ -303,7 +313,7 @@ export function CheckInForm({ action }: { action: Action }) {
       <button
         type="submit"
         disabled={pending}
-        className="mt-4 rounded bg-slate-900 px-5 py-2 text-white hover:bg-slate-700 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900"
+        className={buttonClass("primary", "mt-8 w-full sm:w-auto")}
       >
         {pending ? "Submitting..." : "Submit check-in"}
       </button>

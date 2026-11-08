@@ -20,8 +20,8 @@ export default async function Page() {
   const alerts = await listPharmacyAlerts(sql);
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Pharmacy alerts</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Pharmacy alerts</h1>
+      <p className="mt-2 text-sm text-muted">
         Escalations and problems reported by the pharmacy. A pharmacist acknowledges them.
       </p>
       {alerts.length === 0 ? (
@@ -36,7 +36,7 @@ export default async function Page() {
               data-testid={`clinician-alert-${a.messageId}`}
               data-status={a.status}
               data-kind={a.kind}
-              className="rounded border border-slate-300 p-4 dark:border-slate-700"
+              className="rounded-xl border bg-surface border-line-strong p-4"
             >
               <p className="text-sm font-medium">
                 {LABEL[a.kind]} ·{" "}

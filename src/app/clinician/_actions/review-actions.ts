@@ -38,6 +38,8 @@ async function run<S extends z.ZodType<{ renewalId: string }>>(
     throw e;
   }
   revalidatePath("/clinician/queue");
+  // The visit view reads projections per request; invalidate it so the panel reflects the command.
+  revalidatePath("/clinician/renewals/[renewalId]", "page");
   return { ok: true };
 }
 

@@ -22,8 +22,8 @@ export default async function Page() {
   const open = alerts.filter((a) => a.status === "open");
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Pharmacist inbox</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Pharmacist inbox</h1>
+      <p className="mt-2 text-sm text-muted">
         Messages from the (simulated) pharmacy that need a person. Synthetic data only.
       </p>
       {alerts.length === 0 ? (
@@ -42,11 +42,11 @@ export default async function Page() {
                 data-testid={`alert-${a.messageId}`}
                 data-status={a.status}
                 data-kind={a.kind}
-                className="rounded border border-slate-300 p-4 dark:border-slate-700"
+                className="rounded-xl border bg-surface border-line-strong p-4"
               >
                 <p className="text-sm font-medium">{KIND_LABEL[a.kind]}</p>
                 <p className="mt-1">{a.message}</p>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                <p className="mt-1 text-xs text-muted">
                   Renewal {a.renewalId}
                   {a.code ? ` · ${a.code}` : ""} · received{" "}
                   <time dateTime={a.raisedAt}>{a.raisedAt.replace("T", " ").slice(0, 16)} UTC</time>
@@ -57,7 +57,7 @@ export default async function Page() {
                     <input type="hidden" name="messageId" value={a.messageId} />
                     <button
                       type="submit"
-                      className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 disabled:opacity-60"
                     >
                       Acknowledge
                     </button>

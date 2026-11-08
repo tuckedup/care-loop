@@ -51,7 +51,7 @@ export async function AutonomySwitch() {
           Automatic renewals are disabled in production. Every request requires clinician review.
         </p>
       )}
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <p className="mt-1 text-sm text-muted">
         Only renewals the deterministic rules mark AUTO_ELIGIBLE (all checks clean, no AI signal,
         not controlled, identity verified, pharmacy confirmed) can ever be auto-approved. The
         language model can only add escalations; it never approves. Escalated, rejected, follow-up
@@ -67,11 +67,11 @@ export async function AutonomySwitch() {
               value={m.mode}
               disabled={m.mode === mode || (locked && m.mode !== "SHADOW")}
               aria-label={`Set mode ${m.mode}`}
-              className="rounded border border-slate-400 px-3 py-1 text-sm disabled:cursor-default disabled:bg-slate-200 disabled:text-slate-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-100"
+              className="rounded-xl border bg-surface border-line-strong px-3 py-1 text-sm disabled:cursor-default disabled:bg-slate-200 disabled:text-slate-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-100"
             >
               {m.mode === mode ? `${m.label} (current)` : m.label}
             </button>
-            <span className="pt-1 text-sm text-slate-600 dark:text-slate-400">{m.help}</span>
+            <span className="pt-1 text-sm text-muted">{m.help}</span>
           </div>
         ))}
       </form>

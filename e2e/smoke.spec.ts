@@ -4,7 +4,9 @@ import { expect, test } from "@playwright/test";
 test("home page renders with the synthetic-data banner", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "A clearer loop for prescription renewals." }),
+    page.getByRole("heading", {
+      name: "Safer psychiatric prescription renewals, with a clinician in the loop.",
+    }),
   ).toBeVisible();
   await expect(page.getByTestId("synthetic-banner")).toContainText("Synthetic data only");
   await expect(page.getByRole("link", { name: "Explore the synthetic demo" })).toHaveAttribute(
@@ -39,6 +41,10 @@ test("demo entry point works at mobile width and by keyboard", async ({ page }) 
   for (const width of [320, 375]) {
     await page.setViewportSize({ width, height: 812 });
     await page.goto("/");
+    // First stop is the skip link, then the brand link, then the hero call to action.
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("link", { name: "Skip to main content" })).toBeFocused();
+    await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Explore the synthetic demo" })).toBeFocused();
     const overflow = await page.evaluate(

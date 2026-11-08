@@ -1,4 +1,14 @@
 import {
+  Badge,
+  Card,
+  FlowSteps,
+  Notice,
+  PageHeader,
+  PageShell,
+  PillIcon,
+  buttonClass,
+} from "../../_components/ui";
+import {
   formatFrequency,
   listPatientMedsForRenewal,
   syncProjections,
@@ -27,64 +37,76 @@ export default async function Page({
   const meds = await listPatientMedsForRenewal(sql, patientId);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Patient renewal</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Choose a current medication to renew. Synthetic data only.
-      </p>
+    <PageShell>
+      <FlowSteps current={1} />
+      <PageHeader
+        title="Patient renewal"
+        lead="Choose a current medication to renew. Synthetic data only."
+      />
       {error ? (
-        <p
-          role="alert"
-          className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900"
-        >
-          {ERRORS[error] ?? "Something went wrong. Please try again."}
-        </p>
+        <div className="mt-6">
+          <Notice tone="danger" role="alert">
+            {ERRORS[error] ?? "Something went wrong. Please try again."}
+          </Notice>
+        </div>
       ) : null}
 
-      {meds.length === 0 ? (
-        <p className="mt-6" data-testid="no-meds">
-          You have no active medications on file.
-        </p>
-      ) : (
-        <ul className="mt-6 flex flex-col gap-3" aria-label="Your active medications">
-          {meds.map((m) => (
-            <li
-              key={m.prescriptionId}
-              data-testid={`med-${m.prescriptionId}`}
-              className="rounded border border-slate-300 p-4 dark:border-slate-700"
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div>
-                  <p className="font-medium">{m.drugName}</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    {m.doseMg} mg, {formatFrequency(m.frequency)}
-                  </p>
+      <section className="mt-8" aria-labelledby="meds-heading">
+        <h2 id="meds-heading" className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Your active medications
+        </h2>
+        {meds.length === 0 ? (
+          <Card className="mt-3">
+            <p data-testid="no-meds">You have no active medications on file.</p>
+          </Card>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-3" aria-label="Your active medications">
+            {meds.map((m) => (
+              <li
+                key={m.prescriptionId}
+                data-testid={`med-${m.prescriptionId}`}
+                className="rounded-card border border-line bg-surface p-5 shadow-card"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-800 dark:bg-sunken dark:text-brand-300">
+                      <PillIcon className="h-6 w-6" />
+                    </span>
+                    <div>
+                      <p className="text-lg font-semibold">{m.drugName}</p>
+                      <p className="text-sm text-muted">
+                        {m.doseMg} mg, {formatFrequency(m.frequency)}
+                      </p>
+                    </div>
+                  </div>
+                  {m.blocked === null ? (
+                    <form action={startRenewalAction}>
+                      <input type="hidden" name="prescriptionId" value={m.prescriptionId} />
+                      <button type="submit" className={buttonClass("primary")}>
+                        Request renewal<span className="sr-only"> for {m.drugName}</span>
+                      </button>
+                    </form>
+                  ) : (
+                    <div data-testid={`not-renewable-${m.prescriptionId}`} className="max-w-sm">
+                      <Badge tone="warning">Not renewable here</Badge>
+                      <p className="mt-2 text-sm text-muted">
+                        {m.blocked === "controlled"
+                          ? `Controlled medication${m.controlledSchedule ? ` (Schedule ${m.controlledSchedule})` : ""}: not renewable here. Please contact your clinician.`
+                          : "Not renewable here. Please contact your clinician."}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                {m.blocked === null ? (
-                  <form action={startRenewalAction}>
-                    <input type="hidden" name="prescriptionId" value={m.prescriptionId} />
-                    <button
-                      type="submit"
-                      className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"
-                    >
-                      Request renewal<span className="sr-only"> for {m.drugName}</span>
-                    </button>
-                  </form>
-                ) : (
-                  <p
-                    data-testid={`not-renewable-${m.prescriptionId}`}
-                    className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900"
-                  >
-                    {m.blocked === "controlled"
-                      ? `Controlled medication${m.controlledSchedule ? ` (Schedule ${m.controlledSchedule})` : ""}: not renewable here. Please contact your clinician.`
-                      : "Not renewable here. Please contact your clinician."}
-                  </p>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <p className="mt-8 text-sm text-muted">
+        Renewals are for stable, existing, non-controlled prescriptions only. Anything else is
+        routed to a clinician.
+      </p>
+    </PageShell>
   );
 }

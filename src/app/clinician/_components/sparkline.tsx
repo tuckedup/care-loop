@@ -36,7 +36,7 @@ export function Sparkline({ id, label, max, points }: Props) {
         width={W}
         height={H}
         viewBox={`0 0 ${W} ${H}`}
-        className="text-slate-700 dark:text-slate-300"
+        className="text-muted"
       >
         <title id={`${id}-title`}>{`${label} trend`}</title>
         <desc id={`${id}-desc`}>{sentence}</desc>
@@ -53,9 +53,7 @@ export function Sparkline({ id, label, max, points }: Props) {
         <span data-testid={`sparkline-${id}-latest`}>
           {latest ? `latest ${latest.value}/${max}` : "no data"}
         </span>
-        {prev ? (
-          <span className="text-slate-600 dark:text-slate-400"> (was {prev.value})</span>
-        ) : null}
+        {prev ? <span className="text-muted"> (was {prev.value})</span> : null}
         <span className="sr-only"> {sentence}</span>
       </figcaption>
     </figure>

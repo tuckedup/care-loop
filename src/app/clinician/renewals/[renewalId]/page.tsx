@@ -37,19 +37,17 @@ function Med({ m, requested }: { m: MedRow; requested: boolean }) {
         {m.doseMg} mg {freqText(m.frequency)}
       </span>
       {m.doseChanged ? (
-        <span className="rounded border border-amber-700 bg-amber-50 px-2 text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+        <span className="rounded-xl border bg-surface border-amber-700 bg-amber-50 px-2 text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-100">
           DOSE CHANGED
         </span>
       ) : null}
       {requested ? (
-        <span className="rounded border border-blue-700 px-2 text-xs font-semibold">
+        <span className="rounded-xl border bg-surface border-blue-700 px-2 text-xs font-semibold">
           Requested for renewal
         </span>
       ) : null}
       {m.status === "stopped" && m.stoppedAt ? (
-        <span className="text-sm text-slate-600 dark:text-slate-400">
-          stopped {m.stoppedAt.slice(0, 10)}
-        </span>
+        <span className="text-sm text-muted">stopped {m.stoppedAt.slice(0, 10)}</span>
       ) : null}
     </li>
   );
@@ -152,7 +150,7 @@ export default async function VisitPage({
         </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Visit view</h1>
-      <p className="text-sm text-slate-600 dark:text-slate-400" data-testid="visit-header">
+      <p className="text-sm text-muted" data-testid="visit-header">
         {data.patientName ? `${data.patientName} (synthetic) · ` : ""}patient{" "}
         {row.patientId ?? "unknown"} · renewal {row.renewalId} · status{" "}
         <span data-testid="visit-status">{row.status}</span>
@@ -161,7 +159,7 @@ export default async function VisitPage({
       {notice ? (
         <p
           role="alert"
-          className="mt-3 rounded border border-amber-700 p-2 text-sm"
+          className="mt-3 rounded-xl border bg-surface border-amber-700 p-2 text-sm"
           data-testid="notice"
         >
           Could not start the review ({notice}). See the actions panel.
@@ -211,7 +209,7 @@ export default async function VisitPage({
           className="mt-3 flex flex-wrap gap-2"
         >
           {row.anomalies.map((a) => (
-            <li key={a} className="rounded border border-amber-700 px-2 text-sm">
+            <li key={a} className="rounded-xl border bg-surface border-amber-700 px-2 text-sm">
               Anomaly: <span className="font-mono">{a}</span>
             </li>
           ))}
@@ -220,7 +218,10 @@ export default async function VisitPage({
 
       <Section id="meds-heading" title="Medications">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div data-testid="meds-active" className="rounded border border-green-700 p-3">
+          <div
+            data-testid="meds-active"
+            className="rounded-xl border bg-surface border-green-700 p-3"
+          >
             <h3 className="font-semibold">Active ({active.length})</h3>
             {active.length === 0 ? (
               <p className="text-sm">None.</p>
@@ -234,7 +235,7 @@ export default async function VisitPage({
           </div>
           <div
             data-testid="meds-stopped"
-            className="rounded border border-slate-500 p-3 text-slate-700 dark:text-slate-300"
+            className="rounded-xl border bg-surface border-line-strong p-3 text-muted"
           >
             <h3 className="font-semibold">Stopped ({stopped.length})</h3>
             {stopped.length === 0 ? (

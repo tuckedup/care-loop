@@ -1,4 +1,12 @@
 import { selectPharmacy, toPharmacyConfirmation } from "@/domain/pharmacy";
+import {
+  FlowSteps,
+  Notice,
+  PageHeader,
+  PageShell,
+  StoreIcon,
+  buttonClass,
+} from "../../_components/ui";
 import { listPharmacies } from "../_lib/pharmacy-service";
 import { loadRenewalForStep, requirePatient } from "../_lib/session";
 import { confirmRenewalPharmacyAction } from "./actions";
@@ -29,27 +37,26 @@ export default async function Page({
   const chosen = selection?.ok ? toPharmacyConfirmation(selection.pharmacy) : null;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Choose your pharmacy</h1>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Check the details before your renewal is sent. Synthetic pharmacies only.
-      </p>
+    <PageShell width="max-w-2xl">
+      {renewalId ? <FlowSteps current={3} /> : null}
+      <PageHeader
+        title="Choose your pharmacy"
+        lead="Check the details before your renewal is sent. Synthetic pharmacies only."
+      />
 
       {selection && !selection.ok ? (
-        <p
-          role="alert"
-          data-testid="pharmacy-error"
-          className="mt-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900"
-        >
-          {ERRORS[selection.error]}
-        </p>
+        <div className="mt-6">
+          <Notice tone="danger" role="alert" data-testid="pharmacy-error">
+            {ERRORS[selection.error]}
+          </Notice>
+        </div>
       ) : null}
 
       {chosen && confirmed === "1" && !renewalId ? (
         <section
           aria-labelledby="done-heading"
           data-testid="pharmacy-confirmed"
-          className="mt-6 rounded border border-green-300 bg-green-50 p-4 text-green-900"
+          className="mt-8 rounded-card border border-emerald-300 bg-emerald-50 p-5 text-emerald-950 shadow-card"
         >
           <h2 id="done-heading" className="font-medium">
             Pharmacy confirmed
@@ -60,30 +67,28 @@ export default async function Page({
         <section
           aria-labelledby="confirm-heading"
           data-testid="pharmacy-confirm"
-          className="mt-6 rounded border border-slate-300 p-4 dark:border-slate-700"
+          className="mt-8 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6"
         >
-          <h2 id="confirm-heading" className="font-medium">
+          <h2 id="confirm-heading" className="flex items-center gap-2 text-lg font-semibold">
+            <StoreIcon className="h-5 w-5 text-brand-700" />
             Confirm this pharmacy
           </h2>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-slate-600 dark:text-slate-400">Name</dt>
+          <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+            <dt className="text-muted">Name</dt>
             <dd data-testid="confirm-name">{chosen.name}</dd>
-            <dt className="text-slate-600 dark:text-slate-400">Address</dt>
+            <dt className="text-muted">Address</dt>
             <dd data-testid="confirm-address">{chosen.address}</dd>
-            <dt className="text-slate-600 dark:text-slate-400">Phone</dt>
+            <dt className="text-muted">Phone</dt>
             <dd data-testid="confirm-phone">{chosen.phone}</dd>
           </dl>
           <form
             {...(renewalId ? { action: confirmRenewalPharmacyAction } : { method: "get" })}
-            className="mt-4 flex flex-wrap gap-3"
+            className="mt-6 flex flex-wrap items-center gap-3"
           >
             {renewalId ? <input type="hidden" name="renewalId" value={renewalId} /> : null}
             <input type="hidden" name="pharmacyId" value={chosen.pharmacyId} />
             {renewalId ? null : <input type="hidden" name="confirmed" value="1" />}
-            <button
-              type="submit"
-              className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"
-            >
+            <button type="submit" className={buttonClass("primary")}>
               Confirm pharmacy
             </button>
             <a
@@ -92,7 +97,7 @@ export default async function Page({
                   ? `/patient/pharmacy?renewalId=${encodeURIComponent(renewalId)}`
                   : "/patient/pharmacy"
               }
-              className="px-2 py-2 text-sm underline"
+              className={buttonClass("ghost")}
             >
               Choose a different pharmacy
             </a>
@@ -101,13 +106,21 @@ export default async function Page({
       ) : (
         <form method="get" className="mt-6">
           {renewalId ? <input type="hidden" name="renewalId" value={renewalId} /> : null}
-          <fieldset>
-            <legend className="font-medium">Pharmacies</legend>
+          <fieldset className="mt-8">
+            <legend className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Pharmacies
+            </legend>
             <ul className="mt-3 flex flex-col gap-2">
               {pharmacies.map((p) => (
                 <li key={p.id}>
-                  <label className="flex items-center gap-3 rounded border border-slate-300 p-3 dark:border-slate-700">
-                    <input type="radio" name="pharmacyId" value={p.id} required />
+                  <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-line-strong bg-surface p-3 hover:border-brand-600 has-[:checked]:border-brand-700 has-[:checked]:bg-brand-50 dark:has-[:checked]:bg-sunken">
+                    <input
+                      type="radio"
+                      className="h-4 w-4 accent-brand-700"
+                      name="pharmacyId"
+                      value={p.id}
+                      required
+                    />
                     <span>{p.name}</span>
                   </label>
                 </li>
@@ -119,14 +132,11 @@ export default async function Page({
               No pharmacies are available.
             </p>
           ) : null}
-          <button
-            type="submit"
-            className="mt-4 rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900"
-          >
+          <button type="submit" className={buttonClass("primary", "mt-6")}>
             Review pharmacy
           </button>
         </form>
       )}
-    </main>
+    </PageShell>
   );
 }

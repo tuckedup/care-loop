@@ -85,7 +85,9 @@ test("another patient cannot open that renewal; other roles cannot open the pati
   await loginAsPatient(context, "patient-trazodone");
   await page.goto(url);
   await expect(page).toHaveURL(/\/patient\/renew\?error=NOT_FOUND$/);
-  await expect(page.getByRole("alert")).toContainText("could not find");
+  await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText(
+    "could not find",
+  );
 
   await page.goto("/login");
   await page.getByRole("button", { name: "Continue as clinician" }).click();

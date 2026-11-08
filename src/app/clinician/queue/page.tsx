@@ -31,12 +31,12 @@ function Badge({
   const cls = {
     red: "border-red-700 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-100",
     amber: "border-amber-700 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100",
-    slate: "border-slate-500 bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100",
+    slate: "border-line-strong bg-slate-50 text-slate-900 dark:text-slate-100",
   }[tone];
   return (
     <span
       data-testid={testId}
-      className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${cls}`}
+      className={`inline-block rounded-xl border bg-surface px-2 py-0.5 text-xs font-medium ${cls}`}
     >
       {children}
     </span>
@@ -54,13 +54,13 @@ function Item({ item, canStart }: { item: QueueItem; canStart: boolean }) {
       data-status={row.status}
       data-escalated={escalated ? "true" : "false"}
       data-awaiting-evaluation={item.awaitingEvaluation ? "true" : "false"}
-      className={`rounded border p-4 ${escalated && open ? "border-2 border-red-700" : "border-slate-300 dark:border-slate-700"}`}
+      className={`rounded border p-4 ${escalated && open ? "border-2 border-red-700" : "border-line-strong"}`}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">
           {item.drugName ?? row.prescriptionId ?? "Unknown medication"}
         </span>
-        <span className="text-sm text-slate-600 dark:text-slate-400">
+        <span className="text-sm text-muted">
           patient {row.patientId ?? "unknown"} · renewal {row.renewalId}
         </span>
       </div>
@@ -122,7 +122,7 @@ function Item({ item, canStart }: { item: QueueItem; canStart: boolean }) {
             <input type="hidden" name="renewalId" value={row.renewalId} />
             <button
               type="submit"
-              className="rounded border border-slate-500 px-3 py-1.5 text-sm font-medium focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+              className="rounded-xl border bg-surface border-line-strong px-3 py-1.5 text-sm font-medium focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
             >
               Open and start review
             </button>
@@ -145,8 +145,8 @@ export default async function QueuePage() {
   const canStart = session.role === "clinician";
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
-      <h1 className="text-2xl font-semibold">Clinician queue</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Clinician queue</h1>
+      <p className="mt-1 text-sm text-muted">
         Escalated renewals are listed first and stay open until a clinician approves, denies or
         books a visit. Renewals that have not been evaluated yet are shown too.
       </p>
@@ -162,7 +162,7 @@ export default async function QueuePage() {
             <h2 id={`h-${s.status}`} className="text-lg font-semibold">
               {s.title} <span className="text-sm font-normal">({list.length})</span>
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">{s.help}</p>
+            <p className="text-sm text-muted">{s.help}</p>
             {list.length === 0 ? (
               <p className="mt-2 text-sm" data-testid={`empty-${s.status}`}>
                 None.

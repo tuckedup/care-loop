@@ -52,8 +52,8 @@ export default async function VisitsPage({
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
-      <h1 className="text-2xl font-semibold">Follow-up visits</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Follow-up visits</h1>
+      <p className="mt-1 text-sm text-muted">
         Synthetic demo data. Signing a note creates a follow-up task and a calendar slot; the note
         text itself is not stored in this demo.
       </p>
@@ -74,18 +74,18 @@ export default async function VisitsPage({
               key={v.visitId}
               data-testid={`visit-${v.visitId}`}
               data-status={v.status}
-              className="rounded border border-slate-300 p-4 dark:border-slate-700"
+              className="rounded-xl border bg-surface border-line-strong p-4"
             >
               <div className="text-sm font-medium">
                 {fmt(v.start)} to {fmt(v.end)}
               </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">
+              <div className="text-sm text-muted">
                 patient {v.patientId}
                 {v.renewalId ? ` · renewal ${v.renewalId}` : ""} · clinician{" "}
                 {v.clinicianId ?? "unassigned"}
               </div>
               <div className="mt-2 flex items-center gap-3">
-                <span className="rounded border border-slate-500 px-2 py-0.5 text-xs font-medium">
+                <span className="rounded-xl border bg-surface border-line-strong px-2 py-0.5 text-xs font-medium">
                   {v.status === "note_signed" ? "Note signed" : "Booked"}
                 </span>
                 {v.status === "booked" && canSign && v.clinicianId === session?.sub ? (
@@ -94,7 +94,7 @@ export default async function VisitsPage({
                       <input type="hidden" name="visitId" value={v.visitId} />
                       <button
                         type="submit"
-                        className="rounded border border-slate-400 px-3 py-1.5 text-sm font-medium dark:border-slate-600"
+                        className="rounded-xl border bg-surface border-line-strong px-3 py-1.5 text-sm font-medium"
                       >
                         Sign visit note
                       </button>
@@ -105,7 +105,7 @@ export default async function VisitsPage({
                         type="button"
                         disabled
                         aria-describedby={`sign-help-${v.visitId}`}
-                        className="rounded border border-slate-400 px-3 py-1.5 text-sm font-medium opacity-50 dark:border-slate-600"
+                        className="rounded-xl border bg-surface border-line-strong px-3 py-1.5 text-sm font-medium opacity-50"
                       >
                         Sign visit note
                       </button>
@@ -132,7 +132,7 @@ export default async function VisitsPage({
               key={t.taskId}
               data-testid={`task-${t.taskId}`}
               data-status={t.status}
-              className="rounded border border-slate-300 p-3 text-sm dark:border-slate-700"
+              className="rounded-xl border bg-surface border-line-strong p-3 text-sm"
             >
               <span className="font-medium">Follow-up visit</span> for patient {t.patientId}
               {t.visitId ? ` (visit ${t.visitId})` : ""} · status {t.status}
@@ -151,7 +151,7 @@ export default async function VisitsPage({
             <li
               key={s.slotId}
               data-testid={`slot-${s.slotId}`}
-              className="rounded border border-slate-300 p-3 text-sm dark:border-slate-700"
+              className="rounded-xl border bg-surface border-line-strong p-3 text-sm"
             >
               {fmt(s.start)} to {fmt(s.end)} · visit {s.visitId}
             </li>

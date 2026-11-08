@@ -26,7 +26,7 @@ export interface ReviewPanelProps {
 }
 
 const btn =
-  "rounded border px-3 py-2 text-sm font-medium focus:outline-2 focus:outline-offset-2 focus:outline-blue-700 disabled:cursor-not-allowed disabled:opacity-50 border-slate-400 dark:border-slate-600";
+  "rounded-xl border bg-surface px-3 py-2 text-sm font-medium focus:outline-2 focus:outline-offset-2 focus:outline-blue-700 disabled:cursor-not-allowed disabled:opacity-50 border-line-strong";
 
 export function ReviewPanel(p: ReviewPanelProps) {
   const router = useRouter();
@@ -64,7 +64,7 @@ export function ReviewPanel(p: ReviewPanelProps) {
       aria-labelledby="actions-heading"
       data-testid="review-panel"
       data-review-state={p.reviewState}
-      className="rounded border border-slate-300 p-4 dark:border-slate-700"
+      className="rounded-xl border bg-surface border-line-strong p-4"
     >
       <h2 id="actions-heading" className="text-lg font-semibold">
         Actions
@@ -80,17 +80,13 @@ export function ReviewPanel(p: ReviewPanelProps) {
         >
           Start review
         </button>
-        <p id="start-help" className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+        <p id="start-help" className="mt-1 text-sm text-muted">
           {p.startReason ?? "Starting the review assigns this renewal to you."}
         </p>
       </div>
 
-      <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
-        <p
-          id="decision-help"
-          className="text-sm text-slate-700 dark:text-slate-300"
-          data-testid="decision-help"
-        >
+      <div className="mt-5 border-t border-line pt-4">
+        <p id="decision-help" className="text-sm text-muted" data-testid="decision-help">
           {p.decisionReason ?? "Review started. You can now decide."}
         </p>
         <div className="mt-3 flex flex-wrap items-start gap-6">
@@ -132,7 +128,7 @@ export function ReviewPanel(p: ReviewPanelProps) {
               onChange={(e) => setReason(e.target.value)}
               disabled={pending || p.decisionReason !== null}
               aria-describedby="deny-help"
-              className="mt-1 w-full rounded border border-slate-400 p-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+              className="mt-1 w-full rounded-xl border bg-surface border-line-strong p-2 text-sm"
             />
             <button
               type="submit"
@@ -171,7 +167,7 @@ export function ReviewPanel(p: ReviewPanelProps) {
               onChange={(e) => setStart(e.target.value)}
               disabled={pending || p.bookReason !== null}
               aria-describedby="book-help"
-              className="mt-1 rounded border border-slate-400 p-1 text-sm dark:border-slate-600 dark:bg-slate-900"
+              className="mt-1 rounded-xl border bg-surface border-line-strong p-1 text-sm"
             />
             <label htmlFor="visit-end" className="mt-2 block text-sm font-medium">
               Visit end
@@ -183,7 +179,7 @@ export function ReviewPanel(p: ReviewPanelProps) {
               onChange={(e) => setEnd(e.target.value)}
               disabled={pending || p.bookReason !== null}
               aria-describedby="book-help"
-              className="mt-1 rounded border border-slate-400 p-1 text-sm dark:border-slate-600 dark:bg-slate-900"
+              className="mt-1 rounded-xl border bg-surface border-line-strong p-1 text-sm"
             />
             <button
               type="submit"

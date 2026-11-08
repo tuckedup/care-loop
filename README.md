@@ -15,13 +15,28 @@ messages, and hitting the refill limit forces a follow-up visit.
 
 ## Demo preview
 
-The landing page links into a role chooser; choosing the patient role opens the synthetic renewal
-workspace. Start the app using [Run it](#run-it), then use `pnpm demo:screenshot` to refresh these
-screenshots.
+The landing page links into a role chooser; each role opens its own workspace. Every screen below is
+synthetic data from the real, tested app (captured by `pnpm demo:screenshot`, which builds and serves
+the app on its own port and database; set `SESSION_SECRET` first, see [Run it](#run-it)).
 
-![CareLoop synthetic workflow landing page](docs/assets/careloop-home.png)
+| Landing                                     | Role chooser                                   |
+| ------------------------------------------- | ---------------------------------------------- |
+| ![Landing page](docs/assets/01-landing.png) | ![Demo role chooser](docs/assets/02-roles.png) |
 
-![CareLoop patient renewal workspace with synthetic medications](docs/assets/careloop-patient-demo.png)
+| Patient: medications                               | Patient: check-in                              | Patient: result                              |
+| -------------------------------------------------- | ---------------------------------------------- | -------------------------------------------- |
+| ![Medication list](docs/assets/03-medications.png) | ![Check-in](docs/assets/08-checkin-filled.png) | ![Renewal result](docs/assets/09-result.png) |
+
+| Clinician: queue                                    | Clinician: visit view                        |
+| --------------------------------------------------- | -------------------------------------------- |
+| ![Review queue](docs/assets/11-clinician-queue.png) | ![Visit view](docs/assets/12-visit-view.png) |
+
+| Admin: dashboard                                 | Mobile (390 px)                                        |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| ![Admin dashboard](docs/assets/14-dashboard.png) | ![Mobile medications](docs/assets/m02-medications.png) |
+
+This is a design demo on synthetic data, not a clinical product: it has no clinical validation and
+makes no production-readiness claim.
 
 ## What CareLoop is, and is not
 

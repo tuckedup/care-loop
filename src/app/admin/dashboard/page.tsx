@@ -23,8 +23,8 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
-      <h1 className="text-2xl font-semibold">Admin dashboard</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Admin dashboard</h1>
+      <p className="mt-1 text-sm text-muted">
         Projection-backed metrics over synthetic renewals. Nothing here is a clinical performance
         claim.
       </p>
@@ -76,10 +76,7 @@ export default async function DashboardPage() {
             {c.nonConcur} did not concur).
           </p>
         )}
-        <p
-          data-testid="concurrence-target"
-          className="mt-1 text-sm text-slate-600 dark:text-slate-400"
-        >
+        <p data-testid="concurrence-target" className="mt-1 text-sm text-muted">
           TARGET: {formatPercent(c.target)} or higher concurrence, taken from public reporting. It
           is a goal for this design, not a result this demo has achieved.
         </p>
@@ -143,7 +140,7 @@ export default async function DashboardPage() {
             </tbody>
           </table>
         )}
-        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+        <p className="mt-1 text-xs text-muted">
           A renewal with several reasons is counted once per reason ({m.escalated} escalated
           renewals).
         </p>
@@ -153,7 +150,7 @@ export default async function DashboardPage() {
         <h2 id="ttd-heading" className="text-lg font-semibold">
           Time to decision
         </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           From renewal request to approval, denial or follow-up requirement.
         </p>
         {t.count === 0 ? (

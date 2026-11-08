@@ -1,29 +1,21 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { requirePageRole } from "@/infra/auth/guard";
+import { RoleNav } from "../_components/role-nav";
 
 // Server-side RBAC for everything under /clinician. Pages and actions re-check on their own.
 export default async function ClinicianLayout({ children }: { children: ReactNode }) {
   await requirePageRole("clinician", "admin");
   return (
     <div>
-      <nav
-        aria-label="Clinician"
-        className="flex gap-4 border-b border-slate-200 px-6 py-3 text-sm dark:border-slate-800"
-      >
-        <Link href="/clinician/queue" className="underline">
-          Renewal queue
-        </Link>
-        <Link href="/clinician/visits" className="underline">
-          Follow-up visits
-        </Link>
-        <Link href="/clinician/pharmacy-alerts" className="underline">
-          Pharmacy alerts
-        </Link>
-        <Link href="/login" className="ml-auto underline">
-          Switch role (demo auth)
-        </Link>
-      </nav>
+      <RoleNav
+        label="Clinician"
+        links={[
+          { href: "/clinician/queue", label: "Renewal queue" },
+          { href: "/clinician/visits", label: "Follow-up visits" },
+          { href: "/clinician/pharmacy-alerts", label: "Pharmacy alerts" },
+          { href: "/clinician/retro-review", label: "Retro review" },
+        ]}
+      />
       {children}
     </div>
   );

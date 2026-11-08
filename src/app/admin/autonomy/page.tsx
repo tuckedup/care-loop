@@ -9,8 +9,8 @@ export default async function AutonomyPage() {
   await requirePageRole("admin");
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
-      <h1 className="text-2xl font-semibold">Autonomy</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Autonomy</h1>
+      <p className="mt-1 text-sm text-muted">
         Synthetic data. The setting is stored as an event and every change is audited.
       </p>
       <div className="mt-6">

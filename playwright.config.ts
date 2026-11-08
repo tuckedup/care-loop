@@ -6,6 +6,7 @@ const baseURL = `http://localhost:${port}`;
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
+  expect: { timeout: 15_000 },
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -13,7 +14,7 @@ export default defineConfig({
   use: { baseURL, trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: process.env.CI ? "pnpm build && pnpm start" : "pnpm dev",
+    command: process.env.CI || process.env.E2E_PROD ? "pnpm build && pnpm start" : "pnpm dev",
     url: baseURL,
     // The demo role switcher is default-deny in production builds (CI runs pnpm build && pnpm start),
     // so the e2e server must opt in explicitly. The login budget is raised because every spec signs in
@@ -25,6 +26,6 @@ export default defineConfig({
       LOGIN_RATE_LIMIT_PER_MIN: "10000",
     },
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: process.env.CI || process.env.E2E_PROD ? 300_000 : 120_000,
   },
 });

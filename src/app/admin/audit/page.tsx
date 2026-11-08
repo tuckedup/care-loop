@@ -33,8 +33,8 @@ export default async function AuditPage({
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
-      <h1 className="text-2xl font-semibold">Audit log</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Audit log</h1>
+      <p className="mt-1 text-sm text-muted">
         FHIR AuditEvent-shaped JSON (not a conformant FHIR server). Synthetic data. The hash chain
         is tamper-evident: it shows when rows were altered, it does not prevent a database superuser
         from altering them.
@@ -44,7 +44,7 @@ export default async function AuditPage({
         <p
           data-testid="chain-status"
           data-chain-valid="true"
-          className="mt-4 inline-block rounded border border-green-700 bg-green-50 px-3 py-1 text-sm font-medium text-green-900 dark:bg-green-950 dark:text-green-100"
+          className="mt-4 inline-block rounded-xl border bg-surface border-green-700 bg-green-50 px-3 py-1 text-sm font-medium text-green-900 dark:bg-green-950 dark:text-green-100"
         >
           Chain intact: {chain.checked} entries verified (head seq {chain.headSeq})
         </p>
@@ -67,7 +67,7 @@ export default async function AuditPage({
             data-testid={`audit-${e.id}`}
             data-action={e.subtype[0]?.code}
             data-role={e.agent[0]?.role[0]?.text}
-            className="rounded border border-slate-300 p-3 dark:border-slate-700"
+            className="rounded-xl border bg-surface border-line-strong p-3"
           >
             <pre className="overflow-x-auto text-xs">{JSON.stringify(e, null, 2)}</pre>
           </li>

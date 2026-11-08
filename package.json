@@ -14,7 +14,7 @@
     "start": "next start",
     "test": "vitest run",
     "e2e": "playwright test",
-    "demo:screenshot": "cross-env PORT=3007 NEXT_DIST_DIR=.next-demo-screenshot CAPTURE_DEMO_SCREENSHOT=true playwright test e2e/smoke.spec.ts --project=chromium --grep \"demo entry point opens\"",
+    "demo:screenshot": "cross-env E2E_PROD=true PORT=3007 NEXT_DIST_DIR=.next-demo-screenshot CAPTURE_DEMO_SCREENSHOT=true DATABASE_URL=postgres://careloop:careloop@127.0.0.1:54329/careloop_shots_e2e playwright test e2e/screenshots.spec.ts --project=chromium",
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:live": "cross-env EVAL_LIVE=1 vitest run --config vitest.eval.config.ts",
     "eval:pins": "tsx scripts/eval-pins.ts",

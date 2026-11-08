@@ -21,8 +21,8 @@ export default async function RetroReviewPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
-      <h1 className="text-2xl font-semibold">Retrospective review</h1>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">Retrospective review</h1>
+      <p className="mt-1 text-sm text-muted">
         Renewals the system approved automatically (rules said AUTO_ELIGIBLE, every check clean) and
         queued for a clinician to review afterwards. Synthetic data.
       </p>
@@ -60,11 +60,11 @@ export default async function RetroReviewPage() {
               data-testid={`retro-item-${i.renewalId}`}
               data-reviewed={i.reviewed}
               data-concur={i.concur === null ? "" : String(i.concur)}
-              className="rounded border border-slate-300 p-3 text-sm dark:border-slate-700"
+              className="rounded-xl border bg-surface border-line-strong p-3 text-sm"
             >
               <p>
                 <span className="font-medium">{i.drugName ?? "Medication"}</span>{" "}
-                <span className="text-slate-600 dark:text-slate-400">
+                <span className="text-muted">
                   renewal {i.renewalId}, auto-approved{" "}
                   {i.autoApprovedAt ? i.autoApprovedAt.slice(0, 16).replace("T", " ") : "?"} UTC
                   {i.autonomyMode ? ` (${i.autonomyMode})` : ""}, reason {i.sampleReason ?? "n/a"}
@@ -81,7 +81,7 @@ export default async function RetroReviewPage() {
                     type="submit"
                     name="concur"
                     value="yes"
-                    className="rounded border border-slate-400 px-3 py-1"
+                    className="rounded-xl border bg-surface border-line-strong px-3 py-1"
                   >
                     Concur
                   </button>
@@ -89,7 +89,7 @@ export default async function RetroReviewPage() {
                     type="submit"
                     name="concur"
                     value="no"
-                    className="rounded border border-red-700 px-3 py-1"
+                    className="rounded-xl border bg-surface border-red-700 px-3 py-1"
                   >
                     Do not concur
                   </button>
