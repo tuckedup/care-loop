@@ -30,10 +30,22 @@ describe("phrase families: coverage with exact offsets", () => {
     ["suicidal_ideation", "I will not be needing them anyway.", "not be needing"],
     ["mania_symptoms", "I have barely slept in four days.", "barely slept"],
     ["mania_symptoms", "My mind is racing all night.", "my mind is racing"],
+    [
+      "mania_symptoms",
+      "I only need a couple of hours of rest lately.",
+      "only need a couple of hours of rest",
+    ],
     ["severe_side_effect", "My lips feel swollen since yesterday.", "lips feel swollen"],
     ["severe_side_effect", "I broke out in hives.", "hives"],
     ["severe_side_effect", "I have trouble breathing at night.", "trouble breathing"],
+    [
+      "severe_side_effect",
+      "My throat feels like it is closing.",
+      "throat feels like it is closing",
+    ],
+    ["severe_side_effect", "My skin is covered in welts.", "welts"],
     ["other_safety_concern", "I just clicked zeros to get through it.", "clicked zeros"],
+    ["other_safety_concern", "I put zeros for everything.", "put zeros for everything"],
     ["other_safety_concern", "If I was honest it would be higher.", "if i was honest"],
   ];
   for (const [type, text, quote] of cases) {

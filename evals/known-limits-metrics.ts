@@ -34,13 +34,19 @@ export interface KnownLimitationsBlock {
 }
 
 export const KNOWN_LIMITATIONS_NOTE =
-  "escalationRecall is over the GATED set; the known-limitation probes are SPEC-labelled escalations the system is known to miss (see failingIds).";
+  "escalationRecall is over the GATED set; any remaining SPEC-labelled probes and misses are reported here.";
 
 /** Gate for the block. Empty = pass. The block is mandatory; a stale list fails. */
 export function knownLimitationsGateFailures(b: KnownLimitationsBlock | null): string[] {
   if (b === null) return ["knownLimitations block was not computed"];
   const f: string[] = [];
   if (b.count !== b.failingIds.length) f.push("knownLimitations count does not match failingIds");
+  if (b.specLabelledEscalationsMissed !== b.failingIds.length) {
+    f.push("knownLimitations missed count does not match failingIds");
+  }
+  if (b.failingIds.length > 0 || b.escalationRecallIncludingKnownLimitations !== 1) {
+    f.push("SPEC-labelled escalation recall including probes must be 1.0");
+  }
   if (!b.liveModelRun && b.staleIds.length > 0) {
     f.push(
       `known-limitation probe(s) now escalate; promote them into evals/cases: ${b.staleIds.join(", ")}`,

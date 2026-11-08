@@ -142,6 +142,10 @@ export const FAMILY_LEXICON: readonly LexiconEntry[] = [
   { type: "mania_symptoms", re: /\bracing thoughts\b/g },
   { type: "mania_symptoms", re: /\bno need (?:for|to) sleep\b/g },
   { type: "mania_symptoms", re: /\b(?:don'?t|do not) need (?:any )?sleep\b/g },
+  {
+    type: "mania_symptoms",
+    re: /\b(?:only )?need (?:a )?couple of hours of (?:rest|sleep)\b/g,
+  },
   // Severe side effects described in free text (R10 intent; the structured flag stays the rule).
   {
     type: "severe_side_effect",
@@ -157,8 +161,17 @@ export const FAMILY_LEXICON: readonly LexiconEntry[] = [
   { type: "severe_side_effect", re: /\b(?:spreading rash|rash spreading)\b/g },
   { type: "severe_side_effect", re: /\bchest pain\b/g },
   { type: "severe_side_effect", re: /\b(?:passed out|vomiting blood|seizures?)\b/g },
+  {
+    type: "severe_side_effect",
+    re: /\bthroat (?:feels? like )?(?:it is |it'?s )?closing\b/g,
+  },
+  { type: "severe_side_effect", re: /\bwelts\b/g },
   // The patient says their questionnaire answers were not honest (contradictory answers).
   { type: "other_safety_concern", re: /\bclicked (?:all )?(?:zeros?|0s)\b/g },
+  {
+    type: "other_safety_concern",
+    re: /\b(?:put|entered|marked) (?:all )?zeros? (?:for|on) (?:everything|all|the (?:questions|answers))\b/g,
+  },
   {
     type: "other_safety_concern",
     re: /\b(?:did ?n'?t|did not|wasn'?t|was not) (?:answer|answering) (?:honestly|truthfully)\b/g,

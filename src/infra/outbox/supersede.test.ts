@@ -29,8 +29,17 @@ afterAll(async () => {
 });
 
 type Call = { type: string; renewalId: string; headers: Record<string, string> };
+const fillMessage = (
+  renewal: { renewalId: string; prescriptionId: string },
+  messageId: string,
+) => ({
+  type: "RxFill",
+  messageId,
+  renewalId: renewal.renewalId,
+  prescriptionId: renewal.prescriptionId,
+});
 /** A pharmacy that answers by request type: RxRenewalResponse -> Status OK; CancelRx -> ack. */
-function pharmacy() {
+function pharmacy(cancelAck = true) {
   const calls: Call[] = [];
   const f = async (_url: string | URL | Request, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body)) as { type: string; renewalId: string };
@@ -43,7 +52,9 @@ function pharmacy() {
       body.type === "CancelRx"
         ? [
             { type: "Status", messageId: `${body.renewalId}:cs`, status: "OK" },
-            { type: "CancelRx", messageId: `${body.renewalId}:cancel`, acknowledged: true },
+            ...(cancelAck
+              ? [{ type: "CancelRx", messageId: `${body.renewalId}:cancel`, acknowledged: true }]
+              : []),
           ]
         : [{ type: "Status", messageId: `${body.renewalId}:s`, status: "OK" }];
     return new Response(JSON.stringify({ messages }), { status: 200 });
@@ -184,6 +195,25 @@ describe("item 2: supersede semantics", () => {
     expect(again.calls).toHaveLength(0);
   });
 
+  it("a Status-only CancelRx response dead-letters and alerts instead of completing silently", async () => {
+    const { r1, r2 } = await r1Stalled();
+    await approveRenewal(db.sql, clinician, { renewalId: r2.renewalId, now: later(73) });
+    const cancelKey = `rx-cancel:${r1.renewalId}:${r2.renewalId}`;
+    const p = pharmacy(false);
+    await work(p.fetch);
+    await sync();
+
+    expect(await streamTypes(db.sql, r1.renewalId)).not.toContain("RxCancelAcknowledged");
+    expect(await alertsFor(r1.renewalId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "error", code: "MISSING_CANCEL_ACK", status: "open" }),
+      ]),
+    );
+    expect(await outbox("pharmacy.CancelRx", cancelKey)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: "dead" })]),
+    );
+  });
+
   it("R1 NOT stalled (fresh) still blocks R2: no CancelRx, R2 is refused with an alert", async () => {
     const { r1, r2 } = await r1Stalled();
     await approveRenewal(db.sql, clinician, { renewalId: r2.renewalId, now: later(1) });
@@ -214,7 +244,7 @@ describe("item 2: supersede semantics", () => {
         messageId: `rxmsg-${r1.renewalId}`,
         idempotencyKey: `rx-renewal:${r1.renewalId}`,
         httpStatus: 200,
-        body: { messages: [{ type: "RxFill", messageId: `${r1.renewalId}:late-fill` }] },
+        body: { messages: [fillMessage(r1, `${r1.renewalId}:late-fill`)] },
       },
       { actor: "t", role: "system", action: "t" },
     );
@@ -239,7 +269,7 @@ describe("item 2: supersede semantics", () => {
         messageId: `rxmsg-${r1.renewalId}`,
         idempotencyKey: `rx-renewal:${r1.renewalId}`,
         httpStatus: 200,
-        body: { messages: [{ type: "RxFill", messageId: `${r1.renewalId}:late-fill` }] },
+        body: { messages: [fillMessage(r1, `${r1.renewalId}:late-fill`)] },
       },
       { actor: "t", role: "system", action: "t" },
     );
@@ -261,7 +291,7 @@ describe("item 2: supersede semantics", () => {
         messageId: `rxmsg-${r1.renewalId}`,
         idempotencyKey: `rx-renewal:${r1.renewalId}`,
         httpStatus: 200,
-        body: { messages: [{ type: "RxFill", messageId: `${r1.renewalId}:fill` }] },
+        body: { messages: [fillMessage(r1, `${r1.renewalId}:fill`)] },
       },
       { actor: "t", role: "system", action: "t" },
     );
@@ -309,7 +339,7 @@ describe("item 2: supersede semantics", () => {
         messageId: `rxmsg-${r1.renewalId}`,
         idempotencyKey: `rx-renewal:${r1.renewalId}`,
         httpStatus: 200,
-        body: { messages: [{ type: "RxFill", messageId: `${r1.renewalId}:fill` }] },
+        body: { messages: [fillMessage(r1, `${r1.renewalId}:fill`)] },
       },
       { actor: "t", role: "system", action: "t" },
     );
@@ -356,7 +386,7 @@ describe("item 2: supersede semantics", () => {
         messageId: `rxmsg-${r2.renewalId}`,
         idempotencyKey: `rx-renewal:${r2.renewalId}`,
         httpStatus: 200,
-        body: { messages: [{ type: "RxFill", messageId: `${r2.renewalId}:fill` }] },
+        body: { messages: [fillMessage(r2, `${r2.renewalId}:fill`)] },
       },
       { actor: "t", role: "system", action: "t" },
     );

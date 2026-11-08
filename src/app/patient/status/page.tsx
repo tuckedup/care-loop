@@ -29,7 +29,14 @@ export default async function StatusPage() {
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-400">
                 Last update{" "}
-                <time dateTime={r.updatedAt}>{r.updatedAt.replace("T", " ").slice(0, 16)} UTC</time>
+                <time dateTime={r.updatedAt}>
+                  {new Intl.DateTimeFormat("en-US", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    timeZone: "UTC",
+                  }).format(new Date(r.updatedAt))}{" "}
+                  UTC
+                </time>
               </p>
               {nextStepFor(r.status) !== "result" ? (
                 <Link

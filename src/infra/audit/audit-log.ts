@@ -148,6 +148,19 @@ export async function appendToStream(
   outbox: readonly OutboxMessageInput[] = [],
 ): Promise<AppendResult> {
   if (events.length === 0) throw new Error("appendToStream requires at least one event");
+  if (
+    process.env.NODE_ENV === "production" &&
+    events.some(
+      (event) =>
+        event.type === "RenewalApproved" &&
+        typeof event.data === "object" &&
+        event.data !== null &&
+        "by" in event.data &&
+        event.data.by === "system",
+    )
+  ) {
+    throw new Error("automatic renewals are unavailable in production");
+  }
   // Validated before any write: a bad message type/payload/key never opens a transaction.
   const outboxMessages = validateOutboxBatch(outbox);
   const { result, audit } = await auditedTransaction(sql, ctx, streamId, async (tx) => {

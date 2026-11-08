@@ -70,10 +70,9 @@ Further gate requirements (F063-F067 and the independent review):
   are both hand-written (circular): this tests parsing and fail-closed handling, not summary quality.
   The judge (`src/ai/judge.ts`) is eval-only; `src/ai/judge.test.ts` walks the resolved import graph
   of `src` to prove no product module imports it.
-- `knownLimitations` block (`evals/known-limits.ts`): mandatory. It lists the pinned probes in
-  `evals/known-limitations` (SPEC-labelled escalations the system misses), the failing ids, and a recall
-  that includes them. `escalationRecall` alone is over the gated set. A probe that now escalates
-  fails the gate (promote it into `evals/cases`).
+- `knownLimitations` block (`evals/known-limits.ts`): mandatory. It lists any remaining pinned
+  SPEC-labelled probes and their outcomes. A tracked miss now fails the gate; a probe that starts
+  escalating must be promoted into `evals/cases`. The three original paraphrase probes are promoted.
 - Manifest and probe ratchets that regenerating pins cannot undo: `REQUIRED_CASE_IDS`
   (`evals/required-ids.ts`) and `REQUIRED_KIND_MINIMUMS` (`evals/lib.ts`) are committed in code, so
   removing a required entry or a whole requirement block fails `pnpm eval`; `REQUIRED_PROBE_IDS` must

@@ -17,6 +17,13 @@ test("status page shows an empty state for a patient with no renewals", async ({
   await loginAsDemoPatient(page);
   await page.goto("/patient/status");
   await expect(page.getByTestId("no-renewals")).toBeVisible();
+  await expect(page.getByTestId("patient-help-note")).toContainText(
+    "This synthetic demo is not monitored",
+  );
+  await expect(page.getByRole("link", { name: "988 for crisis support" })).toHaveAttribute(
+    "href",
+    "https://988lifeline.org/get-help/",
+  );
 });
 
 test("status reads rx_status: requested, verified, then under review after check-in", async ({
@@ -59,7 +66,9 @@ test("status reads rx_status: requested, verified, then under review after check
   item = firstRenewal(page);
   await expect(item).toHaveAttribute("data-status", "escalated");
   // No AI key in e2e => failed AI => ESCALATE (fail closed): still shown as under review.
-  await expect(item.getByTestId("renewal-status")).toHaveText("Under review by your care team");
+  await expect(item.getByTestId("renewal-status")).toHaveText(
+    "Waiting in the clinician review queue",
+  );
 });
 
 test("seeded history appears for its owner only", async ({ page, context }) => {

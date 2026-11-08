@@ -338,3 +338,55 @@ CHANGELOG has a v1.0 section and known limits. feature_list.json: 70/70 passing.
 
 Residual non-blocking: evals are fixture-mode (`liveModelRun: false`); the 3 paraphrase probes are still
 missed when the model is silent; RETRO/SAMPLED is opt-in and owner-gated; nothing was deployed.
+
+## 2026-11-07 — tracked paraphrase misses promoted
+
+Added escalation-only tripwire coverage for reduced need for rest, throat-closing language or
+welts, and an admission of entering zeros. Moved the three unchanged ESCALATE-labelled probes
+into the pinned gated set. Fixture evals now pass 156 cases / 91 risk / 116 escalations / 101 AI,
+with 116/116 escalation recall, 0 tracked misses and 0 unsafe approvals. These are synthetic
+fixture results, not clinical sensitivity or a live-model result.
+
+Verified locally: 103 unit files / 1765 tests, default Playwright 50 passed / 19 expected gated
+skips, gated pharmacy/autonomy/citations 13 passed / 1 expected skip, follow-up 5 passed,
+`pnpm build`, typecheck, lint, formatting, pin check and generated README check. No live
+Anthropic, Supabase or Vercel credentials are configured; no deployment or tag was made.
+RETRO/SAMPLED remains synthetic-only pending independent clinical review and live evaluation.
+
+## 2026-11-07 — production-readiness review and safety backstops
+
+Four separately open goals are tracked in `docs/PRODUCTION_READINESS.md`: clinical evaluation and
+data, protocol/system safety, patient/clinician experience, and infrastructure/privacy/interoperability.
+Reviewed the signed Utah agreement, Legion's public refill page, ONC e-prescribing/safety design,
+WCAG 2.2, and Synthea. Downloaded the official synthetic Synthea FHIR sample to ignored `.init/`
+and profiled 114 bundles, 112 Patient resources, and 3,221 MedicationRequest resources; it is an
+interoperability corpus, not a psychiatric-refill safety benchmark.
+
+Production now refuses system approvals at mode selection, direct auto-approval, the central
+audited append path, and the pharmacy transmit boundary. An independent clinical-safety reviewer
+passed the final app-path delta after testing direct command/outbox and pre-existing stream attacks.
+Docker Postgres binds only to localhost. Optional traces export lengths/counts, not free text or
+signal types. Added a demo entry link and mobile/keyboard smoke check; frontend remains a demo
+pending clinical copy, accessibility, and representative usability review.
+
+Verification: 103 unit files / 1,770 tests, 157 fixture-eval assertions, typecheck, lint,
+formatting, pin check, and production build pass. The previously completed default and gated
+Playwright suites passed on isolated Docker databases. No live model evaluation, real clinical
+validation, production deployment, or real-patient use occurred; no commit or tag was made.
+
+## 2026-11-07 — three verification passes and frontend review
+
+Closed pharmacy partial-response gaps found in independent clinical-safety review: mismatched or
+malformed RxFill messages now fail closed without a false transmit/fill; unsolicited CancelRx
+acknowledgements fail closed; cancel requests require an explicit acknowledgement. Added worker
+coverage for those cases. Corrected the follow-up result text where a booked visit may coexist with a
+denial, moved the urgent-help link to the official 988 Get Help page, and require a trusted explicit
+HTTPS `PHARMACY_BASE_URL` in production rather than deriving the target from request host.
+
+Independent clinical reviewer: PASS on the final delta. Three full passes each completed 104 unit
+test files / 1,783 tests, 157 fixture-eval assertions, and eval pin checks. Typecheck, lint, format
+check, and optimized production build pass. Playwright fail-closed profile passed 55/70 (15 gated
+skips); fixture profiles passed RETRO/pharmacy/citation flows, and follow-up scheduling passed 8/8
+with its synthetic clock switch. 320/375 CSS-pixel keyboard smoke passed. No deployment, live model,
+real prescription transaction, clinical validation, or user study was performed; frontend remains
+a synthetic demo and production-readiness goals remain open.

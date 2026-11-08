@@ -2,7 +2,11 @@
 // Format: v1.<base64url(JSON payload)>.<base64url(HMAC over "v1.<payload>")>
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { MIN_SECRET_LENGTH, usableSessionSecret } from "./production-guards";
+import {
+  DEV_PLACEHOLDER_SECRET,
+  MIN_SECRET_LENGTH,
+  usableSessionSecret,
+} from "./production-guards";
 
 export const ROLES = ["patient", "clinician", "pharmacist", "admin"] as const;
 export type Role = (typeof ROLES)[number];
@@ -29,7 +33,9 @@ export const sessionPayloadSchema = z.object({
 export type Session = z.infer<typeof sessionPayloadSchema>;
 
 export function getSecret(env: Record<string, string | undefined> = process.env): string | null {
-  // Fail closed: missing/short secrets, and in production the .env.example placeholder, give null.
+  if (!env.SESSION_SECRET && (env.NODE_ENV === "development" || env.NODE_ENV === "test")) {
+    return DEV_PLACEHOLDER_SECRET;
+  }
   return usableSessionSecret(env);
 }
 

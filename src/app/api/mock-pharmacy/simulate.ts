@@ -55,7 +55,6 @@ export interface SimulationRates {
   delayed: number;
   fill: number;
   duplicateFill: number;
-  cancelAck: number;
   escalation: number;
 }
 
@@ -65,7 +64,6 @@ export const DEFAULT_RATES: SimulationRates = {
   delayed: 0.3,
   fill: 0.6,
   duplicateFill: 0.2, // share of fills that arrive twice with the same messageId
-  cancelAck: 0.05,
   escalation: 0.08,
 };
 
@@ -129,7 +127,6 @@ export function simulate(
   const rDelayLen = rng();
   const rFill = rng();
   const rDup = rng();
-  const rCancel = rng();
   const rEsc = rng();
 
   if (force && req.type !== "CancelRx") {
@@ -215,9 +212,6 @@ export function simulate(
     messages.push(fill);
     // A duplicate keeps the SAME messageId: consumers must dedupe on it.
     if (rDup < rates.duplicateFill) messages.push({ ...fill });
-  }
-  if (rCancel < rates.cancelAck) {
-    messages.push({ type: "CancelRx", messageId: mid("cancel"), acknowledged: true });
   }
   if (rEsc < rates.escalation) {
     messages.push({

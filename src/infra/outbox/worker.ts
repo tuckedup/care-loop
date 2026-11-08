@@ -122,8 +122,8 @@ interface ClaimRow {
 }
 
 /**
- * Claim up to `limit` due messages of the given types in ONE statement. SKIP LOCKED means
- * concurrent claimers take disjoint rows without waiting. Attempts are counted at claim time,
+ * Claim up to `limit` due messages of the given types. The audited transaction uses SKIP LOCKED,
+ * so concurrent claimers take disjoint rows without waiting. Attempts are counted at claim time,
  * so a worker that crashes mid-handler still consumes an attempt.
  */
 export async function claimBatch(
@@ -131,19 +131,43 @@ export async function claimBatch(
   opts: { types: readonly string[]; limit: number; leaseMs: number; now: Date },
 ): Promise<ClaimedMessage[]> {
   if (opts.types.length === 0) return [];
+  const [candidate] = await sql.unsafe<{ id: string }[]>(
+    `SELECT id FROM outbox
+     WHERE status = 'pending' AND next_attempt_at <= $1::timestamptz AND type = ANY($2::text[])
+     ORDER BY next_attempt_at, id LIMIT 1`,
+    [opts.now.toISOString(), opts.types as string[]],
+  );
+  if (!candidate) return [];
   const leaseUntil = new Date(opts.now.getTime() + opts.leaseMs);
-  const rows = await sql.unsafe<ClaimRow[]>(
-    `UPDATE outbox SET status = 'processing', lease_until = $1::timestamptz,
-            attempts = attempts + 1, updated_at = $2::timestamptz
-     WHERE id IN (
-       SELECT id FROM outbox
-       WHERE status = 'pending' AND next_attempt_at <= $2::timestamptz AND type = ANY($3::text[])
-       ORDER BY next_attempt_at, id
-       LIMIT $4
-       FOR UPDATE SKIP LOCKED
-     )
-     RETURNING id, idempotency_key, type, payload, attempts`,
-    [leaseUntil.toISOString(), opts.now.toISOString(), opts.types as string[], opts.limit],
+  const { result: rows } = await auditedTransaction(
+    sql,
+    audit("outbox.claim"),
+    "outbox",
+    async (tx) => {
+      const claimed = await tx.unsafe<ClaimRow[]>(
+        `UPDATE outbox SET status = 'processing', lease_until = $1::timestamptz,
+                attempts = attempts + 1, updated_at = $2::timestamptz
+         WHERE id IN (
+           SELECT id FROM outbox
+           WHERE status = 'pending' AND next_attempt_at <= $2::timestamptz AND type = ANY($3::text[])
+           ORDER BY next_attempt_at, id
+           LIMIT $4
+           FOR UPDATE SKIP LOCKED
+         )
+         RETURNING id, idempotency_key, type, payload, attempts`,
+        [leaseUntil.toISOString(), opts.now.toISOString(), opts.types as string[], opts.limit],
+      );
+      return {
+        result: claimed,
+        detail: {
+          claimed: claimed.map((row) => ({
+            key: row.idempotency_key,
+            type: row.type,
+            attempt: row.attempts,
+          })),
+        },
+      };
+    },
   );
   return rows
     .map((r) => ({
@@ -228,13 +252,24 @@ async function markFailed(
   const error = truncate(messageOf(err));
   if (!dead) {
     const next = new Date(deps.now.getTime() + computeBackoffMs(m.attempt, deps.cfg, deps.rng));
-    const rows = await sql.unsafe(
-      `UPDATE outbox SET status = 'pending', lease_until = NULL, last_error = $3,
-              next_attempt_at = $4::timestamptz, updated_at = $5::timestamptz
-       WHERE id = $1::bigint AND status = 'processing' AND attempts = $2 RETURNING id`,
-      [m.id.toString(), m.attempt, error, next.toISOString(), deps.now.toISOString()],
+    const { result } = await auditedTransaction(
+      sql,
+      audit("outbox.retry"),
+      `outbox:${m.idempotencyKey}`,
+      async (tx) => {
+        const rows = await tx.unsafe(
+          `UPDATE outbox SET status = 'pending', lease_until = NULL, last_error = $3,
+                  next_attempt_at = $4::timestamptz, updated_at = $5::timestamptz
+           WHERE id = $1::bigint AND status = 'processing' AND attempts = $2 RETURNING id`,
+          [m.id.toString(), m.attempt, error, next.toISOString(), deps.now.toISOString()],
+        );
+        return {
+          result: rows.length === 1,
+          detail: { type: m.type, attempt: m.attempt, applied: rows.length === 1 },
+        };
+      },
     );
-    return rows.length === 1 ? "retry" : "lost";
+    return result ? "retry" : "lost";
   }
   const { result } = await auditedTransaction(
     sql,

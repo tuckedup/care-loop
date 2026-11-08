@@ -7,6 +7,8 @@ were used. This list is derived from the code and config, not from a deployment.
 ## Before you deploy
 
 - [ ] Understand that demo auth lets anyone choose any role. Only deploy with synthetic data.
+- [ ] Understand that production builds force SHADOW mode and refuse automatic mode changes. This
+      repository cannot be deployed as an autonomous clinical renewal service.
 - [ ] Create a Postgres database. From your machine run `pnpm db:migrate` then `pnpm db:seed` against it.
 - [ ] `pnpm build` passes locally (it did when this was written).
 
@@ -17,6 +19,7 @@ were used. This list is derived from the code and config, not from a deployment.
 | `DATABASE_URL`                         | yes      | Supabase transaction-mode pooler URL                                                                                                  |
 | `SESSION_SECRET`                       | yes      | Long random string (32+ characters). The `.env.example` placeholder is refused in production and sessions fail closed                 |
 | `CRON_SECRET`                          | yes      | Long random string. Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` automatically when it is set. Unset means cron routes 401 |
+| `PHARMACY_BASE_URL`                    | yes      | Explicit trusted HTTPS origin for the pharmacy endpoint; production never derives it from request host                                |
 | `DEMO_AUTH_ENABLED`                    | optional | Must be exactly `true` for the role switcher to work in production. Default is off (`/login` shows a disabled notice)                 |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | optional | Live AI path, never exercised by this repo. Without them every renewal escalates (fail closed)                                        |
 | `PHARMACY_STALE_HOURS`                 | optional | Default 72, a demo value                                                                                                              |
@@ -25,6 +28,11 @@ were used. This list is derived from the code and config, not from a deployment.
 **Never set `MOCK_PHARMACY_FORCE`, `RISK_FIXTURE`, `SUMMARY_FIXTURE` or `VISIT_CLOCK_OFFSET_DAYS` in
 production.** They are ignored unless `NODE_ENV` is `development` or `test` (a test proves it), but they
 must not be present anyway. Also leave `LOGIN_RATE_LIMIT_PER_MIN` unset in production.
+
+The production autonomy lock is unconditional: a stored RETRO or SAMPLED event reads as SHADOW,
+the admin action refuses a new automatic mode, and direct auto-approval calls refuse. Removing
+this lock requires completion of the separately tracked goals in
+[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) and independent review.
 
 ## Crons
 

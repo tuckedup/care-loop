@@ -26,7 +26,7 @@ export default async function ResultPage({ params }: { params: Promise<{ renewal
         </h2>
         <p className="mt-1 text-sm">
           {renewal.status === "follow_up_required"
-            ? "Your care team needs to see you before this medication can be renewed. You can book a visit now; booking does not renew your medication."
+            ? "This synthetic demo routes the renewal for clinician follow-up before it can proceed. Booking creates a demo visit only; it does not renew your medication."
             : copy.body}
         </p>
         {renewal.status === "follow_up_required" ? (

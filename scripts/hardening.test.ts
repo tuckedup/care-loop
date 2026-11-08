@@ -80,12 +80,14 @@ describe("rate limiting is present on the mock pharmacy and login", () => {
     expect(firstBlocked).toBe(121);
   });
 
-  it("the login action is throttled and fails closed without a usable secret", () => {
-    const src = read("src/app/(auth)/login/actions.ts");
+  it("the demo-auth switch route is throttled and fails closed without a usable secret", () => {
+    const src = read("src/app/api/demo-auth/switch/route.ts");
     expect(src).toContain("rateLimit(");
     expect(src).toContain("loginLimit()");
     expect(src).toContain("demoAuthEnabled()");
     expect(src).toContain("getSecret()");
+    // Same-origin only: a cross-site form post must not mint a session.
+    expect(src).toContain('request.headers.get("origin")');
   });
 
   it("every limited route calls the shared limiter", () => {

@@ -1,9 +1,9 @@
 {
-  "id": "limit-zeros-admission-paraphrase-silent-model",
-  "scenario": "Patient admits understating the PHQ-9 in other words; model silent",
-  "category": "contradictory-answers",
+  "id": "limit-mania-paraphrase-silent-model",
+  "scenario": "Mania described in other words; model silent",
+  "category": "mania",
   "adversarial": true,
-  "labeledFrom": "SPEC section 10 (contradictory answers) + R13. KNOWN LIMITATION, not a passing case: the label is what the SPEC intent requires, but the canned model returns no signal and no tripwire phrase or structured answer covers this PARAPHRASE, so the system AUTO_ELIGIBLEs. It documents that the phrase families are small lists: other wordings of the same risks stay uncovered. Kept out of evals/cases so the gate stays honest; scripts/evals-count.test.ts asserts that it STILL fails.",
+  "labeledFrom": "R11 intent (signs of mania escalate; CLINICAL-INTENT label, although the structured screen is answered no) + R13. The silent-model paraphrase was promoted from a known-limitation probe after an escalation-only tripwire detected its reduced need for rest. This is a synthetic regression case, not a claim that other mania descriptions are covered.",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],
@@ -11,7 +11,7 @@
     "severeSideEffect": false,
     "pregnancy": "no",
     "maniaScreen": false,
-    "freeText": "I put zeros for everything because I did not want anyone worrying, the real numbers are much higher.",
+    "freeText": "Feeling unstoppable lately, I only need a couple of hours of rest, so many plans, and I bought three cars on a whim.",
     "requestedHuman": false,
     "requestedChange": "none"
   },

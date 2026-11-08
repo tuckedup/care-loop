@@ -2,12 +2,9 @@
 // LANGFUSE_HOST are all set; otherwise a no-op. Every failure (network, HTTP error, timeout,
 // bad config) is swallowed: tracing can never affect a result. Small fetch-based client, no SDK.
 //
-// PRIVACY: when tracing is on, the patient free text passed to the model is sent to the trace
-// as the call input (see docs/MODEL_CARD.md). Quotes are NOT sent as output, only signal types
-// and counts. The ingestion payload shape below follows Langfuse's batch ingestion API as the
-// author understands it; it was NOT verified against a live Langfuse instance in this repo.
+// The ingestion payload shape below has not been verified against a live Langfuse instance.
 import { randomUUID } from "node:crypto";
-import type { FailureReason, SignalType } from "./types";
+import type { FailureReason } from "./types";
 
 export interface TraceEvent {
   name: string;
@@ -19,9 +16,7 @@ export interface TraceEvent {
   failureReason?: FailureReason;
   signalCount: number;
   unverifiedSignalCount: number;
-  signalTypes: SignalType[];
-  /** The call input (patient text). Sent only when tracing is enabled. */
-  input: { freeText: string; sideEffects: string };
+  input: { freeTextLength: number; sideEffectsLength: number };
 }
 
 export interface Tracer {
@@ -62,7 +57,6 @@ export function createLangfuseTracer(cfg: LangfuseConfig): Tracer {
           failureReason: e.failureReason ?? null,
           signalCount: e.signalCount,
           unverifiedSignalCount: e.unverifiedSignalCount,
-          signalTypes: e.signalTypes,
         };
         const body = {
           batch: [

@@ -1,4 +1,8 @@
-import { readAutonomyMode, type AutonomyMode } from "@/domain/autonomy/mode";
+import {
+  productionAutonomyLocked,
+  readAutonomyMode,
+  type AutonomyMode,
+} from "@/domain/autonomy/mode";
 import { loadConfig } from "@/config";
 import { getSql } from "@/infra/db/client";
 import { autonomyFormAction } from "../autonomy/actions";
@@ -24,6 +28,7 @@ const MODES: { mode: AutonomyMode; label: string; help: string }[] = [
 /** Server component: current mode plus the admin-only switch (the action re-checks the role). */
 export async function AutonomySwitch() {
   const mode = await readAutonomyMode(getSql());
+  const locked = productionAutonomyLocked();
   let rate = "unknown";
   let seed = "unknown";
   try {
@@ -41,6 +46,11 @@ export async function AutonomySwitch() {
       <p className="mt-1 text-sm">
         Current mode: <strong data-testid="autonomy-current">{mode}</strong>
       </p>
+      {locked && (
+        <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+          Automatic renewals are disabled in production. Every request requires clinician review.
+        </p>
+      )}
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         Only renewals the deterministic rules mark AUTO_ELIGIBLE (all checks clean, no AI signal,
         not controlled, identity verified, pharmacy confirmed) can ever be auto-approved. The
@@ -55,7 +65,7 @@ export async function AutonomySwitch() {
               type="submit"
               name="mode"
               value={m.mode}
-              disabled={m.mode === mode}
+              disabled={m.mode === mode || (locked && m.mode !== "SHADOW")}
               aria-label={`Set mode ${m.mode}`}
               className="rounded border border-slate-400 px-3 py-1 text-sm disabled:cursor-default disabled:bg-slate-200 disabled:text-slate-900 dark:disabled:bg-slate-700 dark:disabled:text-slate-100"
             >

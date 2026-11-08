@@ -1,5 +1,5 @@
 {
-  "minTotalCases": 153,
+  "minTotalCases": 156,
   "judge": [
     {
       "id": "judge-contradicts-item9",
@@ -62,20 +62,7 @@
       "sha256": "10f843c3e02d9a2d044bd6d7ba0cdbaca864914a3c1bb7d7a08cfec176daa898"
     }
   ],
-  "knownLimitations": [
-    {
-      "id": "limit-mania-paraphrase-silent-model",
-      "sha256": "2778e0550ebaca9a70bb4abc97761d808ce1daabdf099d9355be6e389ef65378"
-    },
-    {
-      "id": "limit-severe-side-effect-paraphrase-silent-model",
-      "sha256": "2ff2f751218d1b418d9d50262ed25fa9061d6b2ea2b90b3c4c538dfbbc7b937f"
-    },
-    {
-      "id": "limit-zeros-admission-paraphrase-silent-model",
-      "sha256": "bc40e02e1f157b102fcd36aa0f3f31cced2e138c7c33784ab09f2ec9edb6e282"
-    }
-  ],
+  "knownLimitations": [],
   "required": [
     {
       "requirement": "controlled-substance (rules)",
@@ -1471,6 +1458,26 @@
         {
           "id": "ai-contradiction-zeros-admission-silent-model",
           "sha256": "17231132bd6993142573f98317e0c4445186f0cf78ede898d82cf3894466da86"
+        }
+      ]
+    },
+    {
+      "requirement": "three previously missed paraphrases, model silent: escalation-only tripwire",
+      "kind": "tripwire-silent-model",
+      "outcome": "ESCALATE",
+      "reasonCode": "LLM_RISK_SIGNAL",
+      "entries": [
+        {
+          "id": "limit-mania-paraphrase-silent-model",
+          "sha256": "2778e0550ebaca9a70bb4abc97761d808ce1daabdf099d9355be6e389ef65378"
+        },
+        {
+          "id": "limit-severe-side-effect-paraphrase-silent-model",
+          "sha256": "2ff2f751218d1b418d9d50262ed25fa9061d6b2ea2b90b3c4c538dfbbc7b937f"
+        },
+        {
+          "id": "limit-zeros-admission-paraphrase-silent-model",
+          "sha256": "bc40e02e1f157b102fcd36aa0f3f31cced2e138c7c33784ab09f2ec9edb6e282"
         }
       ]
     }

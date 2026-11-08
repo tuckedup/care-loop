@@ -18,7 +18,12 @@ export default defineConfig({
     // The demo role switcher is default-deny in production builds (CI runs pnpm build && pnpm start),
     // so the e2e server must opt in explicitly. The login budget is raised because every spec signs in
     // from the same address; both values are for this test server only.
-    env: { DEMO_AUTH_ENABLED: "true", LOGIN_RATE_LIMIT_PER_MIN: "10000" },
+    env: {
+      DATABASE_URL:
+        process.env.DATABASE_URL ?? "postgres://careloop:careloop@127.0.0.1:54329/careloop",
+      DEMO_AUTH_ENABLED: "true",
+      LOGIN_RATE_LIMIT_PER_MIN: "10000",
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

@@ -60,8 +60,8 @@ export default async function FollowUpPage({
       >
         <h2 className="text-lg font-semibold">Follow-up needed</h2>
         <p className="mt-1 text-sm">
-          Your care team needs to see you before this medication can be renewed. Booking a visit
-          does not renew your medication; a clinician decides after your visit.
+          This synthetic demo routes the renewal for clinician follow-up. Booking creates a demo
+          visit only; it does not renew your medication or create a real appointment.
         </p>
       </section>
 

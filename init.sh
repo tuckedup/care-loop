@@ -22,6 +22,19 @@ else
 fi
 set +a
 
+DATABASE_URL="${DATABASE_URL:-postgres://careloop:careloop@127.0.0.1:54329/careloop}"
+export DATABASE_URL
+NEXT_DIST_DIR="${NEXT_DIST_DIR:-.next-dev}"
+export NEXT_DIST_DIR
+
+run_pnpm() {
+  pnpm exec cross-env "DATABASE_URL=$DATABASE_URL" pnpm "$@"
+}
+
+port_ready() {
+  pnpm exec cross-env "DATABASE_URL=$DATABASE_URL" "PORT=$PORT" pnpm exec node scripts/wait-local-port.mjs "$PORT"
+}
+
 echo "init: installing dependencies"
 pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 
@@ -34,23 +47,23 @@ else
 fi
 
 echo "init: migrating"
-pnpm db:migrate
+run_pnpm db:migrate
 echo "init: seeding"
-pnpm db:seed
+run_pnpm db:seed
 
 # Reuse a dev server that already answers; otherwise start one. (Killing the nohup wrapper PID
 # does not stop the node child on Windows/Git Bash, so we never try to restart blindly.)
-if curl -fs "http://localhost:$PORT" >/dev/null 2>&1; then
+if port_ready >/dev/null 2>&1; then
   echo "init: dev server already running at http://localhost:$PORT (reusing)"
   exit 0
 fi
 
 echo "init: starting dev server on :$PORT (log: $LOG_FILE)"
-PORT="$PORT" nohup pnpm dev >"$LOG_FILE" 2>&1 &
+nohup pnpm exec cross-env "DATABASE_URL=$DATABASE_URL" "PORT=$PORT" "NEXT_DIST_DIR=$NEXT_DIST_DIR" pnpm dev >"$LOG_FILE" 2>&1 &
 echo $! >"$PID_FILE"
 
 for i in $(seq 1 60); do
-  if curl -fs "http://localhost:$PORT" >/dev/null 2>&1; then
+  if port_ready >/dev/null 2>&1; then
     echo "init: dev server ready at http://localhost:$PORT"
     exit 0
   fi

@@ -60,6 +60,12 @@ export function createTransmitHandler(deps: TransmitDeps): OutboxHandler {
 
     // ---- defence in depth (no network yet) -------------------------------------------------
     const { events: renewal } = await loadStream(deps.sql, renewalStreamId(facts.renewalId));
+    if (
+      process.env.NODE_ENV === "production" &&
+      renewal.some((event) => event.type === "RenewalApproved" && event.data.by === "system")
+    ) {
+      throw new NonRetryableError("REFUSED: automatic renewals are unavailable in production");
+    }
     const requested = renewal.find((e) => e.type === "RenewalRequested");
     if (!requested || requested.type !== "RenewalRequested") {
       throw new NonRetryableError("REFUSED: renewal was never requested");

@@ -15,7 +15,7 @@ import { EvalCaseSchema, RISK_CATEGORIES, isRiskCategory, type EvalCase } from "
  * Committed historical floors. The manifest minTotalCases ratchets up but is just a number in a
  * generated file; these constants live in code, so lowering the floor needs a reviewed code change.
  */
-export const HISTORICAL_MIN_TOTAL_CASES = 150;
+export const HISTORICAL_MIN_TOTAL_CASES = 156;
 /** SPEC section 10: at least 25 risk cases, each risk category at least 3 incl. one adversarial. */
 export const MIN_RISK_CASES = 25;
 export const MIN_CASES_PER_RISK_CATEGORY = 3;
@@ -33,7 +33,7 @@ export const REQUIRED_KIND_MINIMUMS: Readonly<Record<(typeof REQUIREMENT_KINDS)[
     "benign-clean": 10,
     "benign-clean-ai": 15,
     "controlled-blocked": 6,
-    "tripwire-silent-model": 27,
+    "tripwire-silent-model": 30,
     injection: 12,
     "llm-failure": 7,
   };

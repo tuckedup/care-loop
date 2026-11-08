@@ -76,8 +76,10 @@ export async function runRiskExtraction(
         signalCount: result.status === "ok" ? result.signals.length : 0,
         unverifiedSignalCount:
           result.status === "ok" ? result.signals.filter((s) => !s.verified).length : 0,
-        signalTypes: result.status === "ok" ? result.signals.map((s) => s.type) : [],
-        input: { freeText: text.freeText, sideEffects: text.sideEffects },
+        input: {
+          freeTextLength: text.freeText.length,
+          sideEffectsLength: text.sideEffects.length,
+        },
       });
     } catch {
       /* swallowed */

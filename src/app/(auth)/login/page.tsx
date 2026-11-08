@@ -1,9 +1,10 @@
 import { demoAuthEnabled } from "@/infra/auth/production-guards";
 import { ROLES } from "@/infra/auth/session";
-import { switchRole, signOut } from "./actions";
+import { signOut } from "./actions";
 
 const ERRORS: Record<string, string> = {
   "invalid-role": "Invalid role.",
+  "invalid-origin": "The request could not be verified. Reload the page and try again.",
   disabled: "Demo auth is disabled on this deployment.",
   "rate-limited": "Too many attempts. Wait a minute and try again.",
   "not-configured": "Session signing is not configured, so no session can be created.",
@@ -35,7 +36,12 @@ export default async function LoginPage({
         </p>
       ) : null}
       {enabled ? (
-        <form action={switchRole} className="mt-6 flex flex-col gap-2" data-testid="role-switcher">
+        <form
+          action="/api/demo-auth/switch"
+          method="post"
+          className="mt-6 flex flex-col gap-2"
+          data-testid="role-switcher"
+        >
           {ROLES.map((role) => (
             <button
               key={role}

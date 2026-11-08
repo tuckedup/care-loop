@@ -14,6 +14,7 @@ import { ActorRoleSchema } from "../renewal/review";
 export type AutonomyMode = z.infer<typeof AutonomyModeSchema>;
 export const DEFAULT_AUTONOMY_MODE: AutonomyMode = "SHADOW";
 export const AUTONOMY_STREAM_ID = "settings-autonomy";
+export const productionAutonomyLocked = (): boolean => process.env.NODE_ENV === "production";
 
 /** Anything that is not exactly a known mode (including undefined, "retro", "") becomes SHADOW. */
 export function coerceMode(raw: unknown): AutonomyMode {
@@ -64,6 +65,9 @@ export interface AutonomyActor {
 export async function setAutonomyMode(sql: Sql, actor: AutonomyActor, input: { mode: unknown }) {
   const mode = AutonomyModeSchema.safeParse(input.mode);
   if (!mode.success) throw new DomainError("INVALID_COMMAND", "unknown autonomy mode");
+  if (productionAutonomyLocked() && mode.data !== "SHADOW") {
+    throw new DomainError("AUTONOMY_LOCKED", "automatic renewals are unavailable in production");
+  }
   const ctx: AuditContext = {
     actor: actor.id,
     role: actor.role,
@@ -81,6 +85,7 @@ export async function setAutonomyMode(sql: Sql, actor: AutonomyActor, input: { m
 
 /** The effective mode. Never throws: any problem reads as SHADOW. */
 export async function readAutonomyMode(sql: Sql): Promise<AutonomyMode> {
+  if (productionAutonomyLocked()) return DEFAULT_AUTONOMY_MODE;
   try {
     const { events } = await loadStream(sql, AUTONOMY_STREAM_ID);
     return events.reduce(autonomyAggregate.evolve, autonomyAggregate.initialState).mode;

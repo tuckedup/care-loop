@@ -124,6 +124,29 @@ describe("outbox worker (F045)", () => {
     expect(Number(a!.n)).toBeGreaterThanOrEqual(1);
   });
 
+  it("audits outbox claims and retries without storing the pharmacy error in audit detail", async () => {
+    clock = T0;
+    const key = `audit-${Date.now()}-${Math.random()}`;
+    await enqueue(1, key);
+    const reg = registryWith(async () => {
+      throw new Error("temporary synthetic pharmacy failure");
+    });
+    await runOnce(db.sql, { registry: reg, rng: mulberry32(1), now, config: cfg });
+    const rows = await db.sql.unsafe<{ action: string; detail: Record<string, unknown> }[]>(
+      `SELECT action, detail FROM audit_log
+       WHERE (action = 'outbox.claim' AND detail->'claimed' @> $1::jsonb)
+          OR (action = 'outbox.retry' AND entity = $2)
+       ORDER BY seq`,
+      [JSON.stringify([{ key: `${key}0` }]), `outbox:${key}0`],
+    );
+    expect(rows.map((r) => r.action)).toEqual(["outbox.claim", "outbox.retry"]);
+    expect(rows[0]!.detail.claimed).toEqual([
+      { key: `${key}0`, type: "pharmacy.NewRx", attempt: 1 },
+    ]);
+    expect(JSON.stringify(rows)).not.toContain("temporary synthetic pharmacy failure");
+    expect(await verifyAuditChain(db.sql)).toMatchObject({ valid: true });
+  });
+
   it("dead-letters immediately on a non-retryable error", async () => {
     clock = T0;
     await enqueue(1);

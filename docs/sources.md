@@ -89,6 +89,26 @@ Agents: do not add or modify URLs in this file. Use `TODO: source needed` for ga
 - Synthea (MITRE) home:
   https://synthea.mitre.org/
 
+## Product and usability comparisons
+- Legion Health AI refill product page:
+  https://ai.legionhealth.com/
+- NHS App repeat prescription help and status guidance:
+  https://www.nhs.uk/nhs-app/help/prescriptions/requesting-a-prescription/
+- NHS App August 2026 adoption and prescription tracking metrics:
+  https://digital.nhs.uk/data-and-information/publications/statistical/nhs-app-statistics/august-2026
+- MyChart medication and refill features:
+  https://www.mychart.org/l/en-us/features/view-medications-test-results-bills/
+- Talkiatry refill request process:
+  https://www.talkiatry.com/help-center-articles/how-can-i-request-a-refill
+- ONC safety-enhanced design usability test method:
+  https://healthit.gov/test-method/safety-enhanced-design/
+- WCAG 2.2 reflow guidance:
+  https://www.w3.org/WAI/WCAG22/Understanding/reflow.html
+- 988 Lifeline contact options:
+  https://988lifeline.org/get-help/
+- NCPDP SCRIPT implementation recommendations (August 2026):
+  https://ncpdp.org/NCPDP/media/pdf/SCRIPT-Implementation-Recommendations.pdf
+
 ## Agent workflow
 - Anthropic — Effective harnesses for long-running agents:
   https://anthropic.com/engineering/effective-harnesses-for-long-running-agents

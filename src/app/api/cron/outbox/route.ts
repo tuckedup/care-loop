@@ -25,7 +25,9 @@ export async function GET(request: Request): Promise<Response> {
     const stats = await runOnce(getSql(), {
       registry: createDefaultRegistry({
         sql: getSql(),
-        baseUrl: pharmacyBaseUrl(new URL(request.url).origin),
+        baseUrl: pharmacyBaseUrl(
+          process.env.NODE_ENV === "production" ? undefined : new URL(request.url).origin,
+        ),
       }),
       rng: mulberry32(Number.isFinite(seed) ? seed : 42),
     });

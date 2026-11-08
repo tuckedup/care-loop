@@ -12,8 +12,7 @@ const event: TraceEvent = {
   status: "ok",
   signalCount: 1,
   unverifiedSignalCount: 0,
-  signalTypes: ["self_harm"],
-  input: { freeText: "hello", sideEffects: "" },
+  input: { freeTextLength: 5, sideEffectsLength: 0 },
 };
 const text = { freeText: "I feel hopeless lately.", sideEffects: "" };
 const okJson = JSON.stringify({
@@ -60,8 +59,10 @@ describe("tracerFromEnv", () => {
     const gen = body.batch.find((b: { type: string }) => b.type === "generation-create");
     expect(gen.body.model).toBe("m");
     expect(gen.body.metadata).toMatchObject({ latencyMs: 12, valid: true });
-    // quotes are not exported as output
-    expect(JSON.stringify(gen.body.output)).not.toContain("hopeless");
+    expect(JSON.stringify(body)).not.toContain("hello");
+    expect(JSON.stringify(body)).not.toContain('freeText":');
+    expect(JSON.stringify(body)).not.toContain('sideEffects":');
+    expect(JSON.stringify(body)).not.toContain("self_harm");
   });
 });
 
@@ -114,6 +115,7 @@ describe("integration with runRiskExtraction", () => {
       status: "ok",
       signalCount: 1,
       unverifiedSignalCount: 0,
+      input: { freeTextLength: text.freeText.length, sideEffectsLength: 0 },
     });
     expect(typeof record.mock.calls[0]![0].latencyMs).toBe("number");
   });

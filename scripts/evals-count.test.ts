@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { runAiStage } from "../evals/ai-runner";
 import { AiFixtureSchema } from "../evals/fixtures";
 import { judgeCaseHash, loadJudgeCases } from "../evals/judge-eval";
-import { comparePins, probePins } from "../evals/known-limits";
+import { comparePins, loadProbes, probePins } from "../evals/known-limits";
 import {
   HISTORICAL_MIN_TOTAL_CASES,
   MIN_CASES_PER_RISK_CATEGORY,
@@ -198,11 +198,9 @@ describe("formulary coverage (SPEC section 2)", () => {
 });
 
 describe("known limitations stay documented (evals/known-limitations)", () => {
-  const limitsDir = join(root, "evals", "known-limitations");
-  const limits = loadCases(limitsDir);
+  const limits = loadProbes();
 
   it("every probe passes the case schema and is labelled as a limitation", () => {
-    expect(limits.length).toBeGreaterThanOrEqual(1);
     for (const c of limits) {
       expect(c.id.startsWith("limit-")).toBe(true);
       expect(c.labeledFrom).toMatch(/KNOWN LIMITATION/);
@@ -269,23 +267,29 @@ describe("promoted probes and the remaining known limitations", () => {
     }
   });
 
-  it("exactly the three paraphrase probes remain documented, pinned and reported in latest.json", () => {
-    const probes = loadCases(join(root, "evals", "known-limitations"))
-      .map((c) => c.id)
-      .sort();
-    expect(probes).toEqual([
+  it("all three former paraphrase probes are gated and no known miss remains", () => {
+    const promoted = [
       "limit-mania-paraphrase-silent-model",
       "limit-severe-side-effect-paraphrase-silent-model",
       "limit-zeros-admission-paraphrase-silent-model",
-    ]);
+    ];
+    for (const id of promoted) {
+      expect(ids.has(id), id).toBe(true);
+      expect(cases.find((c) => c.id === id)?.expected.outcome).toBe("ESCALATE");
+    }
+    expect(loadProbes()).toEqual([]);
     const pins = loadManifest().knownLimitations ?? [];
     expect(comparePins("probe", pins, probePins())).toEqual([]);
     const latest = readJson(join(root, "evals", "results", "latest.json")) as {
-      knownLimitations: { failingIds: string[]; count: number; note: string };
+      knownLimitations: {
+        failingIds: string[];
+        count: number;
+        escalationRecallIncludingKnownLimitations: number;
+      };
     };
-    expect(latest.knownLimitations.failingIds.sort()).toEqual(probes);
-    expect(latest.knownLimitations.count).toBe(3);
-    expect(latest.knownLimitations.note).toMatch(/GATED set/);
+    expect(latest.knownLimitations.failingIds).toEqual([]);
+    expect(latest.knownLimitations.count).toBe(0);
+    expect(latest.knownLimitations.escalationRecallIncludingKnownLimitations).toBe(1);
   });
 
   it("judge cases and their fixtures are pinned like the main cases", () => {
@@ -308,18 +312,6 @@ describe("labeledFrom claims about the tripwire are true", () => {
             0 ||
           detectInjection({ freeText: c.input.freeText, sideEffects: c.input.sideEffects }).length >
             0,
-      )
-      .map((c) => c.id);
-    expect(stale).toEqual([]);
-  });
-
-  it("the probes' own 'no tripwire covers this' claim is true too", () => {
-    const limits = loadCases(join(root, "evals", "known-limitations"));
-    const stale = limits
-      .filter(
-        (c) =>
-          detectTripwire({ freeText: c.input.freeText, sideEffects: c.input.sideEffects }).length >
-          0,
       )
       .map((c) => c.id);
     expect(stale).toEqual([]);

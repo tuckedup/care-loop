@@ -2,7 +2,7 @@
 // decision flow, the settings stream, the RBAC-in-domain check and the transmit gate.
 // Invariant under test: ONLY a clean AUTO_ELIGIBLE renewal under RETRO/SAMPLED is auto-approved;
 // SHADOW (default, and any unknown state) never is; the LLM can only add escalation.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createTestDb, type TestDb } from "@/test/db";
 import { readStream } from "@/infra/event-store";
 import { registerAllProjections } from "@/infra/projections/all";
@@ -12,7 +12,7 @@ import { DomainError, replay } from "../aggregate";
 import { loadStream } from "../aggregate-handler";
 import { approveRenewal, startReview } from "../clinician/handlers";
 import { AutonomyModeSchema, type DomainEvent } from "../events";
-import { checkTransmittable } from "../pharmacy-queue";
+import { checkTransmittable, handleCommandWithOutbox } from "../pharmacy-queue";
 import { rxStreamId } from "../patient/patient";
 import { evaluateRenewal } from "../pipeline/process-manager";
 import { aiDepsFor, seedRenewal, spyClient } from "../pipeline/testing";
@@ -26,6 +26,7 @@ import {
   autoApprovalAllowed,
 } from "./mode";
 import { resolveAutonomyDeps, tryAutoApprove, type AutonomyDeps } from "./auto-approve";
+import { createTransmitHandler } from "@/infra/outbox/transmit";
 
 const NOW = new Date("2026-11-06T12:00:00Z");
 const RETRO: AutonomyDeps = { mode: "RETRO", seed: 42, sampleRate: 0.2 };
@@ -421,6 +422,84 @@ describe("decision flow", () => {
 });
 
 describe("settings stream and RBAC", () => {
+  it("blocks a direct AutoApprove append in production without events or an outbox row", async () => {
+    const renewal = await seedRenewal(db.sql);
+    await run(renewal.renewalId, SHADOW);
+    const before = await types(renewal.renewalId);
+    try {
+      vi.stubEnv("NODE_ENV", "production");
+      await expect(
+        handleCommandWithOutbox(
+          db.sql,
+          reviewAggregate,
+          renewalStreamId(renewal.renewalId),
+          {
+            type: "AutoApprove",
+            renewalId: renewal.renewalId,
+            autonomyMode: "RETRO",
+            seed: 42,
+            sampleRate: 0.2,
+          },
+          { actor: "test", role: "system", action: "test:direct-auto-approve" },
+        ),
+      ).rejects.toThrow("automatic renewals are unavailable in production");
+      expect(await types(renewal.renewalId)).toEqual(before);
+      expect(await outboxCount(renewal.renewalId)).toBe(0);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("refuses a pre-existing system-approved outbox row before a production pharmacy call", async () => {
+    const renewal = await seedRenewal(db.sql);
+    await run(renewal.renewalId, RETRO);
+    const key = `rx-renewal:${renewal.renewalId}`;
+    const [row] = await db.sql.unsafe<{ payload: Record<string, unknown> }[]>(
+      `SELECT payload FROM outbox WHERE idempotency_key = $1`,
+      [key],
+    );
+    expect(row).toBeDefined();
+    const pharmacy = vi.fn<typeof fetch>();
+    try {
+      vi.stubEnv("NODE_ENV", "production");
+      await expect(
+        createTransmitHandler({ sql: db.sql, baseUrl: "http://pharmacy.test", fetch: pharmacy })({
+          id: 1n,
+          idempotencyKey: key,
+          type: "pharmacy.RxRenewalResponse",
+          payload: row!.payload,
+          attempt: 1,
+          signal: new AbortController().signal,
+        }),
+      ).rejects.toThrow("automatic renewals are unavailable in production");
+      expect(pharmacy).not.toHaveBeenCalled();
+      expect(await types(renewal.renewalId)).not.toContain("RxRenewalTransmitted");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("locks production to SHADOW even with a stored RETRO mode or direct auto-approval deps", async () => {
+    const renewal = await seedRenewal(db.sql);
+    await run(renewal.renewalId, SHADOW);
+    await setAutonomyMode(db.sql, { role: "admin", id: "admin-1" }, { mode: "RETRO" });
+    try {
+      vi.stubEnv("NODE_ENV", "production");
+      expect(await readAutonomyMode(db.sql)).toBe("SHADOW");
+      await expect(
+        setAutonomyMode(db.sql, { role: "admin", id: "admin-1" }, { mode: "SAMPLED" }),
+      ).rejects.toMatchObject({ code: "AUTONOMY_LOCKED" });
+      expect(await tryAutoApprove(db.sql, renewal.renewalId, RETRO)).toMatchObject({
+        status: "not_applied",
+      });
+      expect(await types(renewal.renewalId)).not.toContain("RenewalApproved");
+      expect(await outboxCount(renewal.renewalId)).toBe(0);
+    } finally {
+      vi.unstubAllEnvs();
+      await setAutonomyMode(db.sql, { role: "admin", id: "admin-1" }, { mode: "SHADOW" });
+    }
+  });
+
   it("defaults to SHADOW; an admin changes the mode; the actor is recorded; the change is audited", async () => {
     expect(await readAutonomyMode(db.sql)).toBe("SHADOW");
     await setAutonomyMode(db.sql, { role: "admin", id: "admin-1" }, { mode: "RETRO" });

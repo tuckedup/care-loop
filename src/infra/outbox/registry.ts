@@ -33,7 +33,28 @@ export function createDefaultRegistry(deps?: RegistryDeps): HandlerRegistry {
   return registry;
 }
 
-/** Base URL for the pharmacy endpoint: PHARMACY_BASE_URL, else the given origin, else localhost. */
+/** Resolve a trusted pharmacy endpoint; never derive it from a request Host header in production. */
 export function pharmacyBaseUrl(fallbackOrigin?: string): string {
-  return process.env.PHARMACY_BASE_URL || fallbackOrigin || "http://localhost:3000";
+  const configured = process.env.PHARMACY_BASE_URL;
+  const raw =
+    configured ||
+    (process.env.NODE_ENV === "production" ? "" : fallbackOrigin || "http://localhost:3000");
+  if (!raw) throw new Error("PHARMACY_BASE_URL must be configured in production");
+
+  let endpoint: URL;
+  try {
+    endpoint = new URL(raw);
+  } catch {
+    throw new Error("PHARMACY_BASE_URL must be an absolute URL");
+  }
+  if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+    throw new Error("PHARMACY_BASE_URL must not contain credentials, query, or fragment");
+  }
+  if (
+    endpoint.protocol !== "https:" &&
+    !(process.env.NODE_ENV !== "production" && endpoint.protocol === "http:")
+  ) {
+    throw new Error("PHARMACY_BASE_URL must use HTTPS in production");
+  }
+  return endpoint.toString().replace(/\/$/, "");
 }

@@ -3,7 +3,7 @@
   "scenario": "Severe reaction in other words; model silent",
   "category": "severe-side-effect",
   "adversarial": true,
-  "labeledFrom": "R10 intent (severe side effects escalate; CLINICAL-INTENT label, the severe flag is unticked) + R13. KNOWN LIMITATION, not a passing case: the label is what the SPEC intent requires, but the canned model returns no signal and no tripwire phrase or structured answer covers this PARAPHRASE, so the system AUTO_ELIGIBLEs. It documents that the phrase families are small lists: other wordings of the same risks stay uncovered. Kept out of evals/cases so the gate stays honest; scripts/evals-count.test.ts asserts that it STILL fails.",
+  "labeledFrom": "R10 intent (severe side effects escalate; CLINICAL-INTENT label, although the severe flag is unticked) + R13. The silent-model paraphrase was promoted from a known-limitation probe after escalation-only tripwires detected throat-closing language and welts. This is a synthetic regression case, not a claim that other severe reactions are covered.",
   "input": {
     "phq9": [0, 0, 0, 0, 0, 0, 0, 0, 0],
     "gad7": [0, 0, 0, 0, 0, 0, 0],

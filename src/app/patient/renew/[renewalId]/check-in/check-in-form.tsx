@@ -248,7 +248,7 @@ export function CheckInForm({ action }: { action: Action }) {
       <YesNo
         name="maniaScreen"
         legend="In the past few weeks, have you had a period of unusually high energy, much less need for sleep, or racing thoughts?"
-        help="TODO: clinically reviewed wording."
+        help="Synthetic demo wording; not for patient care."
         checked={yn(v?.maniaScreen)}
         error={errs.maniaScreen}
       />

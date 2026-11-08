@@ -6,12 +6,7 @@ import { makeEvent, type DomainEvent } from "@/domain/events";
 import { rxIdempotencyKey, rxMessageId } from "@/domain/pharmacy-keys";
 import { createDefaultRegistry } from "@/infra/outbox/registry";
 import { mulberry32 } from "@/infra/outbox/rng";
-import {
-  approvedRenewal,
-  scriptedFetch,
-  streamTypes,
-  type ScriptedAnswer,
-} from "@/infra/outbox/test-fixture";
+import { approvedRenewal, scriptedFetch, streamTypes } from "@/infra/outbox/test-fixture";
 import { runOnce } from "@/infra/outbox/worker";
 import { registerAllProjections } from "@/infra/projections/all";
 import { rebuildProjections } from "@/infra/projections/rebuild";
@@ -98,9 +93,9 @@ describe("decidePharmacyResponse (pure)", () => {
   });
 
   it("an RxFill for a renewal that was never queued, or after a cancel, is ignored", () => {
-    expect(types(decidePharmacyResponse([], input(200, [status, fill])))).toEqual([
-      "PharmacyStatusReceived",
-    ]);
+    const unqueuedFill = decidePharmacyResponse([], input(200, [status, fill]));
+    expect(types(unqueuedFill)).toEqual(["PharmacyStatusReceived", "PharmacyErrorReceived"]);
+    expect(unqueuedFill.outcome.kind).toBe("fatal");
     const cancelled = ev("RxCancelAcknowledged", { messageId: "c1" });
     expect(types(decidePharmacyResponse([queued, cancelled], input(200, [fill])))).not.toContain(
       "RxFillReceived",
@@ -134,29 +129,61 @@ describe("decidePharmacyResponse (pure)", () => {
     expect(decidePharmacyResponse([queued], input(200, atCap)).outcome.kind).toBe("ok");
   });
 
-  it("an RxFill naming another renewal or prescription is not attributed to this renewal", () => {
+  it("a mismatched RxFill is fatal and never transmitted or attributed", () => {
     const other = { ...fill, messageId: "m1:f2", renewalId: "other" };
     const wrongRx = { ...fill, messageId: "m1:f3", prescriptionId: "rx-other" };
-    expect(
-      types(decidePharmacyResponse([queued], input(200, [status, other, wrongRx]))),
-    ).not.toContain("RxFillReceived");
+    const result = decidePharmacyResponse([queued], input(200, [other]));
+    expect(types(result)).toEqual(["PharmacyErrorReceived"]);
+    expect(result.outcome).toMatchObject({
+      kind: "fatal",
+      reason: "pharmacy error RX_FILL_CORRELATION_MISMATCH",
+    });
+    expect(types(decidePharmacyResponse([queued], input(200, [wrongRx])))).not.toContain(
+      "RxFillReceived",
+    );
   });
 
-  it("CancelRx acknowledgement and pharmacist escalation become events", () => {
-    const r = decidePharmacyResponse(
+  it("an RxFill missing either correlation id is not accepted", () => {
+    const missingRenewal = {
+      type: "RxFill",
+      messageId: "m1:missing-renewal",
+      prescriptionId: "rx1",
+    };
+    const missingPrescription = {
+      type: "RxFill",
+      messageId: "m1:missing-prescription",
+      renewalId: R,
+    };
+    const missingIds = decidePharmacyResponse(
       [queued],
-      input(200, [
-        status,
-        { type: "CancelRx", messageId: "m1:cancel", acknowledged: true },
-        { type: "PharmacistEscalation", messageId: "m1:esc", message: "call me" },
-      ]),
+      input(200, [status, missingRenewal, missingPrescription]),
     );
-    expect(types(r)).toEqual([
-      "RxRenewalTransmitted",
-      "PharmacyStatusReceived",
-      "RxCancelAcknowledged",
-      "PharmacistEscalationReceived",
-    ]);
+    expect(types(missingIds)).toEqual([]);
+    expect(missingIds.outcome.kind).toBe("fatal");
+  });
+
+  it("CancelRx acknowledgement requires a cancel request", () => {
+    const r = decidePharmacyResponse([queued], {
+      ...input(200, [{ type: "CancelRx", messageId: "m1:cancel", acknowledged: true }]),
+      kind: "cancel",
+    });
+    expect(types(r)).toEqual(["RxCancelAcknowledged"]);
+    const unsolicited = decidePharmacyResponse(
+      [queued],
+      input(200, [{ type: "CancelRx", messageId: "m1:unexpected", acknowledged: true }]),
+    );
+    expect(types(unsolicited)).toEqual(["PharmacyErrorReceived"]);
+    expect(unsolicited.outcome.kind).toBe("fatal");
+
+    const missingAck = decidePharmacyResponse([queued], {
+      ...input(200, [status]),
+      kind: "cancel",
+    });
+    expect(types(missingAck)).toEqual(["PharmacyStatusReceived", "PharmacyErrorReceived"]);
+    expect(missingAck.outcome).toMatchObject({
+      kind: "fatal",
+      reason: "pharmacy error MISSING_CANCEL_ACK",
+    });
   });
 });
 
@@ -187,15 +214,6 @@ const err = (retryable: boolean, attempt = 1) => ({
   code: retryable ? "PHARMACY_BUSY" : "UNKNOWN_PRESCRIPTION",
   retryable,
 });
-const ok = (r: string): ScriptedAnswer => ({
-  status: 200,
-  messages: [
-    { type: "Status", messageId: `${r}:status`, status: "OK" },
-    { type: "RxFill", messageId: `${r}:fill`, renewalId: r },
-    { type: "RxFill", messageId: `${r}:fill`, renewalId: r },
-  ],
-});
-
 describe("pharmacy responses through the worker", () => {
   it("retryable error -> outbox retry with backoff -> OK -> RxFill; status follows; duplicate fill ignored", async () => {
     const r = await approvedRenewal(db.sql);
@@ -205,7 +223,24 @@ describe("pharmacy responses through the worker", () => {
 
     const pharmacy = scriptedFetch([
       { status: 503, messages: [{ ...err(true), messageId: `${r.renewalId}:e1` }] },
-      ok(r.renewalId),
+      {
+        status: 200,
+        messages: [
+          { type: "Status", messageId: `${r.renewalId}:status`, status: "OK" },
+          {
+            type: "RxFill",
+            messageId: `${r.renewalId}:fill`,
+            renewalId: r.renewalId,
+            prescriptionId: r.prescriptionId,
+          },
+          {
+            type: "RxFill",
+            messageId: `${r.renewalId}:fill`,
+            renewalId: r.renewalId,
+            prescriptionId: r.prescriptionId,
+          },
+        ],
+      },
     ]);
     let stats = await work(pharmacy.fetch);
     expect(stats).toMatchObject({ claimed: 1, retried: 1 });
@@ -272,7 +307,7 @@ describe("pharmacy responses through the worker", () => {
     });
   });
 
-  it("a CancelRx acknowledgement is an event, an alert, and a terminal cancelled status", async () => {
+  it("an unsolicited CancelRx acknowledgement is alerted, never marks a normal renewal cancelled", async () => {
     const r = await approvedRenewal(db.sql);
     const pharmacy = scriptedFetch([
       {
@@ -291,12 +326,71 @@ describe("pharmacy responses through the worker", () => {
     ]);
     await work(pharmacy.fetch);
     await sync();
-    expect(await streamTypes(db.sql, r.renewalId)).toContain("RxCancelAcknowledged");
+    expect(await streamTypes(db.sql, r.renewalId)).not.toContain("RxCancelAcknowledged");
+    expect(await streamTypes(db.sql, r.renewalId)).toContain("PharmacyErrorReceived");
     expect(await streamTypes(db.sql, r.renewalId)).not.toContain("RxFillReceived");
-    expect(await rxStatus(r.renewalId)).toBe("cancelled");
+    expect(await rxStatus(r.renewalId)).toBe("pharmacy_error");
     expect(
       (await listPharmacyAlerts(db.sql)).find((a) => a.renewalId === r.renewalId),
-    ).toMatchObject({ kind: "cancel", status: "open" });
+    ).toMatchObject({ kind: "error", code: "UNSOLICITED_CANCEL_ACK", status: "open" });
+  });
+
+  it("a wrong-correlation RxFill is a fatal worker alert and cannot mark transmission or fill", async () => {
+    const r = await approvedRenewal(db.sql);
+    const pharmacy = scriptedFetch([
+      {
+        status: 200,
+        messages: [
+          {
+            type: "RxFill",
+            messageId: `${r.renewalId}:wrong-fill`,
+            renewalId: "other",
+            prescriptionId: r.prescriptionId,
+          },
+        ],
+      },
+    ]);
+    const stats = await work(pharmacy.fetch);
+    expect(stats).toMatchObject({ claimed: 1, dead: 1 });
+    await sync();
+    const typesForRenewal = await streamTypes(db.sql, r.renewalId);
+    expect(typesForRenewal).toContain("PharmacyErrorReceived");
+    expect(typesForRenewal).not.toContain("RxRenewalTransmitted");
+    expect(typesForRenewal).not.toContain("RxFillReceived");
+    expect(await rxStatus(r.renewalId)).toBe("pharmacy_error");
+    expect(
+      (await listPharmacyAlerts(db.sql)).find((a) => a.renewalId === r.renewalId),
+    ).toMatchObject({
+      kind: "error",
+      code: "RX_FILL_CORRELATION_MISMATCH",
+      status: "open",
+    });
+  });
+
+  it("a valid Status cannot hide an RxFill missing correlation ids", async () => {
+    const r = await approvedRenewal(db.sql);
+    const pharmacy = scriptedFetch([
+      {
+        status: 200,
+        messages: [
+          { type: "Status", messageId: `${r.renewalId}:status`, status: "OK" },
+          { type: "RxFill", messageId: `${r.renewalId}:missing-rx`, renewalId: r.renewalId },
+        ],
+      },
+    ]);
+    const stats = await work(pharmacy.fetch);
+    expect(stats).toMatchObject({ claimed: 1, dead: 1 });
+    await sync();
+    const events = await streamTypes(db.sql, r.renewalId);
+    expect(events).not.toContain("RxRenewalTransmitted");
+    expect(events).not.toContain("RxFillReceived");
+    expect(await rxStatus(r.renewalId)).toBe("pharmacy_error");
+    expect(
+      (await listPharmacyAlerts(db.sql)).find((a) => a.renewalId === r.renewalId),
+    ).toMatchObject({
+      kind: "error",
+      status: "open",
+    });
   });
 
   it("a fill delivered in the same answer as a retryable error does not re-send", async () => {
@@ -305,7 +399,12 @@ describe("pharmacy responses through the worker", () => {
       {
         status: 200,
         messages: [
-          { type: "RxFill", messageId: `${r.renewalId}:fill` },
+          {
+            type: "RxFill",
+            messageId: `${r.renewalId}:fill`,
+            renewalId: r.renewalId,
+            prescriptionId: r.prescriptionId,
+          },
           { ...err(true), messageId: `${r.renewalId}:err` },
         ],
       },

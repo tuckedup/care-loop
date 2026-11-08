@@ -188,14 +188,14 @@ const goodJudge: JudgeEvalMetrics = {
 };
 const goodLimits: KnownLimitationsBlock = {
   note: KNOWN_LIMITATIONS_NOTE,
-  probeIds: ["p1", "p2", "p3"],
-  failingIds: ["p1", "p2", "p3"],
+  probeIds: [],
+  failingIds: [],
   staleIds: [],
-  count: 3,
+  count: 0,
   escalationRecallGatedSet: 1,
-  escalationRecallIncludingKnownLimitations: 0.9,
+  escalationRecallIncludingKnownLimitations: 1,
   specLabelledEscalations: 30,
-  specLabelledEscalationsMissed: 3,
+  specLabelledEscalationsMissed: 0,
   missingRequired: [],
   pinFailures: [],
   liveModelRun: false,
@@ -890,13 +890,28 @@ describe("known limitations, coverage floors and judge pins in the gate", () => 
 
   it("a stale probe list fails: a probe that now escalates must be promoted", () => {
     const m = cm([result({})], "fixtures", cites(1, 1), {
-      knownLimitations: { ...goodLimits, failingIds: ["p1", "p2"], staleIds: ["p3"], count: 2 },
+      knownLimitations: { ...goodLimits, probeIds: ["p3"], staleIds: ["p3"] },
     });
     expect(gateFailures(m).join()).toMatch(/promote them into evals\/cases: p3/);
     const inconsistent = cm([result({})], "fixtures", cites(1, 1), {
-      knownLimitations: { ...goodLimits, probeIds: ["p1", "p2", "p3", "p4"] },
+      knownLimitations: { ...goodLimits, probeIds: ["p4"] },
     });
     expect(gateFailures(inconsistent).join()).toMatch(/probe list is stale/);
+  });
+
+  it("a known SPEC-labelled escalation miss fails the gate", () => {
+    const m = cm([result({})], "fixtures", cites(1, 1), {
+      knownLimitations: {
+        ...goodLimits,
+        probeIds: ["p1"],
+        failingIds: ["p1"],
+        count: 1,
+        escalationRecallIncludingKnownLimitations: 30 / 31,
+        specLabelledEscalations: 31,
+        specLabelledEscalationsMissed: 1,
+      },
+    });
+    expect(gateFailures(m).join()).toMatch(/including probes must be 1\.0/);
   });
 
   it("probe pin failures fail the gate, and the block states the gated-set caveat", () => {
@@ -945,7 +960,7 @@ describe("known limitations, coverage floors and judge pins in the gate", () => 
   it("the committed latest.json carries the knownLimitations block and the judge section", () => {
     const latest = readResults(join(root, "evals", "results", "latest.json"));
     expect(latest.knownLimitations.count).toBe(latest.knownLimitations.failingIds.length);
-    expect(latest.knownLimitations.escalationRecallIncludingKnownLimitations).toBeLessThan(1);
+    expect(latest.knownLimitations.escalationRecallIncludingKnownLimitations).toBe(1);
     expect(latest.summaryJudge.liveJudgeRun).toBe(false);
   });
 });
@@ -992,68 +1007,55 @@ describe("manifest and probe ratchets (attacks that eval:pins alone cannot repai
       EVAL_MANIFEST_PATH: writeManifest(regenerated),
     });
     expect(r.status).not.toBe(0);
-    expect(r.out).toMatch(/manifest has 0 'tripwire-silent-model' entries; at least 27 required/);
+    expect(r.out).toMatch(/manifest has 0 'tripwire-silent-model' entries; at least 30 required/);
     expect(r.out).toMatch(/required manifest entry removed/);
   }, 120_000);
 
-  it("attack: deleting two of the three probes (pins regenerated) fails; promotion is the only way out", async () => {
-    const probesSrc = join(root, "evals", "known-limitations");
-    const keep = mk();
-    cpSync(
-      join(probesSrc, `${REQUIRED_PROBE_IDS[0]}.json`),
-      join(keep, `${REQUIRED_PROBE_IDS[0]}.json`),
-    );
+  it("a promoted probe must exist in both the gated cases and the manifest", async () => {
+    const empty = mk();
+    const promotedIds = new Set(REQUIRED_PROBE_IDS);
     const none = await runKnownLimitations(
       false,
-      { escalationCases: 0, escalated: 0 },
-      probePins(keep),
+      { escalationCases: 3, escalated: 3 },
+      probePins(empty),
       { requiredIds: REQUIRED_PROBE_IDS, gatedCaseIds: new Set(), manifestIds: new Set() },
-      keep,
+      empty,
     );
-    expect(none.missingRequired).toEqual([REQUIRED_PROBE_IDS[1], REQUIRED_PROBE_IDS[2]]);
+    expect(none.missingRequired).toEqual(REQUIRED_PROBE_IDS);
     expect(knownLimitationsGateFailures(none).join()).toMatch(
       /required known-limitation probe missing \(deleted, not promoted\)/,
     );
-    // promotion direction: the id exists as a gated case AND in the manifest
     const promoted = await runKnownLimitations(
       false,
-      { escalationCases: 0, escalated: 0 },
-      probePins(keep),
+      { escalationCases: 3, escalated: 3 },
+      probePins(empty),
       {
         requiredIds: REQUIRED_PROBE_IDS,
-        gatedCaseIds: new Set([REQUIRED_PROBE_IDS[1]!, REQUIRED_PROBE_IDS[2]!]),
-        manifestIds: new Set([REQUIRED_PROBE_IDS[1]!, REQUIRED_PROBE_IDS[2]!]),
+        gatedCaseIds: promotedIds,
+        manifestIds: promotedIds,
       },
-      keep,
+      empty,
     );
     expect(promoted.missingRequired).toEqual([]);
     expect(knownLimitationsGateFailures(promoted)).toEqual([]);
-    // a case that is gated but NOT in the manifest is not a promotion
     const half = await runKnownLimitations(
       false,
-      { escalationCases: 0, escalated: 0 },
-      probePins(keep),
+      { escalationCases: 3, escalated: 3 },
+      probePins(empty),
       {
         requiredIds: REQUIRED_PROBE_IDS,
-        gatedCaseIds: new Set([REQUIRED_PROBE_IDS[1]!, REQUIRED_PROBE_IDS[2]!]),
+        gatedCaseIds: promotedIds,
         manifestIds: new Set(),
       },
-      keep,
+      empty,
     );
-    expect(half.missingRequired.length).toBe(2);
+    expect(half.missingRequired).toEqual(REQUIRED_PROBE_IDS);
   }, 120_000);
 
-  it("process level: a probes directory missing required probes fails pnpm eval", async () => {
-    const probes = mk();
-    const r = await runEval(casesSrc, fixturesSrc, { EVAL_PROBES_DIR: probes });
-    expect(r.status).not.toBe(0);
-    expect(r.out).toMatch(/required known-limitation probe missing/);
-  }, 120_000);
-
-  it("the probe floor ids exist as pinned probes today", () => {
-    const pins = new Set((loadManifest().knownLimitations ?? []).map((p) => p.id));
+  it("the probe floor ids are now promoted and pinned as gated cases", () => {
+    const pins = new Set(loadManifest().required.flatMap((r) => r.entries.map((e) => e.id)));
     for (const id of REQUIRED_PROBE_IDS) {
-      expect(readdirSync(join(root, "evals", "known-limitations"))).toContain(`${id}.json`);
+      expect(readdirSync(join(root, "evals", "cases"))).toContain(`${id}.json`);
       expect(pins.has(id), id).toBe(true);
     }
   });

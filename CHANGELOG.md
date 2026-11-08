@@ -3,6 +3,16 @@
 All notable changes to CareLoop. Format follows Keep a Changelog; versions follow the
 release schedule in docs/SPEC.md. All data is synthetic.
 
+## Unreleased — synthetic-demo safety and evaluation hardening
+
+- Promoted three formerly missed paraphrases into the pinned eval set, preserving their ESCALATE
+  labels. Fixture recall is 116/116 on synthetic cases; this is not real-world performance.
+- Locked production builds to SHADOW and blocked direct auto-approval and mode changes there.
+- Bound the Docker database port to localhost and removed raw text and clinical signal types from
+  optional trace exports. Added a synthetic-demo entry link and mobile keyboard smoke test.
+- Added separate production-readiness goals for clinical evaluation, protocol controls, frontend
+  usability, and operations/interoperability. No real service or patient data was used.
+
 ## v1.0 - evals, autonomy modes, docs, deploy hardening
 
 All data is synthetic. Tagging `v1.0.0` is the owner's step (agents do not tag).
@@ -31,20 +41,23 @@ All data is synthetic. Tagging `v1.0.0` is the owner's step (agents do not tag).
 - Admin dashboard (`/admin/dashboard`: concurrence with the 98% figure labelled as a TARGET, escalation
   mix, time to decision) and `/admin/evals` (eval results, synthetic labels).
 - E2E: auto-renew in RETRO mode (`e2e/retro-auto-renew.spec.ts`).
-- Eval suite (F063-F067): 153 hand-labelled synthetic cases (88 risk, 113 escalation, 98 AI) run through
+- Eval suite (F063-F067): 156 hand-labelled synthetic cases (91 risk, 116 escalation, 101 AI) run through
   the real decision pipeline with recorded fixtures, including 6 controlled-substance-AI-blocked cases
-  (zero LLM calls) and 3 paraphrase probes kept as documented known limitations. The gate fails if
-  gated escalation recall, auto-approve precision, citation validity or the required-case/probe pins
-  drift. `evals/results/latest.json` records every number plus `mode: fixtures` and
+  (zero LLM calls) and 3 formerly missed paraphrases promoted into the gated set without changing
+  their labels. Escalation-only tripwires cover reduced need for rest, throat-closing language or
+  welts, and an admission of entering zeros. The gate fails on any tracked SPEC-labelled miss,
+  unsafe approval, invalid citation, or required-case/probe pin drift. `evals/results/latest.json`
+  records every number plus `mode: fixtures` and
   `liveModelRun: false`; a CREOLA-style summary judge runs eval-only with recorded fixtures.
 
 ### Known limits
 
 - Evals use synthetic handwritten fixtures, not a live model run. Live mode is `pnpm eval:live` and is
   not claimed here.
-- Three documented paraphrase probes are still missed when the model is silent: gated escalation recall
-  is 1.0; including known limitations it is 113/116 = 0.974. Default SHADOW mode has a clinician approve
-  every renewal; RETRO/SAMPLED is opt-in and the owner decides before enabling it.
+- Escalation recall is 116/116 on the synthetic fixture set, with no remaining tracked misses.
+  This does not establish recall on unseen wording or a live model. Default SHADOW mode has a
+  clinician approve every renewal; RETRO/SAMPLED remains synthetic-only pending independent clinical
+  review and live evaluation.
 - Nothing was deployed. Deploy config and hardening are verified by build and tests only.
 
 ## v0.3 - outbox, pharmacy, follow-up, audit

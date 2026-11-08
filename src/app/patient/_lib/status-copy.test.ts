@@ -28,7 +28,11 @@ const TABLE: Record<string, { state: ResultState; mustSay: RegExp; mustNotSay?: 
   transmitted: { state: "approved", mustSay: /being sent/i },
   pharmacy_status: { state: "approved", mustSay: /being sent/i },
   // A fill is a fill: not "being sent".
-  filled: { state: "filled", mustSay: /filled/i, mustNotSay: /being sent|waiting/i },
+  filled: {
+    state: "filled",
+    mustSay: /contact the pharmacy to confirm/i,
+    mustNotSay: /should be ready|being sent|waiting/i,
+  },
   cancelled: { state: "cancelled", mustSay: /cancelled/i, mustNotSay: /approved|filled/i },
   cancel_requested: {
     state: "replaced",
@@ -65,14 +69,14 @@ describe("patient copy per rx_status value", () => {
     expect(statusLabel("pharmacy_error", "ERROR:PHARMACY_BUSY:retryable")).not.toMatch(/notified/i);
   });
 
-  it("a fatal pharmacy error (an alert row exists) says the care team has been notified", () => {
+  it("a fatal pharmacy error (an alert row exists) says a demo alert was recorded", () => {
     for (const ps of [
       "ERROR:UNKNOWN_PRESCRIPTION",
       "ERROR:TRANSMIT_DEAD_LETTERED",
       "ERROR:STALLED_NO_FILL",
     ]) {
       expect(resultStateFor("pharmacy_error", ps)).toBe("pharmacy_problem");
-      expect(statusLabel("pharmacy_error", ps)).toMatch(/notified/i);
+      expect(statusLabel("pharmacy_error", ps)).toMatch(/demo queue alert was recorded/i);
     }
     // Unknown pharmacy status on an error is treated as final (an alert exists for non-retryable).
     expect(resultStateFor("pharmacy_error", null)).toBe("pharmacy_problem");

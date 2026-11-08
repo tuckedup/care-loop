@@ -49,7 +49,9 @@ test("patient renews sertraline: renew -> verify -> check-in -> status", async (
   const item = page.getByTestId(`renewal-${renewalId}`);
   await expect(item).toContainText("sertraline");
   await expect(item).toHaveAttribute("data-status", "escalated");
-  await expect(item.getByTestId("renewal-status")).toHaveText("Under review by your care team");
+  await expect(item.getByTestId("renewal-status")).toHaveText(
+    "Waiting in the clinician review queue",
+  );
 
   // what actually happened in the event store
   const sql = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false, onnotice: () => {} });

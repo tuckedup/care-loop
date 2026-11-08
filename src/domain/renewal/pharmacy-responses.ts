@@ -25,8 +25,8 @@ export const PharmacyMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("RxFill"),
     messageId: id,
-    renewalId: id.optional(),
-    prescriptionId: id.optional(),
+    renewalId: id,
+    prescriptionId: id,
   }),
   z.object({ type: z.literal("CancelRx"), messageId: id, acknowledged: z.literal(true) }),
   z.object({
@@ -117,10 +117,17 @@ export function decidePharmacyResponse(
       outcome: { kind: "fatal", reason: "pharmacy response too large", events: 0 },
     };
   }
+  if (invalid > 0 && messages.length > 0) {
+    return {
+      events: [],
+      outcome: { kind: "fatal", reason: "invalid pharmacy response message", events: 0 },
+    };
+  }
   const queuedEvent = history.find((e) => e.type === "RxRenewalQueued");
   const queued = queuedEvent !== undefined;
   const queuedRx = queuedEvent?.type === "RxRenewalQueued" ? queuedEvent.data.prescriptionId : null;
   let cancelled = history.some((e) => e.type === "RxCancelAcknowledged");
+  let cancelAcknowledged = false;
   let filled = history.some((e) => e.type === "RxFillReceived");
   const seen = seenIds(history);
   const accepted = input.httpStatus >= 200 && input.httpStatus < 300;
@@ -134,6 +141,42 @@ export function decidePharmacyResponse(
     if (m.type === "Error") {
       if (m.retryable) retryable ??= `${m.code} (retryable)`;
       else fatal ??= m.code;
+    }
+    if (m.type === "RxFill" && (m.renewalId !== renewalId || m.prescriptionId !== queuedRx)) {
+      const correlationId = `${m.messageId}:correlation`;
+      fatal ??= "RX_FILL_CORRELATION_MISMATCH";
+      if (!seen.has(correlationId)) {
+        out.push({
+          type: "PharmacyErrorReceived",
+          data: {
+            v: 1,
+            renewalId,
+            messageId: correlationId,
+            code: "RX_FILL_CORRELATION_MISMATCH",
+            retryable: false,
+          },
+        });
+        seen.add(correlationId);
+      }
+      continue;
+    }
+    if (m.type === "CancelRx" && input.kind !== "cancel") {
+      const anomalyId = `${m.messageId}:unsolicited-cancel`;
+      fatal ??= "UNSOLICITED_CANCEL_ACK";
+      if (!seen.has(anomalyId)) {
+        out.push({
+          type: "PharmacyErrorReceived",
+          data: {
+            v: 1,
+            renewalId,
+            messageId: anomalyId,
+            code: "UNSOLICITED_CANCEL_ACK",
+            retryable: false,
+          },
+        });
+        seen.add(anomalyId);
+      }
+      continue;
     }
     if (seen.has(m.messageId)) continue; // dedupe on messageId (also within this batch)
     seen.add(m.messageId);
@@ -159,11 +202,7 @@ export function decidePharmacyResponse(
       case "RxFill":
         // A fill only means something for a renewal we queued, and never after a cancel.
         // ...and only if it names this renewal and prescription (no cross-attribution).
-        if (
-          queued &&
-          (m.renewalId === undefined || m.renewalId === renewalId) &&
-          (m.prescriptionId === undefined || m.prescriptionId === queuedRx)
-        ) {
+        if (queued && m.renewalId === renewalId && m.prescriptionId === queuedRx) {
           if ((input.supersededBy?.length ?? 0) > 0) {
             // A fill for a SUPERSEDED renewal: record it (it happened) and flag it for a person.
             // It never re-opens the renewal (filled is terminal) and is never silently ignored.
@@ -202,6 +241,7 @@ export function decidePharmacyResponse(
           break;
         }
         cancelled = true;
+        cancelAcknowledged = true;
         out.push({
           type: "RxCancelAcknowledged",
           data: { v: 1, renewalId, messageId: m.messageId },
@@ -214,6 +254,20 @@ export function decidePharmacyResponse(
         });
         break;
     }
+  }
+
+  if (input.kind === "cancel" && !cancelAcknowledged && fatal === null && retryable === null) {
+    fatal = "MISSING_CANCEL_ACK";
+    out.push({
+      type: "PharmacyErrorReceived",
+      data: {
+        v: 1,
+        renewalId,
+        messageId: `${input.messageId}:missing-cancel-ack`,
+        code: fatal,
+        retryable: false,
+      },
+    });
   }
 
   let outcome: ConsumeOutcome;

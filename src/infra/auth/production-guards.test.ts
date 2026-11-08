@@ -28,6 +28,13 @@ describe("SESSION_SECRET production guard", () => {
     }
   });
 
+  it("uses the public demo secret only as a missing development/test default", () => {
+    expect(getSecret({ NODE_ENV: "development" })).toBe(DEV_PLACEHOLDER_SECRET);
+    expect(getSecret({ NODE_ENV: "test" })).toBe(DEV_PLACEHOLDER_SECRET);
+    expect(getSecret({ NODE_ENV: "production" })).toBeNull();
+    expect(getSecret({ NODE_ENV: "development", SESSION_SECRET: "short" })).toBeNull();
+  });
+
   it("a strong secret is usable in production", () => {
     expect(usableSessionSecret({ NODE_ENV: "production", SESSION_SECRET: GOOD })).toBe(GOOD);
   });

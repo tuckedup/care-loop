@@ -24,6 +24,7 @@ import { reviewAggregate, type AutoApprove } from "../renewal/review";
 import {
   autoApprovalAllowed,
   DEFAULT_AUTONOMY_MODE,
+  productionAutonomyLocked,
   readAutonomyMode,
   type AutonomyMode,
 } from "./mode";
@@ -69,6 +70,9 @@ export async function tryAutoApprove(
   deps: AutonomyDeps,
   opts: { now?: Date; staleHours?: number } = {},
 ): Promise<AutoApproveResult> {
+  if (productionAutonomyLocked()) {
+    return { status: "not_applied", reason: "automatic renewals are unavailable in production" };
+  }
   if (!autoApprovalAllowed(deps.mode)) return { status: "not_applied", reason: "mode is SHADOW" };
   try {
     const command: AutoApprove = {

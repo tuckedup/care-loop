@@ -53,7 +53,6 @@ describe("mock pharmacy simulation (F046)", () => {
       delayed: 0,
       fill: 0,
       dupFill: 0,
-      cancelAck: 0,
       escalation: 0,
     };
     for (let i = 0; i < 3000; i++) {
@@ -79,7 +78,7 @@ describe("mock pharmacy simulation (F046)", () => {
         seen.dupFill++;
         expect(fills[0]!.messageId).toBe(fills[1]!.messageId); // consumers dedupe on messageId
       }
-      if (s.messages.some((m) => m.type === "CancelRx")) seen.cancelAck++;
+      expect(s.messages.some((m) => m.type === "CancelRx")).toBe(false);
       if (s.messages.some((m) => m.type === "PharmacistEscalation")) seen.escalation++;
     }
     for (const [k, v] of Object.entries(seen)) expect(v, k).toBeGreaterThan(0);

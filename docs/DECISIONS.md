@@ -508,3 +508,18 @@ Status: accepted for the demo. All data is synthetic. Implementer choices below 
   improvement, not done.
 - **Pooler.** postgres.js runs with `prepare: false`; no LISTEN/NOTIFY and no session advisory locks exist (the
   event store uses a row lock in a transaction). Never tried against a real Supabase pooler.
+
+### Post-v1.0 — production autonomy lock and data minimization
+
+The signed Utah agreement describes a phased, organization-specific pilot with identity,
+prescription, consent, stability, timing, and oversight controls that this synthetic demo does
+not implement. Until those controls and an independently reviewed evaluation exist, production
+builds force SHADOW regardless of stored mode, reject RETRO/SAMPLED mode changes, and refuse
+direct auto-approval. The central audited append path also refuses system approvals in production,
+and the pharmacy transmit handler refuses any pre-existing system-approved stream before a network
+call. This is a deliberate fail-closed stop, not an implementation of the pilot.
+The criteria for revisiting it are in `docs/PRODUCTION_READINESS.md`.
+
+Local Docker Postgres now binds to loopback, not all interfaces. Optional trace exports contain
+only input lengths, status, and signal counts rather than patient text, quotes, or signal types.
+These controls reduce accidental exposure but do not make the demo suitable for real health data.

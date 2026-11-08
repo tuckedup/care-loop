@@ -6,10 +6,22 @@
 
 CareLoop is a demo of an AI-assisted psychiatric prescription-renewal loop, modeled on the public
 protocol of Legion Health's Utah AI pilot (see [docs/sources.md](docs/sources.md) for the source list).
+The evidence-based launch blockers are tracked as separate goals in
+[docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
 A patient on a stable, existing, non-controlled medication asks for a refill and does a short check-in.
 Deterministic rules plus an LLM that can only add risk signals either auto-renew (depending on the
 autonomy mode) or escalate to a human clinician. A mock pharmacy answers with NCPDP-SCRIPT-style
 messages, and hitting the refill limit forces a follow-up visit.
+
+## Demo preview
+
+The landing page links into a role chooser; choosing the patient role opens the synthetic renewal
+workspace. Start the app using [Run it](#run-it), then use `pnpm demo:screenshot` to refresh these
+screenshots.
+
+![CareLoop synthetic workflow landing page](docs/assets/careloop-home.png)
+
+![CareLoop patient renewal workspace with synthetic medications](docs/assets/careloop-patient-demo.png)
 
 ## What CareLoop is, and is not
 
@@ -20,6 +32,7 @@ It is:
 - Four role-based apps (patient, clinician, pharmacist, admin) behind a signed-cookie demo login.
 - Fully runnable locally with Docker (Postgres) and no API keys: without `ANTHROPIC_API_KEY` the AI path
   fails closed and renewals escalate to a clinician.
+- Automatic renewals are locked off in production builds, even if a RETRO or SAMPLED setting was stored.
 
 It is not:
 
@@ -202,10 +215,10 @@ it drifts from `evals/results/latest.json`.
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Run mode                                                  | fixtures (fixtures: synthetic-handwritten)                                                       |
 | Live model run                                            | no                                                                                               |
-| Cases                                                     | 153                                                                                              |
-| Risk cases                                                | 88                                                                                               |
-| Cases that exercise the AI path                           | 98                                                                                               |
-| Cases labelled ESCALATE                                   | 113                                                                                              |
+| Cases                                                     | 156                                                                                              |
+| Risk cases                                                | 91                                                                                               |
+| Cases that exercise the AI path                           | 101                                                                                              |
+| Cases labelled ESCALATE                                   | 116                                                                                              |
 | Escalation recall (gated set)                             | 100.0%                                                                                           |
 | Unsafe approvals (gated cases)                            | 0                                                                                                |
 | Auto-approve precision                                    | 100.0%                                                                                           |
@@ -213,13 +226,13 @@ it drifts from `evals/results/latest.json`.
 | Reason-code accuracy                                      | 100.0%                                                                                           |
 | Citation validity                                         | 100.0%                                                                                           |
 | AI-blocked cases / LLM calls on them                      | 6 / 0                                                                                            |
-| Known-limitation probes (not gated)                       | 3 probes the system still misses                                                                 |
-| Known SPEC-labelled escalations missed (non-gated probes) | 3                                                                                                |
-| Escalation recall including the probes                    | 97.4% (3 missed of 116 SPEC-labelled escalations)                                                |
+| Known-limitation probes (not gated)                       | 0                                                                                                |
+| Known SPEC-labelled escalations missed (non-gated probes) | 0                                                                                                |
+| Escalation recall including the probes                    | 100.0% (0 missed of 116 SPEC-labelled escalations)                                               |
 | Summary judge (fixture judgments)                         | 15 cases, 8 judged, 7 fail-closed; hallucinations 3 major / 1 minor, omissions 4 major / 1 minor |
 | Gate                                                      | pass                                                                                             |
 
-Source: `evals/results/latest.json` (generated by `evals/run.eval.ts@1.1.0`). These are FIXTURE results: every model answer is a hand-written canned response, no live model or live judge has ever run, so the numbers show how the pipeline handles those responses, not how any real model performs. Recall of 100% is over the gated set only; the probes row is the honest figure.
+Source: `evals/results/latest.json` (generated by `evals/run.eval.ts@1.1.0`). These are FIXTURE results: every model answer is a hand-written canned response, no live model or live judge has ever run, so the numbers show how the pipeline handles those responses, not how any real model performs. Recall is measured only on this synthetic case set; the probes row reports any separately tracked misses.
 <!-- eval-results:end -->
 
 ## Known limitations
@@ -229,15 +242,14 @@ Source: `evals/results/latest.json` (generated by `evals/run.eval.ts@1.1.0`). Th
   been used. Results demonstrate behaviour and regressions of this pipeline, not model performance.
 - **Eval cases are small, synthetic and hand-labelled** from the SPEC; they are not clinical validation.
   Some labels rest on implementation choices (listed in [docs/MODEL_CARD.md](docs/MODEL_CARD.md)).
-- **Three paraphrase probes still fail.** `evals/known-limitations/` holds three SPEC-labelled escalations the
-  system misses when the model is silent: mania, a severe reaction and an understated PHQ-9, each worded
-  differently from the gated cases. They show the tripwire phrase lists are narrow. Recall over the gated set is 100%;
-  the honest figure including the probes is in the results table. In the default SHADOW autonomy mode a
-  clinician approves every renewal; in RETRO and SAMPLED modes a model miss on such wording would be sent
-  automatically. An owner decision is needed before enabling those modes anywhere real.
+- **The three previously missed paraphrase probes are now gated cases.** Escalation-only checks cover
+  reduced need for rest, throat-closing language or welts, and an admission of entering zeros.
+  The fixture set has no known misses, but this does not establish recall on unseen language or a
+  live model. RETRO and SAMPLED are available only for synthetic development/testing; a production
+  build treats every renewal as SHADOW and rejects mode changes to automatic renewal.
 - **The tripwire and the summary deny-list are heuristics**: small English-only lexicons, deliberately
   over-inclusive (the phrase-family tripwire over-escalates on innocent uses of its words; the ordinary-text
-  and adversarial near-miss false-positive figures in the model card are different measurements, neither a real-world rate), not clinically reviewed, with documented misses.
+  and adversarial near-miss false-positive figures in the model card are different measurements, neither a real-world rate), not clinically reviewed, and not exhaustive.
 - **Demo auth is a role switcher**, not authentication. The app database role still has UPDATE and
   DELETE on `events` (append-only is enforced by triggers a superuser could disable).
 - **Real gaps stay marked `TODO: source needed`** (hydroxyzine numeric limits, mirtazapine monitoring

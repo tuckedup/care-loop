@@ -48,7 +48,6 @@ function fakePharmacy(
       delayed: 0,
       fill: 1,
       duplicateFill: 0,
-      cancelAck: 0,
       escalation: 0,
     });
     return { status: sim.httpStatus, body: { messages: sim.messages } };
