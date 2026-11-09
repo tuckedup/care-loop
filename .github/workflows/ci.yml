@@ -99,7 +99,9 @@ jobs:
           --health-cmd "pg_isready -U careloop"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgres://careloop:careloop@localhost:54329/careloop
+      # The e2e suite refuses to reset any database whose name does not end in _e2e. It creates,
+      # migrates and seeds this database itself, so no separate migrate or seed step is needed.
+      DATABASE_URL: postgres://careloop:careloop@localhost:54329/careloop_e2e
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -109,8 +111,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm db:migrate
-      - run: pnpm db:seed
       - run: pnpm e2e
       - uses: actions/upload-artifact@v4
         if: failure()

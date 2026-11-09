@@ -51,7 +51,14 @@ test("admin sees metric cards, the failed-cases section, and the synthetic / no-
     latest.getByTestId("eval-failures").or(latest.getByTestId("eval-no-failures")),
   ).toBeVisible();
   await expect(latest.getByRole("heading", { name: "By category" })).toBeVisible();
-  // No live run has been recorded for this demo.
-  await expect(page.getByTestId("evals-live")).toHaveAttribute("data-state", "missing");
-  await expect(page.getByTestId("evals-live")).toContainText("No live model run");
+  // The live block depends on whether `pnpm eval:live` was ever run on this machine (its result file
+  // is git-ignored): CI has none, a developer machine may. Either way it must never be silent or
+  // pass as a fixture result.
+  const live = page.getByTestId("evals-live");
+  await expect(live).toHaveAttribute("data-state", /^(missing|ok)$/);
+  if ((await live.getAttribute("data-state")) === "missing") {
+    await expect(live).toContainText("No live model run");
+  } else {
+    await expect(live.getByTestId("eval-live-flag")).toHaveAttribute("data-live", "true");
+  }
 });
