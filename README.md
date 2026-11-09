@@ -13,6 +13,8 @@ Deterministic rules plus an LLM that can only add risk signals either auto-renew
 autonomy mode) or escalate to a human clinician. A mock pharmacy answers with NCPDP-SCRIPT-style
 messages, and hitting the refill limit forces a follow-up visit.
 
+Resume facts and design notes: [docs/RESUME.md](docs/RESUME.md).
+
 ## Demo preview
 
 The landing page links into a role chooser; each role opens its own workspace. Every screen below is
