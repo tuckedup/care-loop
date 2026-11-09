@@ -1051,5 +1051,49 @@
       "pnpm build"
     ],
     "passes": true
+  },
+  {
+    "id": "F071",
+    "title": "Independent clinical-safety review of the eval-gate delta is recorded",
+    "release": "v1.0",
+    "requiresClinicalSafetyReview": true,
+    "steps": [
+      "Run the clinical-safety-reviewer over evals/, the manifest/probe pins and commit c9d0dea",
+      "Fix or document every finding; record the verdict in docs/SAFETY_REVIEW.md"
+    ],
+    "verification": [
+      "pnpm eval",
+      "pnpm exec vitest run scripts/eval-gate.test.ts"
+    ],
+    "passes": true
+  },
+  {
+    "id": "F072",
+    "title": "Live-model eval runbook, guards and Wilson-interval reporting helper",
+    "release": "v1.0",
+    "requiresClinicalSafetyReview": true,
+    "steps": [
+      "Document the guarded EVAL_LIVE path in docs/LIVE_EVAL.md (never run; needs a key)",
+      "Add evals/wilson.ts with tests so recall is reported with uncertainty"
+    ],
+    "verification": [
+      "pnpm exec vitest run scripts/wilson.test.ts scripts/eval-gate.test.ts",
+      "pnpm eval"
+    ],
+    "passes": true
+  },
+  {
+    "id": "F073",
+    "title": "Clinical review sign-off record (UNSIGNED) with a test that every rule has a row",
+    "release": "v1.0",
+    "requiresClinicalSafetyReview": true,
+    "steps": [
+      "Add docs/CLINICAL_REVIEW.md listing every rule id with reviewer/date columns",
+      "Add scripts/clinical-review.test.ts: every rule in code has a row; SIGNED needs reviewer and date"
+    ],
+    "verification": [
+      "pnpm exec vitest run scripts/clinical-review.test.ts"
+    ],
+    "passes": true
   }
 ]
