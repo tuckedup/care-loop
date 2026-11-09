@@ -10,7 +10,9 @@ import {
   type RiskTextInput,
 } from "./types";
 
-export const DEFAULT_MAX_TOKENS = 1024;
+// Headroom for long check-ins: a live run at 1024 hit stop_reason max_tokens (truncated JSON, so
+// the call failed closed and the model's signal was lost). Truncation still fails closed.
+export const DEFAULT_MAX_TOKENS = 4096;
 
 /** Parses raw model text into a validated RiskOutput. One optional markdown fence is tolerated. */
 export function parseRiskOutput(raw: string): RiskOutput {

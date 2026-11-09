@@ -9,7 +9,7 @@ real patients, no production-readiness claim.**
 | Metric                           | Value                                                                                                 | How to check                                                      |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | TypeScript source (src/)         | about 38,500 lines                                                                                    | `git ls-files "src/**/*.ts" "src/**/*.tsx" \| xargs cat \| wc -l` |
-| Automated unit/integration tests | 1,801 across 104 test files                                                                           | `pnpm test`                                                       |
+| Automated unit/integration tests | 1,818 across 109 test files                                                                           | `pnpm test`                                                       |
 | Browser end-to-end specs         | 20 Playwright spec files                                                                              | `pnpm e2e`                                                        |
 | Safety eval cases                | 156 labelled cases (recall reported with Wilson intervals), pinned by a manifest, with probe ratchets | `pnpm eval`                                                       |
 | Deterministic clinical checks    | 13 numbered rules (R01-R13) plus drug-specific, medication-identity and payload checks                | `src/domain/rules/`                                               |
@@ -28,7 +28,7 @@ real patients, no production-readiness claim.**
 - Proved controlled substances never reach the AI path with a test, and gated changes behind a
   156-case eval suite with pinned manifests and adversarial probes.
 - Shipped four role-based apps (patient, clinician, pharmacist, admin) with server-side RBAC,
-  accessible responsive UI (skip link, focus ring, 320px reflow, reduced motion) and 1,801 tests.
+  accessible responsive UI (skip link, focus ring, 320px reflow, reduced motion) and 1,818 tests.
 
 Do not add outcome claims (accuracy, time saved, patients served): this demo has none.
 

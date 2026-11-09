@@ -72,9 +72,11 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
   and over-escalate on some innocent uses of the same words. Not clinically validated.
 - Offsets from a live model are often wrong, which makes real signals unverifiable (they still
   escalate) and can fail the live citation gate.
-- A live model has run once (2026-11-09, `claude-sonnet-5-5`, 131 synthetic cases): no escalation was
-  missed (91/91), but the eval gate failed on other measures and three model calls failed closed;
-  see `LIVE_EVAL.md`. The published `latest.json` results are still from hand-written fixtures.
+- A live model has run (2026-11-09, `claude-sonnet-5-5`, 131 synthetic cases, plus a 3-trial repeat):
+  no escalation was missed (91/91; 165/165 over repeated trials) and nothing was approved unsafely,
+  but the strict eval gate still fails on reason codes, citation validity (58/60) and the live judge;
+  see `LIVE_EVAL.md`. A first run also exposed an output limit that truncated long check-ins (fixed).
+  The published `latest.json` results are still from hand-written fixtures.
 - The Langfuse request shape has not been verified against a live instance.
 - Eval set size: the SPEC target (60+ cases, 25+ risk cases, each risk category at least 3 cases with an
   adversarial one) is met; see the eval set section below. The cases are small, synthetic and hand-labelled,

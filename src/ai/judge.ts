@@ -202,7 +202,7 @@ export async function judgeSummary(input: JudgeInput, deps: JudgeDeps): Promise<
           model: deps.model,
           system: prompt.system,
           user: prompt.user,
-          maxTokens: 1500,
+          maxTokens: 4096,
           signal: controller.signal,
         }),
         deadline,

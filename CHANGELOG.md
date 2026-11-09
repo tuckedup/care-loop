@@ -8,9 +8,13 @@ release schedule in docs/SPEC.md. All data is synthetic.
 - UI redesign (design tokens, self-hosted Figtree at 18px, role navigation); `pnpm dev` now works without
   a `.env`; the clinician review panel no longer sticks pending in production builds.
 - Eval gate: a manifest requirement's outcome is now pinned to its kind in code (F071 review finding);
-  added `evals/wilson.ts` for recall intervals, `docs/LIVE_EVAL.md` (first live run on 2026-11-09 with
-  `claude-sonnet-5-5`: 91/91 escalations, 0 unsafe approvals, but the live gate FAILED; details there),
-  `docs/CLINICAL_REVIEW.md` (every rule UNSIGNED) and `docs/SAFETY_REVIEW.md` (F071-F073).
+  added `evals/wilson.ts` for recall intervals, `docs/LIVE_EVAL.md`, `docs/CLINICAL_REVIEW.md` (every
+  rule UNSIGNED) and `docs/SAFETY_REVIEW.md` (F071-F073).
+- First live-model eval (2026-11-09, `claude-sonnet-5-5`, synthetic cases): 91/91 escalations and 0
+  unsafe approvals, but the strict live gate FAILED (reason codes, citation validity 58/60, live
+  judge); details in `docs/LIVE_EVAL.md`. It exposed an output limit (1024/1500 tokens) that truncated
+  long check-ins, now 4096. Added `pnpm eval:live:repeat` (pass^k, Wilson and clustered error bars,
+  over-escalation) and `evals/stats.ts`; its 3-trial run escalated 165/165 trials.
 - Promoted three formerly missed paraphrases into the pinned eval set, preserving their ESCALATE
   labels. Fixture recall is 116/116 on synthetic cases; this is not real-world performance.
 - Locked production builds to SHADOW and blocked direct auto-approval and mode changes there.
