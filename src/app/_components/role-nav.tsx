@@ -16,6 +16,7 @@ export function RoleNav({ label, links }: { label: string; links: readonly NavLi
             <Link
               key={l.href}
               href={l.href}
+              prefetch={false}
               aria-current={active ? "page" : undefined}
               className={
                 active
@@ -29,6 +30,7 @@ export function RoleNav({ label, links }: { label: string; links: readonly NavLi
         })}
         <Link
           href="/login"
+          prefetch={false}
           className="ml-auto rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-sunken hover:text-ink"
         >
           Switch role (demo auth)

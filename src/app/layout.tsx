@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </div>
         <header className="sticky top-0 z-30 border-b border-line bg-canvas/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center gap-3 px-5 py-3 sm:px-8">
-            <Link href="/" className="flex items-center gap-2.5 rounded-lg">
+            <Link href="/" prefetch={false} className="flex items-center gap-2.5 rounded-lg">
               <BrandMark />
               <span className="font-display text-xl font-semibold tracking-tight">CareLoop</span>
             </Link>

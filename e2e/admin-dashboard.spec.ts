@@ -57,6 +57,11 @@ test("the admin switches the autonomy mode from the dashboard and from /admin/au
   page,
   context,
 }) => {
+  // Production builds lock autonomy to SHADOW by design (unit-tested), so only dev servers can switch.
+  test.skip(
+    !!process.env.CI || !!process.env.E2E_PROD,
+    "autonomy is locked to SHADOW in production builds",
+  );
   await loginAs(context, "admin", DEMO_SUBJECTS.admin);
   await page.goto("/admin/dashboard");
   await page.getByRole("button", { name: "Set mode SAMPLED" }).click();

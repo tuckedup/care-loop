@@ -361,7 +361,10 @@ export default async function VisitPage({
           AI-generated summary, not a recommendation; escalation reason codes above are
           authoritative
         </p>
-        <Suspense fallback={<p role="status">Generating summary...</p>}>
+        <Suspense
+          key={`${data.row.renewalId}:${data.row.lastPosition}`}
+          fallback={<p role="status">Generating summary...</p>}
+        >
           <SummarySection data={data} />
         </Suspense>
       </Section>

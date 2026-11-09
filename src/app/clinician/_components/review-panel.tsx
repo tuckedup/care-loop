@@ -1,7 +1,6 @@
 "use client";
 // Clinician command buttons. All gating here is for EXPLANATION only: every command is
 // re-validated server-side (RBAC from the session, same-reviewer rule, aggregate refusals).
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   approveRenewalAction,
@@ -29,7 +28,6 @@ const btn =
   "rounded-xl border bg-surface px-3 py-2 text-sm font-medium focus:outline-2 focus:outline-offset-2 focus:outline-blue-700 disabled:cursor-not-allowed disabled:opacity-50 border-line-strong";
 
 export function ReviewPanel(p: ReviewPanelProps) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [reason, setReason] = useState("");
@@ -43,7 +41,7 @@ export function ReviewPanel(p: ReviewPanelProps) {
         const r = await fn();
         if (r.ok) {
           setMessage({ kind: "ok", text: `${label}: done.` });
-          router.refresh();
+          // The action revalidates this page, so Next re-renders it with the new state.
         } else {
           setMessage({ kind: "error", text: `${label} failed (${r.code}): ${r.message}` });
         }

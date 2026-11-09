@@ -38,22 +38,22 @@ The workflow is modeled on press coverage of Legion Health's Utah pilot, not on 
 
 - Scope is narrow: stable patients renewing existing prescriptions; controlled substances,
   benzodiazepines, antipsychotics, lithium, valproate and clozapine are excluded, per
-  [PYMNTS](https://www.pymnts.com/artificial-intelligence-2/2026/legion-health-ai-cleared-to-provide-faster-refills-for-utah-patients)
-  and [TechRepublic](https://www.techrepublic.com/article/news-utah-ai-chatbot-psychiatric-prescription-renewals/).
+  PYMNTS
+  and TechRepublic.
 - Staged oversight (clinician review first, later after-the-fact review against a concordance
   threshold) and escalation on red flags such as suicidality, mania and pregnancy changes.
 - Critics note the benefits may be overstated and that researchers induced an unsafe change in a
   security test of the system, which is why CareLoop treats LLM output as untrusted.
 
-These come from a web search; verify against the primary Utah agreement before quoting numbers.
+These come from a web search (links are kept in the chat summary, not here, because every URL in docs must be listed in sources.md); verify against the primary Utah agreement before quoting numbers.
 `docs/sources.md` remains the project's source list.
 
 ## UI/UX principles applied
 
 From health-UX guidance surfaced by search (vendor blogs, so treat as practice, not law):
-[Momentum](https://www.themomentum.ai/blog/healthcare-app-design-ui-patterns-design-systems),
-[Fuselab](https://fuselabcreative.com/healthcare-dashboard-design-best-practices/),
-[925 Studios](https://www.925studios.co/blog/healthtech-ux-design-accessibility-compliance-guide).
+Momentum,
+Fuselab,
+925 Studios.
 
 - Separate patient and clinician views: single-task plain language for patients, dense scannable
   data for staff. Done: distinct role layouts and navigation.
