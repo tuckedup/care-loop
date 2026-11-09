@@ -12,7 +12,8 @@ import { clusteredSe, mean, passHatK } from "./stats";
 import { wilsonInterval } from "./wilson";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const OUT = join(here, "results", "live-repeat.json");
+const outPath = (model: string) =>
+  join(here, "results", `live-repeat.${model.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
 const CONCURRENCY = 4;
 
 interface Trial {
@@ -57,7 +58,7 @@ async function main() {
   await pool(jobs, CONCURRENCY, async ({ c, trial }) => {
     const stage = await runAiStage(c, true);
     if (stage.skipped) return;
-    const res = runCase(c, stage.ai);
+    const res = runCase(c, stage.ai, { live: true });
     trials.push({
       caseId: c.id,
       category: c.category,
@@ -122,6 +123,7 @@ async function main() {
     blockedModelCalls: blockedCalls,
     flakyCases: flaky,
   };
+  const OUT = outPath(cfg.model);
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, `${JSON.stringify(out, null, 2)}\n`);
 

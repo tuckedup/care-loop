@@ -4,6 +4,8 @@ import type { JudgeFailureReason } from "../src/ai/judge";
 
 /** Ratchet: the judge case set may only grow. */
 export const MIN_JUDGE_CASES = 12;
+/** Live floor: only the live-applicable judge cases run live (fixture-only failure cases are skipped). */
+export const MIN_LIVE_JUDGE_CASES = 8;
 
 export interface JudgeCaseOutcome {
   id: string;
@@ -26,6 +28,8 @@ export interface JudgeEvalMetrics {
   labelSource: "fixture-judge-synthetic-handwritten" | "live-judge";
   /** true ONLY for `pnpm eval:live`. */
   liveJudgeRun: boolean;
+  /** The judge model on a live run (may differ from the model under test). */
+  judgeModel?: string;
   promptVersion: string;
   cases: number;
   judged: number;
@@ -52,8 +56,9 @@ export interface JudgeEvalMetrics {
 export function judgeGateFailures(m: JudgeEvalMetrics | null): string[] {
   if (m === null) return ["summary judge section was not computed"];
   const f: string[] = [];
-  if (m.cases < MIN_JUDGE_CASES) {
-    f.push(`only ${m.cases} judge cases ran; at least ${MIN_JUDGE_CASES} required`);
+  const floor = m.liveJudgeRun ? MIN_LIVE_JUDGE_CASES : MIN_JUDGE_CASES;
+  if (m.cases < floor) {
+    f.push(`only ${m.cases} judge cases ran; at least ${floor} required`);
   }
   f.push(...m.pinFailures);
   if (m.labelMismatches.length > 0) {

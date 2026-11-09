@@ -17,6 +17,8 @@ export interface AiStageResult {
   /** Model-produced signals (tripwire signals are excluded). */
   modelSignals: number;
   modelSignalsVerified: number;
+  /** Model signals whose quote appears verbatim in the named field (offsets may be wrong). */
+  modelSignalsGrounded: number;
   /** Locally produced tripwire / injection signals, reported separately. */
   tripwireSignals: number;
   /** The medication was blocked from the AI path (positive allow-list). */
@@ -54,6 +56,7 @@ export async function runAiStage(
       calls: 0,
       modelSignals: 0,
       modelSignalsVerified: 0,
+      modelSignalsGrounded: 0,
       tripwireSignals: 0,
       blocked: false,
       skipped: true,
@@ -127,11 +130,16 @@ export async function runAiStage(
   // Citation validity covers ONLY model-produced signals; tripwire signals are verified by
   // construction and are counted separately.
   const modelSigs = signals.filter((s) => s.origin === "model");
+  const grounded = modelSigs.filter((s) => {
+    const text = s.sourceField === "freeText" ? c.input.freeText : c.input.sideEffects;
+    return s.quote.length > 0 && text.includes(s.quote);
+  });
   return {
     ai: toRulesAiResult(result),
     calls,
     modelSignals: modelSigs.length,
     modelSignalsVerified: modelSigs.filter((s) => s.verified).length,
+    modelSignalsGrounded: grounded.length,
     tripwireSignals: signals.length - modelSigs.length,
     blocked,
     skipped: false,

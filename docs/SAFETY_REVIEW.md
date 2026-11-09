@@ -38,3 +38,22 @@ signals, controlled-substance cases still make 0 model calls, `passHatK` and `cl
 their definitions, and `live-repeat.ts` cannot overwrite `latest.json` or `live-latest.json` or print
 the key. Non-blocking: a single missed trial makes the repeat script exit non-zero (noisy but safe),
 and the repeat harness has no automated test beyond the statistics.
+
+## 2026-11-09: relaxed live gate profile
+
+Scope: `evals/lib.ts`, `evals/ai-runner.ts`, `evals/judge-eval.ts`, `evals/judge-metrics.ts`,
+`evals/run.eval.ts`, `src/ai/judge.ts` (opt-in leading-prose tolerance), `scripts/live-gate.test.ts`.
+
+Verdict: **PASS**. No relaxation can hide a missed escalation, an unsafe approval, a model call on a
+controlled medication or a fail-open path; the hard checks are untouched in both modes and the fixture
+gate takes the same code path as before. Findings and resolutions:
+
+| #   | Severity | Finding                                                                                                                | Resolution                                                      |
+| --- | -------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1   | Medium   | Docs said the manifest "was NOT loosened"; the live silent-model check is now skipped                                  | Fixed: `LIVE_EVAL.md` lists every relaxation                    |
+| 2   | Medium   | Nothing in the docs or results marked the live gate as the relaxed variant                                             | Fixed: `gateProfile` in results, docs and a test                |
+| 3   | Low      | Lenient judge parse changed a product default (a pinned test caught it)                                                | Fixed: tolerance is opt-in, set only by the live harness        |
+| 4   | Low      | Per-case reason assertion in `run.eval.ts` still exact in live mode, so the process exit and the result file disagreed | Fixed: live mode uses the same rule as the gate; re-run exits 0 |
+| 5   | Info     | A model may add `LLM_RISK_SIGNAL` without a required reason regression being flagged                                   | Accepted: intended trade-off, recorded in `LIVE_EVAL.md`        |
+
+The second model (`claude-fable-5-1`) is an eval-only judge and has no path to a renewal outcome.

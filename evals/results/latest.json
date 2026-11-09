@@ -22,6 +22,9 @@
   "outcomeAccuracy": 1,
   "reasonCodeAccuracy": 1,
   "citationValidity": 1,
+  "gateProfile": "strict",
+  "citationBasis": "offsets",
+  "citationOffsetExact": null,
   "summaryJudge": {
     "labelSource": "fixture-judge-synthetic-handwritten",
     "liveJudgeRun": false,

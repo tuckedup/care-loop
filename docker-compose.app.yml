@@ -44,6 +44,8 @@ services:
     environment:
       ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      EVAL_JUDGE_MODEL: ${EVAL_JUDGE_MODEL:-}
+      EVAL_REPEATS: ${EVAL_REPEATS:-3}
     secrets: [anthropic_api_key]
     volumes:
       - ./evals/results:/app/evals/results

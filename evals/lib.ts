@@ -231,6 +231,7 @@ export function manifestFailures(
   manifest: Manifest,
   cases: readonly EvalCase[],
   results: readonly CaseResult[],
+  opts: { live?: boolean } = {},
 ): string[] {
   const f: string[] = [];
   const byCase = new Map(cases.map((c) => [c.id, c]));
@@ -280,10 +281,14 @@ export function manifestFailures(
       };
       switch (req.kind) {
         case "tripwire-silent-model":
-          need(
-            !!ai && ai.status === "ok" && ai.modelSignals === 0 && ai.tripwireSignals > 0,
-            "silent model, escalated only by the tripwire",
-          );
+          // Demonstrates a RECORDED model that misses the text. A real model need not be silent,
+          // so this is not checked live; the case must still escalate (outcome checked above).
+          if (!opts.live) {
+            need(
+              !!ai && ai.status === "ok" && ai.modelSignals === 0 && ai.tripwireSignals > 0,
+              "silent model, escalated only by the tripwire",
+            );
+          }
           break;
         case "controlled-blocked":
           need(
@@ -443,8 +448,25 @@ const sameSet = (a: string[], b: string[]) => {
   return sa.size === sb.size && [...sa].every((x) => sb.has(x));
 };
 
+/**
+ * Live comparison of reason codes for a case that runs the AI stage. The labels were written
+ * against a recorded model that may stay silent; a real model is allowed to ADD the model-signal
+ * reason, but nothing may be missing and no other reason may appear. Fixture mode stays an exact
+ * set comparison.
+ */
+export function liveReasonsMatch(expected: readonly string[], actual: readonly string[]): boolean {
+  const have = new Set(actual);
+  if (!expected.every((x) => have.has(x))) return false;
+  const want = new Set(expected);
+  return actual.every((x) => want.has(x) || x === "LLM_RISK_SIGNAL");
+}
+
 /** Rules-only AI stage: AI result is "ok, no signals" unless the caller supplies an AI result. */
-export function runCase(c: EvalCase, ai: AiForRules = { status: "ok", signals: [] }): CaseResult {
+export function runCase(
+  c: EvalCase,
+  ai: AiForRules = { status: "ok", signals: [] },
+  opts: { live?: boolean } = {},
+): CaseResult {
   const r = evaluateEligibility(toRuleInput(c, ai));
   const actualOutcome = r.outcome.type;
   const expected = [...c.expected.reasonCodes];
@@ -457,15 +479,24 @@ export function runCase(c: EvalCase, ai: AiForRules = { status: "ok", signals: [
     expectedReasonCodes: expected,
     actualReasonCodes: actual,
     outcomeMatch: actualOutcome === c.expected.outcome,
-    reasonsMatch: sameSet(expected, actual),
+    reasonsMatch:
+      opts.live && c.aiFixture !== undefined
+        ? liveReasonsMatch(expected, actual)
+        : sameSet(expected, actual),
     usedAi: c.aiFixture !== undefined,
   };
 }
 
 export interface CitationStats {
   modelSignals: number;
+  /**
+   * Fixture mode: signals whose offsets verify exactly. Live mode: signals whose quote appears
+   * verbatim in the patient's text (a fabricated quote still fails; a wrong offset does not).
+   */
   modelSignalsVerified: number;
   tripwireSignals: number;
+  /** Live mode only: signals whose offsets also verify exactly (reported, not gated). */
+  modelSignalsOffsetExact?: number;
 }
 
 /** Coverage inputs; anything omitted fails the gate (fail closed). */
@@ -527,6 +558,16 @@ export interface Metrics {
   reasonCodeAccuracy: number;
   /** Valid / all MODEL-produced signals. null = nothing was checked, which fails the gate. */
   citationValidity: number | null;
+  /**
+   * Which gate produced `gate`. "relaxed-live" is NOT equivalent to the strict CI gate: it skips
+   * the silent-model demonstration, lets a model add LLM_RISK_SIGNAL, grounds citations on the
+   * quote text and tolerates extra minor judge omissions. The safety checks are identical.
+   */
+  gateProfile: "strict" | "relaxed-live";
+  /** What "valid" means: exact offsets (fixtures) or quote found verbatim in the text (live). */
+  citationBasis: "offsets" | "quote-grounded";
+  /** Live only: model signals with exact offsets, over all model signals. Reported, not gated. */
+  citationOffsetExact: number | null;
   /** CREOLA-style summary-judge metrics (fixture judgments unless liveJudgeRun). */
   summaryJudge: JudgeEvalMetrics | null;
   /**
@@ -619,6 +660,14 @@ export function computeMetrics(
       ? results.filter((r) => r.reasonsMatch).length / results.length
       : 0,
     citationValidity,
+    gateProfile: mode === "live" ? "relaxed-live" : "strict",
+    citationBasis: mode === "live" ? "quote-grounded" : "offsets",
+    citationOffsetExact:
+      mode === "live" &&
+      citations.modelSignals > 0 &&
+      citations.modelSignalsOffsetExact !== undefined
+        ? citations.modelSignalsOffsetExact / citations.modelSignals
+        : null,
     summaryJudge: extras.judge ?? null,
     knownLimitations: extras.knownLimitations ?? null,
     setFloorFailures: extras.setFloorFailures ?? null,

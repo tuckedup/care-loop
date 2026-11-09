@@ -141,7 +141,28 @@ export interface JudgeCaseRun {
   skipped: boolean;
 }
 
-function matchesLabel(c: JudgeCase, dropped: number, r: JudgeResult): boolean {
+/**
+ * Live judges may add MINOR omissions the hand label does not list. In live mode the line verdicts
+ * and the set of MAJOR omissions must still equal the label exactly, and every labelled omission
+ * source must be reported; fixture mode compares the full omission set.
+ */
+export function liveOmissionsMatch(
+  want: readonly { sourceId: string; severity: string }[],
+  got: readonly { sourceId: string; severity: string }[],
+): boolean {
+  const key = (o: { sourceId: string; severity: string }) => `${o.sourceId}|${o.severity}`;
+  const majors = (xs: readonly { sourceId: string; severity: string }[]) =>
+    xs
+      .filter((o) => o.severity === "major")
+      .map(key)
+      .sort();
+  const a = majors(want);
+  const b = majors(got);
+  if (a.length !== b.length || !a.every((k, i) => k === b[i])) return false;
+  return want.every((w) => got.some((g) => g.sourceId === w.sourceId));
+}
+
+function matchesLabel(c: JudgeCase, dropped: number, r: JudgeResult, live = false): boolean {
   const e = c.expected;
   if (dropped !== e.droppedUpstream) return false;
   if (e.status === "judge_failed") return r.status === "judge_failed" && r.reason === e.reason;
@@ -154,10 +175,17 @@ function matchesLabel(c: JudgeCase, dropped: number, r: JudgeResult): boolean {
   ) {
     return false;
   }
+  if (live) return liveOmissionsMatch(e.omissions, r.omissions);
   const key = (o: { sourceId: string; severity: string }) => `${o.sourceId}|${o.severity}`;
   const got = r.omissions.map(key).sort();
   const want = e.omissions.map(key).sort();
   return got.length === want.length && got.every((k, i) => k === want[i]);
+}
+
+/** The judge model: EVAL_JUDGE_MODEL (a second, stronger model) when set, else the main model. */
+export function liveJudgeModel(fallback: string | undefined): string | undefined {
+  const v = process.env.EVAL_JUDGE_MODEL?.trim();
+  return v ? v : fallback;
 }
 
 export async function runJudgeCase(
@@ -175,7 +203,7 @@ export async function runJudgeCase(
   let timeoutMs: number;
   if (live) {
     const cfg = loadAiConfig();
-    model = opts.liveModel ?? cfg.model;
+    model = opts.liveModel ?? liveJudgeModel(cfg.model);
     client =
       opts.liveClient !== undefined
         ? opts.liveClient
@@ -196,7 +224,10 @@ export async function runJudgeCase(
       return NEVER();
     });
   }
-  const result = await judgeSummary({ sources: c.sources, lines }, { client, model, timeoutMs });
+  const result = await judgeSummary(
+    { sources: c.sources, lines },
+    { client, model, timeoutMs, tolerateLeadingProse: live },
+  );
   const hall = { major: 0, minor: 0 };
   const omis = { major: 0, minor: 0 };
   if (result.status === "judged") {
@@ -215,7 +246,7 @@ export async function runJudgeCase(
       linesJudged: result.status === "judged" ? result.lines.length : 0,
       hallucination: hall,
       omission: omis,
-      matchesLabel: matchesLabel(c, dropped, result),
+      matchesLabel: matchesLabel(c, dropped, result, live),
     },
   };
 }
@@ -236,6 +267,7 @@ export async function runJudgeEval(
   const m: JudgeEvalMetrics = {
     labelSource: live ? "live-judge" : "fixture-judge-synthetic-handwritten",
     liveJudgeRun: live,
+    ...(live ? { judgeModel: opts.liveModel ?? liveJudgeModel(loadAiConfig().model) } : {}),
     promptVersion: JUDGE_PROMPT_VERSION,
     cases: runs.length,
     judged: 0,

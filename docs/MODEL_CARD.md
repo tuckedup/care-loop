@@ -71,12 +71,16 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 - The tripwire lexicons are small, English-only and not exhaustive; they will miss many phrasings
   and over-escalate on some innocent uses of the same words. Not clinically validated.
 - Offsets from a live model are often wrong, which makes real signals unverifiable (they still
-  escalate) and can fail the live citation gate.
-- A live model has run (2026-11-09, `claude-sonnet-5-5`, 131 synthetic cases, plus a 3-trial repeat):
-  no escalation was missed (91/91; 165/165 over repeated trials) and nothing was approved unsafely,
-  but the strict eval gate still fails on reason codes, citation validity (58/60) and the live judge;
-  see `LIVE_EVAL.md`. A first run also exposed an output limit that truncated long check-ins (fixed).
-  The published `latest.json` results are still from hand-written fixtures.
+  escalate). The live gate now checks that the quote appears verbatim in the text and reports exact
+  offsets separately; the strict CI gate still requires exact offsets.
+- Live models have run (2026-11-09, 131 synthetic cases; `claude-sonnet-5-5` under test, with
+  `claude-fable-5-1` as an eval-only judge, plus a 3-trial repeat for each of the two models): no
+  escalation was missed (91/91; 165/165 over repeated trials) and nothing was approved unsafely. The
+  live gate passes only under a RELAXED live profile that was defined after the first results (see
+  `LIVE_EVAL.md`); the first, strict run failed on reason codes, citations and the judge. It is not
+  equivalent to the strict CI gate and is not clinical validation. The published `latest.json`
+  results are still from hand-written fixtures. A second model is used only to judge in the eval,
+  never to approve a renewal.
 - The Langfuse request shape has not been verified against a live instance.
 - Eval set size: the SPEC target (60+ cases, 25+ risk cases, each risk category at least 3 cases with an
   adversarial one) is met; see the eval set section below. The cases are small, synthetic and hand-labelled,

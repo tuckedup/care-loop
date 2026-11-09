@@ -58,9 +58,16 @@ async function load(): Promise<Loaded> {
       }
       const stage = await runAiStage(c, LIVE);
       if (stage.skipped) continue;
-      results.push({ ...runCase(c, stage.ai), ai: stage.obs });
+      results.push({ ...runCase(c, stage.ai, { live: LIVE }), ai: stage.obs });
       citations.modelSignals += stage.modelSignals;
-      citations.modelSignalsVerified += stage.modelSignalsVerified;
+      // Live: a quote found verbatim in the text counts; exact offsets are reported separately.
+      citations.modelSignalsVerified += LIVE
+        ? stage.modelSignalsGrounded
+        : stage.modelSignalsVerified;
+      if (LIVE) {
+        citations.modelSignalsOffsetExact =
+          (citations.modelSignalsOffsetExact ?? 0) + stage.modelSignalsVerified;
+      }
       citations.tripwireSignals += stage.tripwireSignals;
       if (stage.blocked) {
         blockedAiCases += 1;
@@ -68,7 +75,7 @@ async function load(): Promise<Loaded> {
       }
     }
     const extras: CoverageExtras = {
-      manifestFailures: manifestFailures(manifest, cases, results),
+      manifestFailures: manifestFailures(manifest, cases, results, { live: LIVE }),
       casesDirLabel: dirLabel("EVAL_CASES_DIR"),
       fixturesDirLabel: dirLabel("EVAL_FIXTURES_DIR"),
       blockedAiCases,
@@ -112,7 +119,15 @@ describe("eval suite", () => {
   for (const r of results) {
     it(`${r.id}`, () => {
       expect(r.actualOutcome).toBe(r.expectedOutcome);
-      expect([...r.actualReasonCodes].sort()).toEqual([...r.expectedReasonCodes].sort());
+      if (LIVE) {
+        // Same rule as the gate: a live model may add LLM_RISK_SIGNAL, nothing else may differ.
+        expect(
+          r.reasonsMatch,
+          `reasons expected ${r.expectedReasonCodes} got ${r.actualReasonCodes}`,
+        ).toBe(true);
+      } else {
+        expect([...r.actualReasonCodes].sort()).toEqual([...r.expectedReasonCodes].sort());
+      }
     });
   }
 

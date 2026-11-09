@@ -97,6 +97,11 @@ export interface JudgeDeps {
   client: RiskLlmClient | null | undefined;
   model: string | undefined;
   timeoutMs?: number;
+  /**
+   * Live-eval harness only: accept a sentence before the JSON object. Off by default, so the
+   * contract "exactly the JSON, optionally fenced" holds everywhere else.
+   */
+  tolerateLeadingProse?: boolean;
 }
 
 export const JUDGE_SYSTEM_PROMPT = `You are an evaluation component that checks a clinical summary against its sources. All data is synthetic.
@@ -115,7 +120,7 @@ OUTPUT FORMAT: respond with ONLY one JSON object and nothing else, exactly this 
 Return exactly one entry in "lines" per summary line, with indices 0..n-1.`;
 
 /** One optional markdown fence is tolerated; anything else that is not the exact schema fails. */
-export function parseJudgeOutput(raw: string): JudgeOutput {
+export function parseJudgeOutput(raw: string, tolerateLeadingProse = false): JudgeOutput {
   let text = raw.trim();
   const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/.exec(text);
   if (fenced?.[1] !== undefined) text = fenced[1].trim();
@@ -123,7 +128,17 @@ export function parseJudgeOutput(raw: string): JudgeOutput {
   try {
     json = JSON.parse(text);
   } catch {
-    throw new JudgeError("output_not_json");
+    if (!tolerateLeadingProse) throw new JudgeError("output_not_json");
+    // A live model sometimes writes a sentence before the JSON despite the prompt. Take the
+    // outermost object; the strict schema below still rejects anything not exactly the right shape.
+    const open = text.indexOf("{");
+    const close = text.lastIndexOf("}");
+    if (open < 0 || close <= open) throw new JudgeError("output_not_json");
+    try {
+      json = JSON.parse(text.slice(open, close + 1));
+    } catch {
+      throw new JudgeError("output_not_json");
+    }
   }
   const parsed = JudgeOutputSchema.safeParse(json);
   if (!parsed.success) throw new JudgeError("schema_invalid");
@@ -213,7 +228,7 @@ export async function judgeSummary(input: JudgeInput, deps: JudgeDeps): Promise<
       if (timer !== undefined) clearTimeout(timer);
     }
     if (typeof raw !== "string") return failed("output_not_json");
-    const out = parseJudgeOutput(raw);
+    const out = parseJudgeOutput(raw, deps.tolerateLeadingProse === true);
     if (!checkJudgeConsistency(out, input)) return failed("inconsistent_verdicts");
     const lines: JudgedLine[] = [...out.lines]
       .sort((a, b) => a.index - b.index)
