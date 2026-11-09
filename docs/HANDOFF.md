@@ -244,3 +244,16 @@ run but without a further independent safety review of that last delta (recorded
 > passed the local v1.0 gate. The three former paraphrase misses are now gated cases; verify the
 > updated eval and safety tests before any future release. Do not deploy with real patient data or
 > treat fixture recall as clinical validation. The owner decides whether to tag `v1.0.0` after review.
+
+## Update: UI redesign and e2e modes
+
+- UI: shared design system in `src/app/_components/ui.tsx`, tokens in `src/app/globals.css`, self-hosted
+  Figtree via `@fontsource-variable/figtree`, 18px base. `pnpm dev` works without a `.env` (development
+  falls back to the docker database in `src/infra/db/client.ts`; production still requires `DATABASE_URL`).
+- e2e: dev-mode first-compile can race (`Unexpected end of JSON input`); set `E2E_PROD=true` to run
+  Playwright against `next build && next start` (`pnpm demo:screenshot` does). The autonomy-switch spec
+  skips there because autonomy is locked to SHADOW in production builds.
+- Clinician visit view: the summary `Suspense` is keyed per event position so it cannot hold the review
+  action transition open; the action's `revalidatePath` refreshes the page (no `router.refresh`).
+- Restore `tsconfig.json` with `git checkout tsconfig.json` after e2e runs (Next rewrites it), then
+  `pnpm exec prettier --write tsconfig.json` if `format:check` complains about line endings.
