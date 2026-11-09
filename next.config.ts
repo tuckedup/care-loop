@@ -48,6 +48,8 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Concurrent dev servers/e2e runs must not share a build cache: set NEXT_DIST_DIR (e.g. .next-ui).
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Container builds set NEXT_OUTPUT=standalone to trace a minimal server; local builds are unchanged.
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
   // /admin/evals reads evals/results/*.json at request time; trace them into the serverless bundle.

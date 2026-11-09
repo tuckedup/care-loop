@@ -1,0 +1,21 @@
+# Never send secrets, local state or build output to the Docker build context.
+.git
+.env
+.env.*
+!.env.example
+secrets/
+node_modules
+.next
+.next-*/
+.init/
+.claude/
+.rev-tmp*/
+test-results/
+playwright-report/
+coverage/
+evals/results/live-latest.json
+docs/assets/
+*.log
+*.png
+Dockerfile*
+docker-compose*.yml

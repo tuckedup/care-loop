@@ -20,8 +20,16 @@ const homeByRole = {
 } as const;
 
 export async function POST(request: Request) {
-  const url = new URL(request.url);
-  if (request.headers.get("origin") !== url.origin) {
+  // Same-origin check against the Host the browser actually used. request.url cannot be trusted for
+  // this: a container bound to 0.0.0.0 reports that as its host, which would reject every real
+  // browser. A cross-site form always carries a foreign Origin, so the check still blocks CSRF.
+  const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = request.headers.get("host");
+  const reqUrl = new URL(request.url);
+  const url = new URL(
+    `${proto === "https" ? "https" : reqUrl.protocol.replace(":", "")}://${host ?? reqUrl.host}`,
+  );
+  if (!host || request.headers.get("origin") !== url.origin) {
     return NextResponse.redirect(new URL("/login?error=invalid-origin", url), 303);
   }
   if (!demoAuthEnabled()) return NextResponse.redirect(new URL("/login?error=disabled", url), 303);

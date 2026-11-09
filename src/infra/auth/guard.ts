@@ -17,9 +17,11 @@ export class AuthError extends Error {
 }
 
 export async function getSession(): Promise<Session | null> {
+  // Read cookies FIRST so every guarded page is dynamic. If the flag check came first, a build made
+  // without DEMO_AUTH_ENABLED would prerender protected pages as static redirects to /login.
+  const store = await cookies();
   // Production default deny: with demo auth switched off no demo cookie is honoured.
   if (!demoAuthEnabled()) return null;
-  const store = await cookies();
   return verifySession(store.get(SESSION_COOKIE)?.value);
 }
 

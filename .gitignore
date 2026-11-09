@@ -39,3 +39,6 @@ pnpm-debug.log*
 evals/results/live-latest.json
 .next-*/
 .rev-tmp*/
+
+# local secret files for containers (never commit)
+secrets/

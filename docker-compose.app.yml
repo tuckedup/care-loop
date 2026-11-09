@@ -1,0 +1,58 @@
+# Containerised app, one-shot migrate/seed and the guarded live eval. Use together with the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.app.yml --profile app up --build
+# Secrets are mounted from ./secrets/* (git-ignored) at /run/secrets and never placed in the image
+# or in environment variables of the compose file. See docs/CONTAINERS.md.
+services:
+  migrate:
+    profiles: ["app", "tools"]
+    build: { context: ., target: tools }
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      DATABASE_URL: postgres://careloop:careloop@db:5432/careloop
+    command: ["pnpm", "db:migrate"]
+
+  seed:
+    profiles: ["tools"]
+    build: { context: ., target: tools }
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    environment:
+      DATABASE_URL: postgres://careloop:careloop@db:5432/careloop
+    command: ["pnpm", "db:seed"]
+
+  app:
+    profiles: ["app"]
+    build: { context: ., target: runner }
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATABASE_URL: postgres://careloop:careloop@db:5432/careloop
+      SESSION_SECRET_FILE: /run/secrets/session_secret
+      DEMO_AUTH_ENABLED: "true" # synthetic demo only: not real authentication
+      PHARMACY_BASE_URL: http://127.0.0.1:3000
+    secrets: [session_secret]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  eval-live:
+    profiles: ["live-eval"]
+    build: { context: ., target: tools }
+    environment:
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+    secrets: [anthropic_api_key]
+    volumes:
+      - ./evals/results:/app/evals/results
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    command: ["pnpm", "eval:live"]
+
+secrets:
+  session_secret:
+    file: ./secrets/session_secret
+  anthropic_api_key:
+    file: ./secrets/anthropic_api_key
