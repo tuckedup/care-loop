@@ -14,7 +14,7 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
 
 ## Model
 
-- Provider/model: set by env `ANTHROPIC_MODEL`. No live model has ever run in this repo, so there is no model to record for the published eval results (they come from hand-written fixtures). TODO: record the exact model and date when the first live run exists.
+- Provider/model: set by env `ANTHROPIC_MODEL`. The published eval results (`latest.json`) come from hand-written fixtures, so they name no model. The one live run (2026-11-09) used `claude-sonnet-5-5`; its results are in `LIVE_EVAL.md`.
 - Prompt versions: risk extraction `risk-signals-v1` (src/ai/prompt.ts), visit summary `visit-summary-v2`,
   summary judge `summary-judge-v1` (eval only). Output schemas are the strict Zod schemas in src/ai.
 
@@ -72,8 +72,9 @@ Controlled substances (never enter the AI path), diagnosis, dose changes, drug-i
   and over-escalate on some innocent uses of the same words. Not clinically validated.
 - Offsets from a live model are often wrong, which makes real signals unverifiable (they still
   escalate) and can fail the live citation gate.
-- A live model has never been run in this repo: `pnpm eval:live` and the Anthropic client are
-  untested against the real API, and all eval fixtures are hand-written.
+- A live model has run once (2026-11-09, `claude-sonnet-5-5`, 131 synthetic cases): no escalation was
+  missed (91/91), but the eval gate failed on other measures and three model calls failed closed;
+  see `LIVE_EVAL.md`. The published `latest.json` results are still from hand-written fixtures.
 - The Langfuse request shape has not been verified against a live instance.
 - Eval set size: the SPEC target (60+ cases, 25+ risk cases, each risk category at least 3 cases with an
   adversarial one) is met; see the eval set section below. The cases are small, synthetic and hand-labelled,

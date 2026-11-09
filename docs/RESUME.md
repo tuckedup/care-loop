@@ -65,5 +65,6 @@ Fuselab,
 
 ## Honest gaps
 
-No clinical validation, no live-model evaluation, no real EPCS or pharmacy integration, and the
+No clinical validation, one live-model run only (`claude-sonnet-5-5`, 131 synthetic cases: 91/91
+escalations and 0 unsafe approvals, but the live eval gate failed; see LIVE_EVAL.md), no real EPCS or pharmacy integration, and the
 production deployment checklist in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) is open.

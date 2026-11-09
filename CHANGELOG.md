@@ -8,7 +8,8 @@ release schedule in docs/SPEC.md. All data is synthetic.
 - UI redesign (design tokens, self-hosted Figtree at 18px, role navigation); `pnpm dev` now works without
   a `.env`; the clinician review panel no longer sticks pending in production builds.
 - Eval gate: a manifest requirement's outcome is now pinned to its kind in code (F071 review finding);
-  added `evals/wilson.ts` for recall intervals, `docs/LIVE_EVAL.md` (live run never executed),
+  added `evals/wilson.ts` for recall intervals, `docs/LIVE_EVAL.md` (first live run on 2026-11-09 with
+  `claude-sonnet-5-5`: 91/91 escalations, 0 unsafe approvals, but the live gate FAILED; details there),
   `docs/CLINICAL_REVIEW.md` (every rule UNSIGNED) and `docs/SAFETY_REVIEW.md` (F071-F073).
 - Promoted three formerly missed paraphrases into the pinned eval set, preserving their ESCALATE
   labels. Fixture recall is 116/116 on synthetic cases; this is not real-world performance.
